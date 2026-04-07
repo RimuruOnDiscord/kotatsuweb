@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/manga-scrapers/:path*",
+      "destination": "https://manga-scrapers.onrender.com/:path*"
+    }
+  ]
+}
