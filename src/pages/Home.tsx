@@ -4,6 +4,8 @@ import {
   X, Star, Flame, BookOpen, ShieldCheck, Play
 } from 'lucide-react';
 import AppTopbar from '../components/AppTopbar';
+import { containsNovelToken, isAllowedSeriesType } from '../utils/contentFilters';
+import { handleRippleMouseDown } from '../utils/ripple';
 
 // --- Interfaces ---
 interface Manga {
@@ -56,9 +58,24 @@ const normalizeContinueReading = (raw: string | null): ContinueReadingData[] => 
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is ContinueReadingData => Boolean(item?.mangaId && item?.href));
+      return parsed.filter((item): item is ContinueReadingData =>
+        Boolean(item?.mangaId && item?.href) &&
+        !containsNovelToken(item.mangaId) &&
+        !containsNovelToken(item.chapterId) &&
+        !containsNovelToken(item.mangaTitle) &&
+        !containsNovelToken(item.chapterTitle) &&
+        !containsNovelToken(item.href)
+      );
     }
-    if (parsed?.mangaId && parsed?.href) {
+    if (
+      parsed?.mangaId &&
+      parsed?.href &&
+      !containsNovelToken(parsed.mangaId) &&
+      !containsNovelToken(parsed.chapterId) &&
+      !containsNovelToken(parsed.mangaTitle) &&
+      !containsNovelToken(parsed.chapterTitle) &&
+      !containsNovelToken(parsed.href)
+    ) {
       return [parsed as ContinueReadingData];
     }
   } catch {
@@ -221,7 +238,8 @@ const ContinueReadingCard: React.FC<{
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => navigate(data.href)}
-                className="group/button relative flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-400 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#04110d] transition-all active:scale-[0.98] hover:bg-emerald-300"
+                onMouseDown={handleRippleMouseDown}
+                className="ripple-button group/button relative flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-emerald-400 px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#04110d] transition-all active:scale-[0.98] hover:bg-emerald-300"
               >
                 <div className="absolute inset-0 bg-white/30 translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-500 skew-x-[-20deg]" />
                 <Play size={13} fill="currentColor" className="relative z-10" />
@@ -229,7 +247,8 @@ const ContinueReadingCard: React.FC<{
               </button>
               <button
                 onClick={() => onClear(data.mangaId)}
-                className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                onMouseDown={handleRippleMouseDown}
+                className="ripple-button rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.22em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white active:scale-[0.98]"
               >
                 Clear
               </button>
@@ -277,7 +296,13 @@ const Homer: React.FC = () => {
     const syncContinueReading = () => {
       try {
         const raw = window.localStorage.getItem(CONTINUE_READING_KEY);
-        setContinueReading(normalizeContinueReading(raw));
+        const nextEntries = normalizeContinueReading(raw);
+        setContinueReading(nextEntries);
+        if (nextEntries.length > 0) {
+          window.localStorage.setItem(CONTINUE_READING_KEY, JSON.stringify(nextEntries));
+        } else {
+          window.localStorage.removeItem(CONTINUE_READING_KEY);
+        }
       } catch {
         setContinueReading([]);
       }
@@ -319,7 +344,7 @@ const Homer: React.FC = () => {
     fetchTop();
   }, []);
 
-  const filteredTopManga = topManga.filter((manga) => matchesFormatFilter(manga.type, formatFilter));
+  const filteredTopManga = topManga.filter((manga) => isAllowedSeriesType(manga.type) && matchesFormatFilter(manga.type, formatFilter));
   const heroManga = filteredTopManga[0];
   const heroYear = heroManga?.published?.from ? new Date(heroManga.published.from).getFullYear() : null;
   const heroAuthor = heroManga?.authors?.[0]?.name;
@@ -384,7 +409,8 @@ const Homer: React.FC = () => {
                     <div className="mt-7 flex flex-wrap gap-3">
                       <button
                         onClick={() => navigate(`/read/${heroManga.mal_id}`)}
-                        className="group relative inline-flex items-center gap-2 overflow-hidden rounded-2xl bg-emerald-400 px-6 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-[#04110d] transition-all hover:bg-emerald-300 active:scale-[0.98]"
+                        onMouseDown={handleRippleMouseDown}
+                        className="ripple-button group relative inline-flex items-center gap-2 overflow-hidden rounded-2xl bg-emerald-400 px-6 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-[#04110d] transition-all hover:bg-emerald-300 active:scale-[0.98]"
                       >
                         <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
                         <BookOpen size={16} fill="currentColor" className="relative z-10" />
@@ -392,7 +418,8 @@ const Homer: React.FC = () => {
                       </button>
                       <button
                         onClick={() => navigate('/browse')}
-                        className="inline-flex items-center rounded-2xl bg-white/[0.03] px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-white/85 transition-colors hover:bg-white/[0.06]"
+                        onMouseDown={handleRippleMouseDown}
+                        className="ripple-button inline-flex items-center rounded-2xl bg-white/[0.03] px-5 py-3.5 text-sm font-black uppercase tracking-[0.18em] text-white/85 transition-colors hover:bg-white/[0.06] active:scale-[0.98]"
                       >
                         Browse Library
                       </button>
