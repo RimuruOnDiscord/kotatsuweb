@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Star, X, ShieldCheck, Globe } from 'lucide-react';
 import AppTopbar from '../components/AppTopbar';
+import { isAllowedSeriesType } from '../utils/contentFilters';
+import { handleRippleMouseDown } from '../utils/ripple';
 
 interface Manga {
   mal_id: number;
@@ -176,8 +178,9 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity', title = 'Ex
       const items = Array.isArray(data.data) ? data.data : [];
 
       const filteredData = hasCommittedQuery
-        ? items.filter((m: any) => matchesFormatFilter(m.type, formatFilter))
+        ? items.filter((m: any) => isAllowedSeriesType(m.type) && matchesFormatFilter(m.type, formatFilter))
         : items.filter((m: any) =>
+            isAllowedSeriesType(m.type) &&
             !(m.genres ?? []).some((g: any) => FORBIDDEN_GENRE_IDS.includes(g.mal_id)) &&
             matchesFormatFilter(m.type, formatFilter)
           );
@@ -279,10 +282,11 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity', title = 'Ex
                   key={filter}
                   type="button"
                   onClick={() => setBrowseFormatFilter(filter)}
+                  onMouseDown={handleRippleMouseDown}
                   className={`rounded-2xl border px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] transition-all ${
                     isActive
-                      ? 'border-emerald-400/30 bg-emerald-400 text-[#04110d] shadow-[0_16px_32px_-20px_rgba(52,211,153,0.9)]'
-                      : 'border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white'
+                      ? 'ripple-button border-emerald-400/30 bg-emerald-400 text-[#04110d] shadow-[0_16px_32px_-20px_rgba(52,211,153,0.9)]'
+                      : 'ripple-button border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white'
                   }`}
                 >
                   {filter}
