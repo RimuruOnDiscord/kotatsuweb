@@ -13,6 +13,8 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { isAllowedSeriesType } from '../utils/contentFilters';
+import { handleRippleMouseDown } from '../utils/ripple';
 
 interface SearchResult {
   mal_id: number;
@@ -96,7 +98,11 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
         const response = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(trimmedQuery)}&limit=6`);
         const data = await response.json();
         if (!active) return;
-        setSearchResults(Array.isArray(data.data) ? data.data : []);
+        setSearchResults(
+          Array.isArray(data.data)
+            ? data.data.filter((entry: SearchResult) => isAllowedSeriesType(entry.type))
+            : []
+        );
         setShowSearch(true);
       } catch {
         if (!active) return;
@@ -156,7 +162,7 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
     <header className="sticky top-0 z-[100] w-full border-b border-white/5 bg-[#111214] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.9)]">
       <div className="mx-auto flex w-full max-w-[1420px] items-center justify-between gap-6 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <button onClick={() => navigate('/')} className="hidden px-1 py-1 transition-opacity hover:opacity-90 md:flex">
+          <button onClick={() => navigate('/')} onMouseDown={handleRippleMouseDown} className="ripple-button hidden px-1 py-1 transition-opacity hover:opacity-90 md:flex">
             <BrandLogo />
           </button>
 
@@ -208,7 +214,7 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
                     <div className="h-3 w-1 rounded-full bg-emerald-500 animate-[bounce_1s_infinite_400ms]" />
                   </div>
                 ) : searchQuery ? (
-                  <button type="button" onClick={clearSearch} className="rounded-full p-1 transition-transform duration-300 hover:rotate-90">
+                  <button type="button" onClick={clearSearch} onMouseDown={handleRippleMouseDown} className="ripple-button rounded-full p-1 transition-transform duration-300 hover:rotate-90">
                     <X size={14} className="text-zinc-500 hover:text-emerald-400" />
                   </button>
                 ) : null}
@@ -243,7 +249,8 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
                         key={manga.mal_id}
                         type="button"
                         onClick={() => openManga(manga.mal_id)}
-                        className="group/item relative flex w-full items-center gap-4 rounded-[1.4rem] border border-white/[0.04] bg-[#111214]/90 p-3 text-left transition-all duration-300 hover:border-emerald-400/10 hover:bg-[#15171a]"
+                        onMouseDown={handleRippleMouseDown}
+                        className="ripple-button group/item relative flex w-full items-center gap-4 rounded-[1.4rem] border border-white/[0.04] bg-[#111214]/90 p-3 text-left transition-all duration-300 hover:border-emerald-400/10 hover:bg-[#15171a]"
                       >
                         <div className="relative h-16 w-12 flex-shrink-0 overflow-hidden rounded-[1rem] bg-[#16181b]">
                           <img src={manga.images.jpg.image_url} className="h-full w-full object-cover transition-transform duration-500 group-hover/item:scale-105" alt={manga.title} />
@@ -279,7 +286,8 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
                 <button
                   type="button"
                   onClick={() => submitSearch(searchQuery)}
-                  className="group w-full border-t border-white/[0.05] bg-[#0f1512] py-4 transition-colors hover:bg-[#132019]"
+                  onMouseDown={handleRippleMouseDown}
+                  className="ripple-button group w-full border-t border-white/[0.05] bg-[#0f1512] py-4 transition-colors hover:bg-[#132019]"
                 >
                   <span className="text-[9px] font-black uppercase tracking-[0.32em] text-emerald-400 transition-all group-hover:tracking-[0.38em]">
                     Open Browse Results
