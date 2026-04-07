@@ -112,6 +112,7 @@ const Page: React.FC = () => {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
+  const autoAdvanceTriggeredRef = useRef(false);
 
   const [apiChapters, setApiChapters] = useState<ReaderChapter[]>([]);
   const [pages, setPages] = useState<string[]>([]);
@@ -153,6 +154,7 @@ const Page: React.FC = () => {
     const fetchReaderData = async () => {
       if (!decodedMangaId || !decodedChapterId) return;
       setLoading(true);
+      autoAdvanceTriggeredRef.current = false;
       try {
         const res = await fetch(`${scraperBase}/pages/${encodeURIComponent(decodedChapterId)}`);
         const data = await res.json();
@@ -241,6 +243,21 @@ const Page: React.FC = () => {
 
     let ticking = false;
 
+    const maybeAutoAdvance = () => {
+      const remainingScroll = container.scrollHeight - container.scrollTop - container.clientHeight;
+      const atBottom = remainingScroll <= 32;
+
+      if (!atBottom) {
+        autoAdvanceTriggeredRef.current = false;
+        return;
+      }
+
+      if (!nextChapter || autoAdvanceTriggeredRef.current) return;
+
+      autoAdvanceTriggeredRef.current = true;
+      window.setTimeout(() => goToChapter(nextChapter), 120);
+    };
+
     const updateVisiblePage = () => {
       ticking = false;
       const anchor = container.getBoundingClientRect().top + container.clientHeight * 0.25;
@@ -262,7 +279,10 @@ const Page: React.FC = () => {
     const onScroll = () => {
       if (ticking) return;
       ticking = true;
-      requestAnimationFrame(updateVisiblePage);
+      requestAnimationFrame(() => {
+        updateVisiblePage();
+        maybeAutoAdvance();
+      });
     };
 
     updateVisiblePage();
@@ -273,7 +293,7 @@ const Page: React.FC = () => {
       container.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [pages.length, readingMode]);
+  }, [nextChapter, pages.length, readingMode]);
 
   useEffect(() => {
     if (readingMode !== 'long-strip') return;
