@@ -14,6 +14,8 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
+import { containsNovelToken } from '../utils/contentFilters';
+import { handleRippleMouseDown } from '../utils/ripple';
 
 const Logo: React.FC = () => (
   <div className="flex items-center">
@@ -51,9 +53,24 @@ const normalizeContinueReading = (raw: string | null): ContinueReadingData[] => 
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is ContinueReadingData => Boolean(item?.mangaId && item?.href));
+      return parsed.filter((item): item is ContinueReadingData =>
+        Boolean(item?.mangaId && item?.href) &&
+        !containsNovelToken(item.mangaId) &&
+        !containsNovelToken(item.chapterId) &&
+        !containsNovelToken(item.mangaTitle) &&
+        !containsNovelToken(item.chapterTitle) &&
+        !containsNovelToken(item.href)
+      );
     }
-    if (parsed?.mangaId && parsed?.href) {
+    if (
+      parsed?.mangaId &&
+      parsed?.href &&
+      !containsNovelToken(parsed.mangaId) &&
+      !containsNovelToken(parsed.chapterId) &&
+      !containsNovelToken(parsed.mangaTitle) &&
+      !containsNovelToken(parsed.chapterTitle) &&
+      !containsNovelToken(parsed.href)
+    ) {
       return [parsed as ContinueReadingData];
     }
   } catch {
@@ -85,7 +102,7 @@ const KeyHint: React.FC<{ keys: string; action: string }> = ({ keys, action }) =
 );
 
 const SidebarOption: React.FC<ReaderOptionProps> = ({ icon: Icon, label, active, onClick }) => (
-  <button onClick={onClick} className={`w-full flex items-center justify-between px-5 py-4 bg-white/[0.02] rounded-2xl border transition-all duration-300 ${active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-white/5 text-gray-500 hover:text-white hover:bg-white/5'}`}>
+  <button onClick={onClick} onMouseDown={handleRippleMouseDown} className={`ripple-button w-full flex items-center justify-between px-5 py-4 bg-white/[0.02] rounded-2xl border transition-all duration-300 ${active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'border-white/5 text-gray-500 hover:text-white hover:bg-white/5'}`}>
     <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
     <Icon size={16} className={active ? 'text-emerald-500' : 'text-gray-600'} />
   </button>
@@ -128,6 +145,12 @@ const Page: React.FC = () => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   useEffect(() => {
+    if (containsNovelToken(decodedMangaId) || containsNovelToken(decodedChapterId)) {
+      navigate('/', { replace: true });
+    }
+  }, [decodedChapterId, decodedMangaId, navigate]);
+
+  useEffect(() => {
     const id = 'reader-core-styles';
     if (document.getElementById(id)) return;
     const s = document.createElement('style');
@@ -148,6 +171,26 @@ const Page: React.FC = () => {
       input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 999px; border: 2px solid rgba(4,8,6,1); background: #34D399; box-shadow: 0 0 0 6px rgba(16,185,129,.15); cursor: pointer; }
     `;
     document.head.appendChild(s);
+  }, []);
+
+  useEffect(() => {
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyHeight = body.style.height;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const previousHtmlHeight = documentElement.style.height;
+
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+    documentElement.style.overflow = 'hidden';
+    documentElement.style.height = '100%';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.height = previousBodyHeight;
+      documentElement.style.overflow = previousHtmlOverflow;
+      documentElement.style.height = previousHtmlHeight;
+    };
   }, []);
 
   useEffect(() => {
@@ -401,19 +444,19 @@ const Page: React.FC = () => {
         <header className={`border-b border-white/5 bg-[#050505]/88 shadow-2xl backdrop-blur-xl transition-all duration-300 ${focusMode ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}>
           <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
             <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-              <button onClick={() => navigate(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-400 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400">
+              <button onClick={() => navigate(-1)} onMouseDown={handleRippleMouseDown} className="ripple-button flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-400 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400">
                 <ChevronLeft size={22} />
               </button>
-          <button onClick={() => navigate('/')} className="hidden px-1 py-1 transition-opacity hover:opacity-90 md:flex">
+          <button onClick={() => navigate('/')} onMouseDown={handleRippleMouseDown} className="ripple-button hidden px-1 py-1 transition-opacity hover:opacity-90 md:flex">
             <Logo />
           </button>
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => setFocusMode((current) => !current)} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400">
+              <button onClick={() => setFocusMode((current) => !current)} onMouseDown={handleRippleMouseDown} className="ripple-button flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400">
                 {focusMode ? <Eye size={18} /> : <EyeOff size={18} />}
               </button>
-              <button onClick={() => setSidebarOpen((current) => !current)} className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${sidebarOpen ? 'border-emerald-500 bg-emerald-500 text-black' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:scale-105'}`}>
+              <button onClick={() => setSidebarOpen((current) => !current)} onMouseDown={handleRippleMouseDown} className={`ripple-button flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${sidebarOpen ? 'border-emerald-500 bg-emerald-500 text-black' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400 hover:scale-105'}`}>
                 <Layout size={18} />
               </button>
             </div>
@@ -467,7 +510,7 @@ const Page: React.FC = () => {
                 </div>
 
                 <div className="flex min-h-0 flex-1 items-center gap-3">
-                  <button onClick={handlePrevAction} disabled={!prevChapter && safePageIndex === 0} className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20 md:flex">
+                  <button onClick={handlePrevAction} onMouseDown={handleRippleMouseDown} disabled={!prevChapter && safePageIndex === 0} className="ripple-button hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20 md:flex">
                     <ChevronLeft size={24} />
                   </button>
                   <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-[32px] border border-white/10 bg-[#020303] shadow-[0_60px_120px_rgba(0,0,0,0.55)]">
@@ -477,7 +520,7 @@ const Page: React.FC = () => {
                     {activePageUrl ? <img src={activePageUrl} className={`relative z-10 max-h-full max-w-full object-contain ${fitWidth ? 'h-auto w-full' : 'h-full w-auto'}`} alt={`Page ${safePageIndex + 1}`} /> : null}
                     <button onClick={handleNextAction} disabled={!nextChapter && safePageIndex >= pages.length - 1} className="absolute inset-y-0 right-0 z-20 w-1/5 min-w-[64px] bg-gradient-to-l from-black/35 to-transparent transition-opacity hover:opacity-100 disabled:opacity-0" aria-label="Next page" />
                   </div>
-                  <button onClick={handleNextAction} disabled={!nextChapter && safePageIndex >= pages.length - 1} className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20 md:flex">
+                  <button onClick={handleNextAction} onMouseDown={handleRippleMouseDown} disabled={!nextChapter && safePageIndex >= pages.length - 1} className="ripple-button hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20 md:flex">
                     <ChevronRight size={24} />
                   </button>
                 </div>
@@ -504,7 +547,7 @@ const Page: React.FC = () => {
               <div className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-500">Reader Console</div>
               <div className="mt-1 text-sm font-black uppercase tracking-wide text-white">Control Surface</div>
             </div>
-            <button onClick={() => setSidebarOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-400 transition-colors hover:text-white">
+            <button onClick={() => setSidebarOpen(false)} onMouseDown={handleRippleMouseDown} className="ripple-button flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-400 transition-colors hover:text-white">
               <X size={18} />
             </button>
           </div>
@@ -543,7 +586,7 @@ const Page: React.FC = () => {
                   <div className="text-[9px] font-black uppercase tracking-[0.26em] text-gray-500">Chapter Browser</div>
                   <div className="mt-1 text-sm font-black uppercase tracking-wide text-white">Fast Navigation</div>
                 </div>
-                <button onClick={() => setChapterBrowserOpen((current) => !current)} className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-gray-400 transition-transform hover:text-white">
+                <button onClick={() => setChapterBrowserOpen((current) => !current)} onMouseDown={handleRippleMouseDown} className="ripple-button flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-gray-400 transition-transform hover:text-white">
                   <ChevronDown size={18} className={`transition-transform duration-300 ${chapterBrowserOpen ? 'rotate-180' : ''}`} />
                 </button>
               </div>
@@ -556,7 +599,7 @@ const Page: React.FC = () => {
                   </div>
                   <div className="mt-3 max-h-72 overflow-y-auto thin-scroll pr-1">
                     {filteredChapters.map((ch) => (
-                      <button key={ch.id} onClick={() => goToChapter(ch)} className={`mb-1.5 flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.16em] transition-all ${decodedChapterId === ch.id ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border border-transparent bg-white/[0.02] text-gray-400 hover:border-white/5 hover:bg-white/[0.05] hover:text-white'}`}>
+                      <button key={ch.id} onClick={() => goToChapter(ch)} onMouseDown={handleRippleMouseDown} className={`ripple-button mb-1.5 flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-[10px] font-black uppercase tracking-[0.16em] transition-all ${decodedChapterId === ch.id ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border border-transparent bg-white/[0.02] text-gray-400 hover:border-white/5 hover:bg-white/[0.05] hover:text-white'}`}>
                         <span className="truncate pr-3">{ch.title}</span>
                         {decodedChapterId === ch.id && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />}
                       </button>
@@ -590,11 +633,11 @@ const Page: React.FC = () => {
             </section>
 
             <section className="grid grid-cols-2 gap-3">
-              <button disabled={!prevChapter} onClick={() => goToChapter(prevChapter)} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20">
+              <button disabled={!prevChapter} onClick={() => goToChapter(prevChapter)} onMouseDown={handleRippleMouseDown} className="ripple-button flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20">
                 <ChevronLeft size={16} />
                 Prev Ch
               </button>
-              <button disabled={!nextChapter} onClick={() => goToChapter(nextChapter)} className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20">
+              <button disabled={!nextChapter} onClick={() => goToChapter(nextChapter)} onMouseDown={handleRippleMouseDown} className="ripple-button flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-[10px] font-black uppercase tracking-[0.18em] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-400 disabled:opacity-20">
                 Next Ch
                 <ChevronRight size={16} />
               </button>
