@@ -6,6 +6,7 @@ import {
   Dices,
   FilterX,
   Folder,
+  Github,
   Home,
   Layers,
   Search,
@@ -175,7 +176,7 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
 
         <div className="flex shrink-0 items-center gap-3">
           <div className="group relative hidden sm:block">
-            <div className="absolute -inset-1 rounded-full bg-[radial-gradient(circle_at_left,rgba(16,185,129,0.14),transparent_60%)] opacity-0 blur-xl transition-opacity duration-500 group-focus-within:opacity-100" />
+            <div className="absolute -inset-1 rounded-full bg-[radial-gradient( opacity-0 blur-xl transition-opacity duration-500 group-focus-within:opacity-100" />
 
             <div className="relative flex items-center overflow-hidden rounded-full border border-white/[0.06] bg-[#0d0f11]/98 shadow-[0_20px_55px_-34px_rgba(0,0,0,0.95)]">
               <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -296,6 +297,16 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
               </div>
             )}
           </div>
+
+          <a
+            href="https://github.com/RimuruOnDiscord/kotatsuweb"
+            target="_blank"
+            rel="noreferrer"
+            onMouseDown={handleRippleMouseDown}
+            className="ripple-button hidden h-12 items-center gap-2 rounded-full border border-white/[0.06] bg-[#0d0f11]/98 px-4 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 transition-colors hover:text-white md:inline-flex"
+          >
+            <Github size={15} />
+          </a>
         </div>
       </div>
     </header>
