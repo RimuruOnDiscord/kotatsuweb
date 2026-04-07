@@ -15,17 +15,13 @@ import {
   EyeOff,
 } from 'lucide-react';
 
-const Logo: React.FC<{ className?: string }> = ({ className = 'w-10 h-10' }) => (
-  <div className={`relative ${className} group flex items-center justify-center`}>
-    <svg viewBox="0 0 1406.2 1406.2" xmlns="http://www.w3.org/2000/svg" className="w-full h-full drop-shadow-[0_0_12px_rgba(16,185,129,0.4)] transition-all duration-500 group-hover:scale-110">
-      <defs>
-        <linearGradient id="mangaVelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#34D399" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-      </defs>
-      <path fill="url(#mangaVelGradient)" d="M391.7,270.7c-51.6,18.6-96.2,88.4-117.9,183.6c-7.8,34.8-15.1,93.5-15.1,121.7v19.7l-23.3,36.6 c-65,101.3-124.6,206.8-180.5,319.2C5.1,1051,0,1063.2,0,1080.9c0,7.8,2,18,4,22.2c6.6,12,22.2,24.4,39.7,31l16,6.2l651.1-0.2 c633.1,0,651.1-0.4,661.2-5.3c32.6-16.9,43-51.7,26.2-88c-63.8-139-150.5-296.8-229.6-418.5l-19.1-29.5l-2.2-33.7 c-8.7-129.4-36.1-208.6-92-266.5c-24.2-24.8-33.5-30.4-50.6-30.6c-23.9,0-39.9,10.9-75.6,52.1c-35.2,40.4-42.4,50.1-66.9,86.4 c-12,17.7-27,38.3-33.2,45.5l-11.3,13.5h-117l-117-0.2L560.2,429C515,359.2,440.7,274.5,419.6,268.7 C406.8,264.9,409,264.5,391.7,270.7z M466.2,666.4c8.9,6.2,11.3,11.8,14.4,37.7c4,30.6,7.7,34.8,27.5,32.4 c18-2.2,32.6,3.6,40.8,16.6c16,25.9-11.5,80.2-50.6,99.3c-14,7.1-19.1,7.8-42.8,7.8c-22.8,0-28.8-1.1-39.4-6.7 c-31.2-16.4-50.3-40.3-58.3-71.8c-4-16.6-4.2-21.7-1.1-36.3c4.2-21.1,11.5-35.2,24.8-50.1C404.8,669.5,449.1,654.4,466.2,666.4z M964,669c8.7,7.3,9.3,9.7,13.5,43.4c2.6,20.6,8.7,26.8,25.3,24.2c16-2.2,29.9,2.2,39.2,12.9c15.1,18.2,6.2,53.4-20.8,82.2 c-21.7,23.1-35.2,28.4-69.2,28.8c-25.9,0-29.1-0.5-42.8-8.2c-20.2-11.3-38.4-29.9-47.7-49c-6.2-12.8-8.2-20.8-8.9-39.2 c-0.9-21.1,0-25,7.7-41c14-30.4,35.5-49.2,65-57C945.2,660.2,954.7,661.1,964,669z" />
-    </svg>
+const Logo: React.FC = () => (
+  <div className="flex items-center">
+    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400/[0.08] text-emerald-300">
+      <svg viewBox="0 0 1406.2 1406.2" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 fill-current">
+        <path d="M391.7,270.7c-51.6,18.6-96.2,88.4-117.9,183.6c-7.8,34.8-15.1,93.5-15.1,121.7v19.7l-23.3,36.6 c-65,101.3-124.6,206.8-180.5,319.2C5.1,1051,0,1063.2,0,1080.9c0,7.8,2,18,4,22.2c6.6,12,22.2,24.4,39.7,31l16,6.2l651.1-0.2 c633.1,0,651.1-0.4,661.2-5.3c32.6-16.9,43-51.7,26.2-88c-63.8-139-150.5-296.8-229.6-418.5l-19.1-29.5l-2.2-33.7 c-8.7-129.4-36.1-208.6-92-266.5c-24.2-24.8-33.5-30.4-50.6-30.6c-23.9,0-39.9,10.9-75.6,52.1c-35.2,40.4-42.4,50.1-66.9,86.4 c-12,17.7-27,38.3-33.2,45.5l-11.3,13.5h-117l-117-0.2L560.2,429C515,359.2,440.7,274.5,419.6,268.7 C406.8,264.9,409,264.5,391.7,270.7z M466.2,666.4c8.9,6.2,11.3,11.8,14.4,37.7c4,30.6,7.7,34.8,27.5,32.4 c18-2.2,32.6,3.6,40.8,16.6c16,25.9-11.5,80.2-50.6,99.3c-14,7.1-19.1,7.8-42.8,7.8c-22.8,0-28.8-1.1-39.4-6.7 c-31.2-16.4-50.3-40.3-58.3-71.8c-4-16.6-4.2-21.7-1.1-36.3c4.2-21.1,11.5-35.2,24.8-50.1C404.8,669.5,449.1,654.4,466.2,666.4z M964,669c8.7,7.3,9.3,9.7,13.5,43.4c2.6,20.6,8.7,26.8,25.3,24.2c16-2.2,29.9,2.2,39.2,12.9c15.1,18.2,6.2,53.4-20.8,82.2 c-21.7,23.1-35.2,28.4-69.2,28.8c-25.9,0-29.1-0.5-42.8-8.2c-20.2-11.3-38.4-29.9-47.7-49c-6.2-12.8-8.2-20.8-8.9-39.2 c-0.9-21.1,0-25,7.7-41c14-30.4,35.5-49.2,65-57C945.2,660.2,954.7,661.1,964,669z" />
+      </svg>
+    </div>
   </div>
 );
 
@@ -144,10 +140,10 @@ const Page: React.FC = () => {
       .thin-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
       .thin-scroll::-webkit-scrollbar-thumb { background: rgba(16,185,129,.75); border-radius: 999px; }
       img { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-      input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 999px; background: #1b1d22; outline: none; }
+      input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 16px; margin: 0; padding: 0; border-radius: 999px; background-color: transparent; outline: none; }
       input[type="range"]::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: transparent; }
       input[type="range"]::-moz-range-track { height: 8px; border-radius: 999px; background: transparent; }
-      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 999px; border: 2px solid rgba(4,8,6,1); background: #34D399; box-shadow: 0 0 0 6px rgba(16,185,129,.15); cursor: pointer; }
+      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -4px; width: 16px; height: 16px; border-radius: 999px; border: 2px solid rgba(4,8,6,1); background: #34D399; box-shadow: 0 0 0 6px rgba(16,185,129,.15); cursor: pointer; }
       input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 999px; border: 2px solid rgba(4,8,6,1); background: #34D399; box-shadow: 0 0 0 6px rgba(16,185,129,.15); cursor: pointer; }
     `;
     document.head.appendChild(s);
@@ -388,17 +384,9 @@ const Page: React.FC = () => {
               <button onClick={() => navigate(-1)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-400 transition-all hover:border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-400">
                 <ChevronLeft size={22} />
               </button>
-              <div onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-2 cursor-pointer">
-                <Logo className="w-8 h-8" />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 leading-none">
-                    <span className="text-lg font-[900] tracking-tighter">MANGA</span>
-                    <span className="text-lg font-[900] tracking-tighter text-emerald-500">VEL</span>
-                    <span className="rounded-sm bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-black italic text-emerald-400">v2</span>
-                  </div>
-                  <span className="hidden text-[9px] font-bold uppercase tracking-[0.22em] text-gray-500 sm:block">Fast / Free / Online</span>
-                </div>
-              </div>
+          <button onClick={() => navigate('/')} className="hidden px-1 py-1 transition-opacity hover:opacity-90 md:flex">
+            <Logo />
+          </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -479,36 +467,7 @@ const Page: React.FC = () => {
 
           {!focusMode && !loading && pages.length > 0 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-5 z-40 flex justify-center px-3">
-              <div className="pointer-events-auto relative flex w-full max-w-[840px] items-center gap-3 overflow-hidden rounded-[30px] border border-white/15 bg-[rgba(7,9,12,0.72)] px-4 py-3 shadow-[0_40px_100px_rgba(0,0,0,0.72)] backdrop-blur-2xl">
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]" />
-                <div className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-white/10" />
-                <button onClick={handlePrevAction} disabled={!prevChapter && safePageIndex === 0} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#141518] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-[#181a1e] hover:text-emerald-400 disabled:opacity-20">
-                  <ChevronLeft size={20} />
-                </button>
-                <div className="relative min-w-0 flex-1">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.28em] text-gray-300/90">
-                      {readingMode === 'single-page' ? 'Page Seek' : 'Scroll Seek'}
-                    </span>
-                    <span className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-400">
-                      {pagePosition}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(pages.length - 1, 0)}
-                    value={safePageIndex}
-                    onChange={(event) => seekToPage(Number(event.target.value))}
-                    style={{
-                      background: `linear-gradient(to right, #34d399 0%, #34d399 ${progressPercent}%, #1b1d22 ${progressPercent}%, #1b1d22 100%)`,
-                    }}
-                  />
-                </div>
-                <button onClick={handleNextAction} disabled={!nextChapter && safePageIndex >= pages.length - 1} className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-[#141518] text-gray-300 transition-all hover:border-emerald-500/30 hover:bg-[#181a1e] hover:text-emerald-400 disabled:opacity-20">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
+
             </div>
           )}
         </div>
