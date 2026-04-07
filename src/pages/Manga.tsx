@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, Tag, Loader2, Bookmark, Search, ArrowDownUp, BookOpen } from 'lucide-react';
 import AppTopbar from '../components/AppTopbar';
+import { handleRippleMouseDown } from '../utils/ripple';
 
 // --- Interfaces ---
 interface MangaData {
@@ -393,7 +394,7 @@ const Manga: React.FC = () => {
       <AppTopbar searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
 
       <div className="relative z-10 mx-auto w-full max-w-[1420px] px-4 pt-8">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full transition-all border border-white/5 mb-8 group">
+        <button onClick={() => navigate(-1)} onMouseDown={handleRippleMouseDown} className="ripple-button flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full transition-all border border-white/5 mb-8 group">
           <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
           <span className="text-sm font-black uppercase tracking-widest">BACK</span>
         </button>
@@ -440,15 +441,16 @@ const Manga: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={handleStartReading}
+                        onMouseDown={handleRippleMouseDown}
                         disabled={!gomangaData?.chapters?.length || isLinking}
-                        className={`h-12 px-8 rounded-xl font-black text-sm flex items-center gap-2 transition-all shadow-lg ${
+                        className={`ripple-button h-12 px-8 rounded-xl font-black text-sm flex items-center gap-2 transition-all shadow-lg ${
                             !gomangaData?.chapters?.length ? 'rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-colors cursor-not-allowed' : 
                             'bg-emerald-500 text-black hover:bg-emerald-400 active:scale-95 shadow-emerald-500/20'
                         }`}
 >                        <BookOpen size={16} fill="currentColor" className="relative z-10" />
                         {isLinking ? <Loader2 className="animate-spin" size={18} /> : !gomangaData?.chapters?.length ? 'Locating...' : 'READ CHAPTER 1'}
                     </button>
-                    <button className="h-12 w-12 flex active:scale-95 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-colors">
+                    <button onMouseDown={handleRippleMouseDown} className="ripple-button h-12 w-12 flex active:scale-95 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-colors">
                         <Bookmark size={20} />
                     </button>
                 </div>
@@ -483,7 +485,8 @@ const Manga: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setChapterSortOrder((current) => current === 'desc' ? 'asc' : 'desc')}
-                                    className="inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                                    onMouseDown={handleRippleMouseDown}
+                                    className="ripple-button inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:bg-white/[0.06] hover:text-white"
                                 >
                                     <ArrowDownUp size={14} />
                                     {chapterSortOrder === 'desc' ? 'Newest' : 'Oldest'}
