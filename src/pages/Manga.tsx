@@ -448,7 +448,7 @@ const Manga: React.FC = () => {
 >                        <BookOpen size={16} fill="currentColor" className="relative z-10" />
                         {isLinking ? <Loader2 className="animate-spin" size={18} /> : !gomangaData?.chapters?.length ? 'Locating...' : 'READ CHAPTER 1'}
                     </button>
-                    <button className="h-12 w-12 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-colors">
+                    <button className="h-12 w-12 flex active:scale-95 items-center justify-center rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white transition-colors">
                         <Bookmark size={20} />
                     </button>
                 </div>
