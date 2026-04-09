@@ -992,15 +992,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity', title = 'Ex
       />
 
       <main className="mx-auto w-full max-w-[1420px] space-y-6 px-4 py-8">
-        <div
-          className={`relative z-[80] transition-[padding] duration-200 ${
-            activeDropdown === 'genre'
-              ? 'pb-[360px]'
-              : activeDropdown
-                ? 'pb-[200px]'
-                : 'pb-2'
-          }`}
-        >
+        <div className="relative z-[80] pb-2">
             <div className="flex w-full flex-wrap items-center gap-2 overflow-visible pb-2 xl:flex-nowrap">
               
               {/* Perfectly matched Search Bar */}
