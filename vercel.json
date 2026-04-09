@@ -2,7 +2,11 @@
   "rewrites": [
     {
       "source": "/manga-scrapers/:path*",
-      "destination": "https://manga-scrapers.onrender.com/:path*"
+      "destination": "https://manga-scrapers-xi.vercel.app/:path*"
+    },
+    {
+      "source": "/((?!api/|manga-scrapers/|assets/|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }
