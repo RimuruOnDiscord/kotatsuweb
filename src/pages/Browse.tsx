@@ -1001,7 +1001,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity', title = 'Ex
                 : 'pb-2'
           }`}
         >
-            <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <div className="flex w-full flex-wrap items-center gap-2 overflow-visible pb-2 xl:flex-nowrap">
               
               {/* Perfectly matched Search Bar */}
               <div className="relative flex items-center overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0d0f11]/98 shadow-[0_20px_55px_-34px_rgba(0,0,0,0.95)]">
