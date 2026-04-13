@@ -187,7 +187,7 @@ const ContinueReadingCard: React.FC<{
 
   return (
     <div 
-      onClick={() => navigate(`/read/${data.mangaId}`)}
+      // Navigates directly to the manga details page using the Jikan ID
       className="group relative flex min-h-44 gap-3 overflow-hidden rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 transition-all duration-300 hover:bg-[var(--app-surface-2)] hover:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.85)]"
     >
       <div className="relative w-32 flex-shrink-0 overflow-hidden rounded-[1.1rem] bg-[var(--app-card)] ring-1 ring-white/[0.08]">
@@ -220,9 +220,10 @@ const ContinueReadingCard: React.FC<{
           </div>
         </div>
 
+        {/* Prevent clicks in the lower block from bubbling to the background */}
         <div 
           onClick={(e) => e.stopPropagation()}
-          className="mt-auto cursor-default rounded-[1.15rem] bg-[var(--app-card)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+          className="mt-auto rounded-[1.15rem] bg-[var(--app-card)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
         >
           <div className="min-w-0">
             <div className="flex items-end justify-between gap-3">
