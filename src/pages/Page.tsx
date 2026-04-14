@@ -562,7 +562,7 @@ const Page: React.FC = () => {
                 <div className="overflow-hidden rounded-[28px] border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-[0_50px_100px_rgba(0,0,0,0.5)]">
                   {pages.map((url, i) => (
                     <div key={url} className="relative bg-[var(--app-bg)]">
-                      <div className="absolute right-4 top-4 z-10 rounded-full border border-[var(--app-border)] bg-[var(--app-bg)]/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 backdrop-blur">{i + 1}</div>
+
                       <img
                         ref={(node) => {
                           imageRefs.current[i] = node;
