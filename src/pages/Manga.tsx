@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Star, Tag, Loader2, Bookmark, Search, ArrowDownUp, BookOpen, RadioTower, Check, X, Users, Link2 } from 'lucide-react';
+import { ChevronLeft, Star, Tag, Loader2, Bookmark, Info, Search, ArrowDownUp, BookOpen, RadioTower, Check, X, Users, Link2, MessageSquare, Trophy, TrendingUp, Heart, Calendar, Library } from 'lucide-react';
 import AppTopbar from '../components/AppTopbar';
 import { handleRippleMouseDown } from '../utils/ripple';
 import {
@@ -19,6 +19,7 @@ interface MangaData {
   mal_id: number;
   title: string;
   title_english?: string;
+  title_japanese?: string;
   synopsis?: string;
   chapters?: number;
   volumes?: number;
@@ -27,6 +28,10 @@ interface MangaData {
   type?: string; 
   rank?: number;
   popularity?: number;
+  members?: number;
+  favorites?: number;
+  published?: { string: string };
+  serializations?: { name: string }[];
   authors?: { name: string }[];
   genres?: { mal_id: number; name: string }[];
   images: { jpg: { image_url: string; large_image_url: string; }; };
@@ -38,6 +43,18 @@ interface Recommendation {
     title: string;
     images: { jpg: { image_url: string } };
   };
+}
+
+interface Review {
+  mal_id: number;
+  user: {
+    username: string;
+    images: { jpg: { image_url: string } };
+  };
+  score: number;
+  review: string;
+  is_spoiler: boolean;
+  date: string;
 }
 
 interface AniListSupplement {
@@ -177,6 +194,11 @@ const formatChapterDate = (isoDate?: string) => {
   }).format(parsedDate);
 };
 
+const formatNumber = (num?: number) => {
+  if (!num) return 'N/A';
+  return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
+};
+
 const Manga: React.FC = () => {
   const { mangaId } = useParams<{ mangaId: string }>();
   const navigate = useNavigate();
@@ -186,6 +208,7 @@ const Manga: React.FC = () => {
   const [data, setData] = useState<MangaData | null>(null);
   const [readerSources, setReaderSources] = useState<ResolvedReaderSource[]>([]);
   const [recs, setRecs] = useState<Recommendation[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceScanLoading, setSourceScanLoading] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
@@ -197,7 +220,7 @@ const Manga: React.FC = () => {
   const [chapterSearchQuery, setChapterSearchQuery] = useState('');
   const [chapterSortOrder, setChapterSortOrder] = useState<ChapterSortOrder>('desc');
 
-  // Animations CSS Injection (ORIGINAL)
+  // Animations CSS Injection
   useEffect(() => {
     const id = 'vf-ui-animations';
     if (document.getElementById(id)) return;
@@ -217,7 +240,7 @@ const Manga: React.FC = () => {
     document.head.appendChild(s);
   }, []);
 
-  // Main Detail Fetch (UPDATED for Recs)
+  // Main Detail Fetch
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -225,6 +248,7 @@ const Manga: React.FC = () => {
         setLoadFailed(false);
         setData(null);
         setRecs([]);
+        setReviews([]);
         setReaderSources([]);
         setAniListSupplement({ relations: [], characters: [], staff: [] });
         setSourceScanLoading(true);
@@ -251,6 +275,15 @@ const Manga: React.FC = () => {
         } catch (recError) {
           console.warn('Recommendation fetch failed:', recError);
           setRecs([]);
+        }
+
+        // Fetch Reviews for Sidebar
+        try {
+          const reviewJson = await fetchJsonWithRetry<{ data?: Review[] }>(`https://api.jikan.moe/v4/manga/${mangaId}/reviews`, [700]);
+          setReviews(reviewJson.data?.slice(0, 4) || []);
+        } catch (reviewError) {
+          console.warn('Review fetch failed:', reviewError);
+          setReviews([]);
         }
 
         if (mangaData.title) {
@@ -379,23 +412,23 @@ const Manga: React.FC = () => {
     setBookmarked(result.bookmarked);
   }, [data]);
 
-const handleReadFirst = async () => {
-  if (selectedSource?.status !== 'available' || !selectedSource.chapters.length || !selectedSource.mangaId) return;
-  setIsLinking(true);
-  // "First" = oldest chapter = lowest number
-  const sorted = [...selectedSource.chapters].sort((a, b) => getChapterSortValue(a) - getChapterSortValue(b));
-  navigate(buildReaderHref(selectedSource.mangaId, sorted[0].id, selectedSource.key));
-  setIsLinking(false);
-};
+  const handleReadFirst = async () => {
+    if (selectedSource?.status !== 'available' || !selectedSource.chapters.length || !selectedSource.mangaId) return;
+    setIsLinking(true);
+    // "First" = oldest chapter = lowest number
+    const sorted = [...selectedSource.chapters].sort((a, b) => getChapterSortValue(a) - getChapterSortValue(b));
+    navigate(buildReaderHref(selectedSource.mangaId, sorted[0].id, selectedSource.key));
+    setIsLinking(false);
+  };
 
-const handleReadLast = async () => {
-  if (selectedSource?.status !== 'available' || !selectedSource.chapters.length || !selectedSource.mangaId) return;
-  setIsLinking(true);
-  // "Last" = newest chapter = highest number
-  const sorted = [...selectedSource.chapters].sort((a, b) => getChapterSortValue(b) - getChapterSortValue(a));
-  navigate(buildReaderHref(selectedSource.mangaId, sorted[0].id, selectedSource.key));
-  setIsLinking(false);
-};
+  const handleReadLast = async () => {
+    if (selectedSource?.status !== 'available' || !selectedSource.chapters.length || !selectedSource.mangaId) return;
+    setIsLinking(true);
+    // "Last" = newest chapter = highest number
+    const sorted = [...selectedSource.chapters].sort((a, b) => getChapterSortValue(b) - getChapterSortValue(a));
+    navigate(buildReaderHref(selectedSource.mangaId, sorted[0].id, selectedSource.key));
+    setIsLinking(false);
+  };
 
   const chapterPool = selectedSource?.status === 'available' ? [...selectedSource.chapters] : [];
   const sortedChapters = [...chapterPool].sort((a, b) => {
@@ -449,15 +482,12 @@ const handleReadLast = async () => {
             <div className="w-full md:w-56 lg:w-72 flex-shrink-0 group perspective-1000">
                 <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10 ring-1 ring-[var(--app-accent-soft)] group-hover:scale-[1.02] transition-transform duration-500">
                     <img src={data.images.jpg.large_image_url} className="w-full h-full object-cover" alt={data.title} />
-                    <div className="absolute top-4 left-4 bg-[var(--app-accent)] text-white px-2 py-1 rounded text-[10px] font-black tracking-widest shadow-xl shadow-[var(--app-accent-soft)]">
-                        #{data.rank || 'N/A'}
-                    </div>
                 </div>
             </div>
 
-            {/* 2. Info & Actions */}
+            {/* 2. Info & Actions (Middle) */}
             <div className="flex-1 flex flex-col justify-end pb-2">
-                <h1 className="text-4xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 mb-4">
+                <h1 className="text-4xl md:text-7xl font-black uppercase italic tracking-tighter leading-[0.9] text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400 mb-4 line-clamp-3">
                     {data.title}
                 </h1>
                 
@@ -481,59 +511,55 @@ const handleReadLast = async () => {
                     ))}
                 </div>
 
-                {/* Action Buttons (Matches Layout of Screenshot, Style of Premium) */}
-<div className="flex items-center gap-3">
-  {/* Split pill button */}
-<div className={`flex items-center rounded-xl overflow-hidden transition-all ${
-  selectedSource?.status !== 'available' || !selectedSource.chapters.length
-    ? 'opacity-40 pointer-events-none'
-    : ''
-}`}>
-  {/* Left: Read First */}
-  <button
-    onClick={handleReadFirst}
-    onMouseDown={handleRippleMouseDown}
-    disabled={selectedSource?.status !== 'available' || !selectedSource.chapters.length || isLinking}
-    className="ripple-button flex h-12 items-center gap-2 rounded-l-xl border-t border-b border-l px-6 text-sm font-black transition-all"
-    style={{
-      backgroundColor: 'var(--app-accent-muted)',
-      color: 'var(--app-accent)',
-      borderColor: 'var(--app-accent-soft)',
-    }}
-  >
-    <BookOpen size={15} />
-    {sourceScanLoading ? 'Scanning…' : isLinking ? <Loader2 className="animate-spin" size={15} /> : 'Read First'}
-  </button>
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <div className={`flex items-center rounded-xl overflow-hidden transition-all ${
+                    selectedSource?.status !== 'available' || !selectedSource.chapters.length
+                      ? 'opacity-40 pointer-events-none'
+                      : ''
+                  }`}>
+                    <button
+                      onClick={handleReadFirst}
+                      onMouseDown={handleRippleMouseDown}
+                      disabled={selectedSource?.status !== 'available' || !selectedSource.chapters.length || isLinking}
+                      className="ripple-button flex h-12 items-center gap-2 rounded-l-xl border-t border-b border-l px-6 text-sm font-black transition-all"
+                      style={{
+                        backgroundColor: 'var(--app-accent-muted)',
+                        color: 'var(--app-accent)',
+                        borderColor: 'var(--app-accent-soft)',
+                      }}
+                    >
+                      <BookOpen size={15} />
+                      {sourceScanLoading ? 'Scanning…' : isLinking ? <Loader2 className="animate-spin" size={15} /> : 'Read First'}
+                    </button>
 
-  {/* Divider */}
-  <div className="w-px self-stretch bg-[var(--app-accent-soft)]" />
-  <div className="w-px self-stretch bg-white/10" />
+                    <div className="w-px self-stretch bg-[var(--app-accent-soft)]" />
+                    <div className="w-px self-stretch bg-white/10" />
 
-  {/* Right: Read Last */}
-  <button
-    onClick={handleReadLast}
-    onMouseDown={handleRippleMouseDown}
-    disabled={selectedSource?.status !== 'available' || !selectedSource.chapters.length || isLinking}
-    className="ripple-button h-12 px-6 font-black text-sm flex items-center gap-2 bg-white/5 text-white hover:bg-white/10 transition-all border-t border-b border-r border-white/10 rounded-r-xl"
-  >
-    <BookOpen size={15} fill="currentColor" />
-    {sourceScanLoading ? 'Scanning…' : isLinking ? <Loader2 className="animate-spin" size={15} /> : 'Read Last'}
-  </button>
-</div>
+                    <button
+                      onClick={handleReadLast}
+                      onMouseDown={handleRippleMouseDown}
+                      disabled={selectedSource?.status !== 'available' || !selectedSource.chapters.length || isLinking}
+                      className="ripple-button h-12 px-6 font-black text-sm flex items-center gap-2 bg-white/5 text-white hover:bg-white/10 transition-all border-t border-b border-r border-white/10 rounded-r-xl"
+                    >
+                      <BookOpen size={15} fill="currentColor" />
+                      {sourceScanLoading ? 'Scanning…' : isLinking ? <Loader2 className="animate-spin" size={15} /> : 'Read Last'}
+                    </button>
+                  </div>
 
-  <button
-    type="button"
-    onClick={handleBookmarkToggle}
-    onMouseDown={handleRippleMouseDown}
-    className={`ripple-button h-12 w-12 flex items-center justify-center rounded-xl border transition-colors ${
-      bookmarked
-        ? 'border-[var(--app-accent-soft)] bg-[var(--app-accent-muted)] text-[var(--app-accent)]'
-        : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
-    }`}
-  >
-    <Bookmark size={20} fill={bookmarked ? 'currentColor' : 'none'} />
-  </button>
-</div>
+                  <button
+                    type="button"
+                    onClick={handleBookmarkToggle}
+                    onMouseDown={handleRippleMouseDown}
+                    className={`ripple-button h-12 w-12 flex items-center justify-center rounded-xl border transition-colors ${
+                      bookmarked
+                        ? 'border-[var(--app-accent-soft)] bg-[var(--app-accent-muted)] text-[var(--app-accent)]'
+                        : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <Bookmark size={20} fill={bookmarked ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-zinc-300">
@@ -546,16 +572,68 @@ const handleReadLast = async () => {
                     ) : null}
                 </div>
             </div>
+
+            {/* 3. Stats & Details Panel (Upper Right) */}
+            <div className="hidden xl:flex flex-col justify-end pb-2 w-[320px] flex-shrink-0">
+                                  <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500 mb-5">
+                        <Info size={14} className="text-[var(--app-accent)]" />
+                        Statistics
+                    </div>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg flex flex-col gap-1 hover:border-white/10 transition-colors">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"><Trophy size={12} className="text-[var(--app-accent)]"/> Rank</span>
+                        <span className="text-xl font-black text-white">#{data.rank || '—'}</span>
+                    </div>
+                    <div className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg flex flex-col gap-1 hover:border-white/10 transition-colors">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"><TrendingUp size={12} className="text-[var(--app-accent)]"/> Popularity</span>
+                        <span className="text-xl font-black text-white">#{data.popularity || '—'}</span>
+                    </div>
+                    <div className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg flex flex-col gap-1 hover:border-white/10 transition-colors">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"><Users size={12} className="text-[var(--app-accent)]"/> Members</span>
+                        <span className="text-xl font-black text-white">{formatNumber(data.members)}</span>
+                    </div>
+                    <div className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg flex flex-col gap-1 hover:border-white/10 transition-colors">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1.5"><Heart size={12} className="text-[var(--app-accent)]"/> Favorites</span>
+                        <span className="text-xl font-black text-white">{formatNumber(data.favorites)}</span>
+                    </div>
+                </div>
+                
+                <div className="bg-black/20 border border-white/5 p-4 rounded-2xl shadow-lg flex flex-col gap-3 hover:border-white/10 transition-colors">
+                    <div className="flex items-start gap-3">
+                        <Calendar size={14} className="text-[var(--app-accent)] flex-shrink-0 mt-0.5" />
+                        <div>
+                            <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Published</span>
+                            <span className="block text-xs font-bold text-gray-300 mt-1">{data.published?.string || 'Unknown'}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <Library size={14} className="text-[var(--app-accent)] flex-shrink-0 mt-0.5" />
+                        <div>
+                            <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Serialization</span>
+                            <span className="block text-xs font-bold text-gray-300 mt-1">{data.serializations?.[0]?.name || 'N/A'}</span>
+                        </div>
+                    </div>
+                    {data.title_japanese && (
+                        <div className="flex items-start gap-3">
+                            <span className="font-japanese text-[14px] leading-none text-[var(--app-accent)] flex-shrink-0 mt-0.5 select-none">あ</span>
+                            <div>
+                                <span className="block text-[10px] font-black uppercase tracking-widest text-zinc-500">Japanese</span>
+                                <span className="block text-xs font-bold text-gray-300 mt-1">{data.title_japanese}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
 
         {/* --- MAIN BODY GRID --- */}
-        <div className="grid lg:grid-cols-[1fr_300px] gap-12">
+        <div className="grid lg:grid-cols-[1fr_320px] gap-12">
             
             {/* LEFT COLUMN: Sources + Synopsis + Chapter List */}
             <div className="space-y-10">
 
                 {/* Synopsis */}
-                <div className="bg-white/[0.02] p-6 rounded-3xl border border-white/5">
+                <div className="bg-white/[0.02] p-6 rounded-3xl border border-white/5 shadow-sm">
                     <h3 className="text-white font-black uppercase tracking-widest text-[11px] mb-3 text-opacity-50">Synopsis</h3>
                     <p className="text-gray-300 leading-relaxed text-sm font-medium">{data.synopsis}</p>
                 </div>
@@ -696,7 +774,7 @@ const handleReadLast = async () => {
                     </div>
                 </div>
 
-                {/* Chapter List (Vertical Rows) */}
+                {/* Chapter List */}
                 <div className="rounded-[2rem] border border-white/[0.05] bg-black/20 p-4 shadow-[0_24px_60px_-38px_rgba(0,0,0,0.9)]">
                     <div className="mb-4 flex flex-col gap-4 px-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -796,20 +874,62 @@ const handleReadLast = async () => {
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: Sidebar (Recommendations) */}
-            <div className="space-y-8">
+            {/* RIGHT COLUMN: Sidebar (Reviews & Recommendations) */}
+            <div className="space-y-10">
+                {/* Reviews */}
                 <div>
-                    <h3 className="text-sm font-black uppercase tracking-widest text-white mb-4 flex items-center gap-2">
-                    </h3>
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500 mb-5">
+                        <MessageSquare size={14} className="text-[var(--app-accent)]" />
+                        Reviews
+                    </div>
+                    <div className="space-y-4">
+                        {reviews.length > 0 ? (
+                            reviews.map((review) => (
+                                <div key={review.mal_id} className="rounded-2xl border border-white/[0.05] bg-black/20 p-4 shadow-lg transition-colors hover:border-white/10 transition-colors">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <img src={review.user.images.jpg.image_url} alt={review.user.username} className="w-9 h-9 rounded-full object-cover bg-white/10 ring-1 ring-white/10" />
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-black text-white truncate">{review.user.username}</div>
+                                                <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">{formatChapterDate(review.date)}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[var(--app-accent)] bg-[var(--app-accent-muted)] px-2 py-1 rounded-lg border border-[var(--app-accent-soft)]">
+                                            <Star size={10} fill="currentColor" />
+                                            <span className="text-[10px] font-black">{review.score}</span>
+                                        </div>
+                                    </div>
+                                    <div className="relative">
+                                        {review.is_spoiler && (
+                                            <span className="inline-block mb-2 text-[8px] font-black uppercase tracking-widest text-red-400 bg-red-400/10 px-2 py-1 rounded border border-red-400/20">Spoiler</span>
+                                        )}
+                                        <p className="text-xs text-gray-300 leading-relaxed font-medium line-clamp-5">{review.review}</p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : !loading ? (
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No reviews found.</div>
+                        ) : (
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest animate-pulse">Loading reviews...</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Recommendations */}
+                <div>
+                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500 mb-5">
+                        <Tag size={14} className="text-[var(--app-accent)]" />
+                        Recommendations
+                    </div>
                     <div className="space-y-3">
                         {recs.length > 0 ? (
                             recs.map((item) => (
                                 <div 
                                     key={item.entry.mal_id} 
                                     onClick={() => navigate(`/read/${item.entry.mal_id}`)}
-                                    className="flex gap-3 group cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-colors"
+                                    className="flex gap-3 group cursor-pointer p-2 rounded-2xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/[0.05]"
                                 >
-                                    <div className="w-14 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-800 ring-1 ring-white/10">
+                                    <div className="w-14 h-20 flex-shrink-0 rounded-[1rem] overflow-hidden bg-gray-800 ring-1 ring-white/10">
                                         <img src={item.entry.images.jpg.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform" alt="" />
                                     </div>
                                     <div className="flex flex-col justify-center min-w-0">
@@ -818,7 +938,7 @@ const handleReadLast = async () => {
                                 </div>
                             ))
                         ) : (
-                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest animate-pulse">Scanning database...</div>
+                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest animate-pulse">Scanning recommendations...</div>
                         )}
                     </div>
                 </div>
