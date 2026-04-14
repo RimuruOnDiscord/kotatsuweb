@@ -56,14 +56,32 @@ const footerGroups: Array<{ title: string; links: FooterLink[] }> = [
 ];
 
 const FooterAnchor: React.FC<FooterLink> = ({ label, to, href }) => {
+  // Function to handle the scroll
+  const handleScroll = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'instant' // or 'smooth' if you want it to slide up
+    });
+  };
+
   const baseClass = "block w-fit text-[14px] text-zinc-400 transition-all hover:text-white hover:underline underline-offset-4 py-1";
 
   return to ? (
-    <Link to={to} className={baseClass}>
+    <Link 
+      to={to} 
+      className={baseClass}
+      onClick={handleScroll} // <--- Added this
+    >
       {label}
     </Link>
   ) : (
-    <a href={href} target="_blank" rel="noreferrer" className={baseClass}>
+    <a 
+      href={href} 
+      target="_blank" 
+      rel="noreferrer" 
+      className={baseClass}
+      // No scroll needed for external links usually, but you can add it if you want
+    >
       {label}
     </a>
   );
