@@ -1,0 +1,458 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Crunchyroll/Funimation Inspired Theme */
+:root {
+  --crunchy-bg: #0f0f23;
+  --crunchy-surface: #1a1a2e;
+  --crunchy-card: #16213e;
+  --crunchy-accent: #e94560;
+  --crunchy-accent-hover: #f05454;
+  --crunchy-text: #ffffff;
+  --crunchy-text-secondary: #bdc3c7;
+  --crunchy-text-muted: #7f8c8d;
+  --crunchy-border: #34495e;
+  --crunchy-orange: #f39c12;
+  --crunchy-blue: #3498db;
+  --crunchy-purple: #9b59b6;
+  --app-bg: #111214;
+  --app-surface-1: #0d0f11;
+  --app-surface-2: #15171a;
+  --app-card: #1a1b1e;
+  --app-border: rgba(255, 255, 255, 0.06);
+  --app-accent: #34d399;
+  --app-accent-strong: #10b981;
+  --app-accent-muted: rgba(52, 211, 153, 0.1);
+  --app-accent-soft: rgba(52, 211, 153, 0.2);
+}
+
+html[data-theme='ocean'] {
+  --app-bg: #0d1520;
+  --app-surface-1: #101b28;
+  --app-surface-2: #132131;
+  --app-card: #172738;
+  --app-border: rgba(125, 211, 252, 0.12);
+  --app-accent: #7dd3fc;
+  --app-accent-strong: #38bdf8;
+  --app-accent-muted: rgba(56, 189, 248, 0.12);
+  --app-accent-soft: rgba(125, 211, 252, 0.2);
+}
+
+html[data-theme='ember'] {
+  --app-bg: #16100f;
+  --app-surface-1: #1d1412;
+  --app-surface-2: #241917;
+  --app-card: #2b1e1b;
+  --app-border: rgba(251, 146, 60, 0.12);
+  --app-accent: #fb923c;
+  --app-accent-strong: #f97316;
+  --app-accent-muted: rgba(249, 115, 22, 0.12);
+  --app-accent-soft: rgba(251, 146, 60, 0.22);
+}
+
+/* 1. MIDNIGHT (Neon Purple/Cyberpunk vibe) */
+html[data-theme='midnight'] {
+  --app-bg: #0b0a12;           /* Deep Midnight */
+  --app-surface-1: #110f1d;    /* Lighter Purple-tinted Gray */
+  --app-surface-2: #191629;    /* UI Surface */
+  --app-card: #1f1c33;         /* Card Surface */
+  --app-border: rgba(192, 132, 252, 0.12);
+  --app-accent: #c084fc;       /* Soft Purple */
+  --app-accent-strong: #a855f7;
+  --app-accent-muted: rgba(168, 85, 247, 0.12);
+  --app-accent-soft: rgba(192, 132, 252, 0.22);
+}
+
+/* 2. FOREST (Deep Moss/Military vibe) */
+html[data-theme='forest'] {
+  --app-bg: #0d110f;           /* Deep Forest Black */
+  --app-surface-1: #121815;    /* Dark Moss */
+  --app-surface-2: #19211d;    /* UI Surface */
+  --app-card: #202b26;         /* Card Surface */
+  --app-border: rgba(74, 222, 128, 0.12);
+  --app-accent: #4ade80;       /* Bright Lime */
+  --app-accent-strong: #22c55e;
+  --app-accent-muted: rgba(34, 197, 94, 0.12);
+  --app-accent-soft: rgba(74, 222, 128, 0.22);
+}
+
+/* 3. CRIMSON (Vampiric/High-Contrast Red) */
+html[data-theme='crimson'] {
+  --app-bg: #110909;           /* Black-Red */
+  --app-surface-1: #1a0d0d;    /* Deep Blood */
+  --app-surface-2: #241212;    /* UI Surface */
+  --app-card: #2e1717;         /* Card Surface */
+  --app-border: rgba(248, 113, 113, 0.12);
+  --app-accent: #f87171;       /* Soft Red */
+  --app-accent-strong: #ef4444;
+  --app-accent-muted: rgba(239, 68, 68, 0.12);
+  --app-accent-soft: rgba(248, 113, 113, 0.22);
+}
+
+/* Add this inside your <style> tag */
+.reader-img {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  height: auto;
+  /* This helps prevent thin white lines between slices */
+  margin-top: -1px; 
+  /* Prevents the browser from smoothing out pixel art/screentones too much */
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* If you want to try and hide those white side-bars on images automatically */
+.dark-mode-img {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+/* Add/Update this in your style block */
+.gap-killer {
+  line-height: 0 !important;
+  font-size: 0 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.manga-image {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  vertical-align: bottom !important;
+  /* Anti-aliasing fix for sub-pixel gaps */
+  transform: translateZ(0); 
+  border: none !important;
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-1 { animation: slideDownFade 0.3s ease-out both 0.1s; }
+.stagger-2 { animation: slideDownFade 0.3s ease-out both 0.15s; }
+.stagger-3 { animation: slideDownFade 0.3s ease-out both 0.2s; }
+
+.filter-mask {
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+
+/* Netflix-style protection */
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  background-color: var(--app-bg);
+}
+
+/* Smooth cursor transition helper */
+.cursor-transition {
+  transition: width 0.3s ease-out, height 0.3s ease-out, background-color 0.3s ease-out, border-color 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.ripple-button {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ui-ripple {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  background: radial-gradient(circle, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.18) 42%, rgba(255,255,255,0.08) 58%, rgba(255,255,255,0) 76%);
+  animation: ui-ripple-burst 720ms cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  z-index: 4;
+}
+
+@keyframes ui-ripple-burst {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: var(--md-sys-color-background);
+    color: var(--md-sys-color-on-background);
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+    font-weight: 400;
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    background-color: var(--app-bg);
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+    scrollbar-width: auto;
+    scrollbar-color: var(--app-accent) #090a0c;
+  }
+
+  /* Visible app scrollbar */
+  ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #090a0c;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--app-accent) 75%, white 25%) 0%, var(--app-accent-strong) 100%);
+    border: 3px solid #090a0c;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--app-accent) 82%, white 18%) 0%, var(--app-accent) 100%);
+  }
+}
+
+@layer utilities {
+  /* Physics-based entrance */
+  @keyframes spring-in {
+    0% { transform: scale(0.95) translateY(10px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  /* Smooth layout transition for list items */
+  .animate-spring {
+    animation: spring-in 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  /* Glass Sweep effect on hover */
+  .glass-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-sweep::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -150%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.03), transparent);
+    transition: 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .glass-sweep:hover::after {
+    left: 150%;
+  }
+}
+
+@layer base {
+  :root {
+    --primary: 262.1 83.3% 57.8%; /* SpenFlix Violet */
+    --primary-foreground: 0 0% 98%;
+  }
+}
+
+/* Custom Exit Animation */
+.slide-exit {
+  animation: slideOut 0.4s ease-in forwards;
+}
+
+@keyframes slideOut {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-20px); opacity: 0; }
+}
+
+@layer utilities {
+  /* Material Design Animations */
+  @keyframes md-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes md-scale-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes md-slide-in-left {
+    from { opacity: 0; transform: translateX(-16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes md-slide-in-right {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes md-bounce-in {
+    0% { opacity: 0; transform: scale(0.3); }
+    50% { opacity: 1; transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* Animation classes */
+  .animate-md-fade-in {
+    animation: md-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-md-scale-in {
+    animation: md-scale-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-md-slide-in-left {
+    animation: md-slide-in-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-md-slide-in-right {
+    animation: md-slide-in-right 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+
+  .animate-md-bounce-in {
+    animation: md-bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) both;
+  }
+
+  /* Staggered animation delays */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.1s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.2s; }
+  .stagger-5 { animation-delay: 0.25s; }
+
+  /* Material Design Elevation */
+  .md-elevation-1 {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  }
+
+  .md-elevation-2 {
+    box-shadow: 0 2px 6px 2px rgba(0, 0, 0, 0.15), 0 8px 24px 4px rgba(0, 0, 0, 0.15);
+  }
+
+  .md-elevation-3 {
+    box-shadow: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 16px 32px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Material Design Typography */
+  .md-display-large {
+    font-size: 57px;
+    line-height: 64px;
+    font-weight: 400;
+    letter-spacing: -0.25px;
+  }
+
+  .md-display-medium {
+    font-size: 45px;
+    line-height: 52px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-display-small {
+    font-size: 36px;
+    line-height: 44px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-headline-large {
+    font-size: 32px;
+    line-height: 40px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-headline-medium {
+    font-size: 28px;
+    line-height: 36px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-headline-small {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-title-large {
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .md-title-medium {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 500;
+    letter-spacing: 0.15px;
+  }
+
+  .md-title-small {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+  }
+
+  .md-body-large {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  .md-body-medium {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+    letter-spacing: 0.25px;
+  }
+
+  .md-body-small {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    letter-spacing: 0.4px;
+  }
+
+  .md-label-large {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+  }
+
+  .md-label-medium {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .md-label-small {
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+}
