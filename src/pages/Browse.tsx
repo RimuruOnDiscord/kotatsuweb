@@ -1,11 +1,11 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, LayoutGrid, List } from 'lucide-react';
 import AppTopbar from '../components/BrowseTopbar';
 import DesktopBrowseFilters from '../components/desktop/DesktopBrowseFilters';
 import MobileBrowseFilters from '../components/mobile/MobileBrowseFilters';
 import { handleRippleMouseDown } from '../utils/ripple';
-
 
 interface BrowseManga {
   mal_id: number;
@@ -368,7 +368,7 @@ const mapAniListMediaToBrowseManga = (entry: AniListMedia): BrowseManga | null =
 
 const MangaListCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => void }> = ({ manga, navigate }) => (
   <div
-    onClick={() => navigate(`/read/${createSlug(manga.title)}`)} // CHANGED HERE to use slug
+    onClick={() => navigate(`/read/${createSlug(manga.title)}`)}
     className="group relative flex h-48 gap-4 overflow-hidden rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 transition-all duration-300 hover:bg-[var(--app-surface-2)] hover:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.85)] cursor-pointer"
   >
     <div className="relative w-32 flex-shrink-0 overflow-hidden rounded-[1.1rem] bg-[var(--app-card)] ring-1 ring-white/[0.08]">
@@ -433,9 +433,64 @@ const MangaListCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => 
   </div>
 );
 
+const MangaGridCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => void }> = ({ manga, navigate }) => (
+  <div
+    onClick={() => navigate(`/read/${createSlug(manga.title)}`)}
+    className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] transition-all duration-300 hover:bg-[var(--app-surface-2)] hover:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.85)]"
+  >
+    <div className="relative aspect-[2/3] w-full overflow-hidden bg-[var(--app-card)]">
+      {manga.images.jpg.image_url ? (
+        <img
+          src={manga.images.jpg.image_url}
+          alt={manga.title}
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-[var(--app-card)] text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">
+          No Cover
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      
+      <div className="absolute left-2 top-2 flex flex-col gap-1">
+        <span className="w-fit rounded-full border border-white/[0.07] bg-black/70 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.22em] text-white backdrop-blur-md">
+          {manga.typeLabel}
+        </span>
+      </div>
+
+      {manga.score ? (
+        <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full border border-white/[0.07] bg-black/70 px-2.5 py-1 text-[10px] font-black text-white backdrop-blur-md">
+          <Star size={10} className="fill-amber-400 text-amber-400" />
+          {manga.score.toFixed(1)}
+        </div>
+      ) : null}
+    </div>
+
+    <div className="flex flex-1 flex-col p-3.5">
+      <h3 className="line-clamp-2 text-[13px] font-black leading-tight text-white transition-colors group-hover:text-[var(--app-accent)]">
+        {manga.title}
+      </h3>
+      <div className="mt-auto pt-2">
+        <p className="truncate text-[10px] font-bold uppercase tracking-[0.05em] text-zinc-400">
+          {manga.year || 'N/A'} • <span className={manga.statusLabel === 'Publishing' ? 'text-[var(--app-accent)]' : ''}>{manga.statusLabel}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
 const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Layout View State (persisted)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    return (localStorage.getItem('browseViewMode') as 'list' | 'grid') || 'list';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('browseViewMode', viewMode);
+  }, [viewMode]);
 
   const committedQuery = searchParams.get('q') || '';
   const committedType = searchParams.get('format') || '';
@@ -482,7 +537,42 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
     []
   );
 
+  useEffect(() => {
+    const id = 'browse-filter-control-style';
+    if (document.getElementById(id)) return;
 
+    const style = document.createElement('style');
+    style.id = id;
+    style.innerHTML = `
+      .browse-filter-control {
+        background-color: var(--app-surface-2) !important;
+        color: #f4f4f5 !important;
+        -webkit-text-fill-color: #f4f4f5 !important;
+        appearance: none;
+      }
+      .browse-filter-control::placeholder {
+        color: #6b7280 !important;
+        opacity: 1;
+      }
+      .browse-filter-control:-webkit-autofill,
+      .browse-filter-control:-webkit-autofill:hover,
+      .browse-filter-control:-webkit-autofill:focus {
+        -webkit-text-fill-color: #f4f4f5;
+        -webkit-box-shadow: 0 0 0px 1000px var(--app-surface-2) inset;
+        box-shadow: 0 0 0px 1000px var(--app-surface-2) inset;
+        transition: background-color 9999s ease-in-out 0s;
+        caret-color: #f4f4f5;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
   useEffect(() => {
     setSearchQuery(committedQuery);
@@ -816,65 +906,100 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       />
 
       <main className="mx-auto w-full max-w-[1420px] space-y-6 px-4 py-8">
-        <DesktopBrowseFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
-          activeDropdown={activeDropdown}
-          setActiveDropdown={setActiveDropdown}
-          typeFilter={typeFilter}
-          genreFilter={genreFilter}
-          statusFilter={statusFilter}
-          languageFilter={languageFilter}
-          yearFilter={yearFilter}
-          lengthFilter={lengthFilter}
-          releaseFilter={releaseFilter}
-          typeOptions={TYPE_OPTIONS}
-          genreOptions={GENRE_OPTIONS}
-          statusOptions={STATUS_OPTIONS}
-          languageOptions={LANGUAGE_OPTIONS}
-          yearOptions={yearOptions}
-          lengthOptions={LENGTH_OPTIONS}
-          releaseOptions={RELEASE_OPTIONS}
-          updateTypeFilter={updateTypeFilter}
-          updateGenreFilter={updateGenreFilter}
-          updateStatusFilter={updateStatusFilter}
-          updateLanguageFilter={updateLanguageFilter}
-          updateYearFilter={updateYearFilter}
-          updateLengthFilter={updateLengthFilter}
-          updateReleaseFilter={updateReleaseFilter}
-          hasActiveFilters={hasActiveFilters}
-          clearFilters={clearFilters}
-        />
+        {/* Wrapping the filters and layout toggles together so they sit cleanly on the same line */}
+        <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <DesktopBrowseFilters
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
+              activeDropdown={activeDropdown}
+              setActiveDropdown={setActiveDropdown}
+              typeFilter={typeFilter}
+              genreFilter={genreFilter}
+              statusFilter={statusFilter}
+              languageFilter={languageFilter}
+              yearFilter={yearFilter}
+              lengthFilter={lengthFilter}
+              releaseFilter={releaseFilter}
+              typeOptions={TYPE_OPTIONS}
+              genreOptions={GENRE_OPTIONS}
+              statusOptions={STATUS_OPTIONS}
+              languageOptions={LANGUAGE_OPTIONS}
+              yearOptions={yearOptions}
+              lengthOptions={LENGTH_OPTIONS}
+              releaseOptions={RELEASE_OPTIONS}
+              updateTypeFilter={updateTypeFilter}
+              updateGenreFilter={updateGenreFilter}
+              updateStatusFilter={updateStatusFilter}
+              updateLanguageFilter={updateLanguageFilter}
+              updateYearFilter={updateYearFilter}
+              updateLengthFilter={updateLengthFilter}
+              updateReleaseFilter={updateReleaseFilter}
+              hasActiveFilters={hasActiveFilters}
+              clearFilters={clearFilters}
+            />
 
-        <MobileBrowseFilters
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
-          typeFilter={typeFilter}
-          genreFilter={genreFilter}
-          statusFilter={statusFilter}
-          languageFilter={languageFilter}
-          yearFilter={yearFilter}
-          lengthFilter={lengthFilter}
-          releaseFilter={releaseFilter}
-          typeOptions={TYPE_OPTIONS}
-          genreOptions={GENRE_OPTIONS}
-          statusOptions={STATUS_OPTIONS}
-          languageOptions={LANGUAGE_OPTIONS}
-          yearOptions={yearOptions}
-          lengthOptions={LENGTH_OPTIONS}
-          releaseOptions={RELEASE_OPTIONS}
-          updateTypeFilter={updateTypeFilter}
-          updateGenreFilter={updateGenreFilter}
-          updateStatusFilter={updateStatusFilter}
-          updateLanguageFilter={updateLanguageFilter}
-          updateYearFilter={updateYearFilter}
-          updateLengthFilter={updateLengthFilter}
-          updateReleaseFilter={updateReleaseFilter}
-          hasActiveFilters={hasActiveFilters}
-          clearFilters={clearFilters}
-        />
+            <MobileBrowseFilters
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
+              typeFilter={typeFilter}
+              genreFilter={genreFilter}
+              statusFilter={statusFilter}
+              languageFilter={languageFilter}
+              yearFilter={yearFilter}
+              lengthFilter={lengthFilter}
+              releaseFilter={releaseFilter}
+              typeOptions={TYPE_OPTIONS}
+              genreOptions={GENRE_OPTIONS}
+              statusOptions={STATUS_OPTIONS}
+              languageOptions={LANGUAGE_OPTIONS}
+              yearOptions={yearOptions}
+              lengthOptions={LENGTH_OPTIONS}
+              releaseOptions={RELEASE_OPTIONS}
+              updateTypeFilter={updateTypeFilter}
+              updateGenreFilter={updateGenreFilter}
+              updateStatusFilter={updateStatusFilter}
+              updateLanguageFilter={updateLanguageFilter}
+              updateYearFilter={updateYearFilter}
+              updateLengthFilter={updateLengthFilter}
+              updateReleaseFilter={updateReleaseFilter}
+              hasActiveFilters={hasActiveFilters}
+              clearFilters={clearFilters}
+            />
+          </div>
+
+          {/* Minimalist Layout Toggles - Placed precisely to the right of the desktop filters */}
+          <div className="flex shrink-0 items-center justify-end">
+            <div className="flex h-[42px] items-center gap-1 rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-1 shadow-sm xl:h-11">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex h-full w-10 items-center justify-center rounded-[1rem] transition-all duration-300 ${
+                  viewMode === 'list'
+                    ? 'bg-[var(--app-surface-2)] text-[var(--app-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+                    : 'text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300'
+                }`}
+                title="List View"
+              >
+                <List size={16} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`flex h-full w-10 items-center justify-center rounded-[1rem] transition-all duration-300 ${
+                  viewMode === 'grid'
+                    ? 'bg-[var(--app-surface-2)] text-[var(--app-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]'
+                    : 'text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid size={16} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {error ? (
           <section className="rounded-[1.7rem] border border-red-500/20 bg-red-500/[0.05] px-6 py-10 text-center">
@@ -883,18 +1008,34 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
             <p className="mt-3 text-sm text-zinc-300">{error}</p>
           </section>
         ) : loading ? (
-          <div className="relative z-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 9 }).map((_, index) => (
-              <div key={index} className="h-48 animate-pulse rounded-[1.4rem] border border-white/[0.06] bg-white/[0.04]" />
-            ))}
-          </div>
-        ) : mangaList.length ? (
-          <>
+          viewMode === 'list' ? (
             <div className="relative z-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {mangaList.map((manga) => (
-                <MangaListCard key={manga.mal_id} manga={manga} navigate={navigate} />
+              {Array.from({ length: 12 }).map((_, index) => (
+                <div key={index} className="h-48 animate-pulse rounded-[1.4rem] border border-white/[0.06] bg-white/[0.04]" />
               ))}
             </div>
+          ) : (
+            <div className="relative z-0 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {Array.from({ length: 24 }).map((_, index) => (
+                <div key={index} className="aspect-[2/3] animate-pulse rounded-[1.4rem] border border-white/[0.06] bg-white/[0.04]" />
+              ))}
+            </div>
+          )
+        ) : mangaList.length ? (
+          <>
+            {viewMode === 'list' ? (
+              <div className="relative z-0 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {mangaList.map((manga) => (
+                  <MangaListCard key={manga.mal_id} manga={manga} navigate={navigate} />
+                ))}
+              </div>
+            ) : (
+              <div className="relative z-0 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                {mangaList.map((manga) => (
+                  <MangaGridCard key={manga.mal_id} manga={manga} navigate={navigate} />
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
               <button
@@ -961,3 +1102,4 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
 };
 
 export default Browse;
+
