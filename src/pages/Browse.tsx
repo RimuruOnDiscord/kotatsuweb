@@ -66,6 +66,7 @@ type FilterOption = {
 type GenreFilterOption = FilterOption & {
   mode?: 'genre' | 'tag';
   queryValue?: string;
+  hidden?: boolean;
 };
 
 // Helper function to turn titles into clean URLs
@@ -86,7 +87,7 @@ const ANILIST_BROWSE_QUERY = `
     $country: CountryCode
     $status: MediaStatus
     $formatIn: [MediaFormat]
-    $formatNotIn: [MediaFormat]
+    $formatNotIn:[MediaFormat]
     $genreIn: [String]
     $tagIn: [String]
     $sort: [MediaSort]
@@ -94,6 +95,7 @@ const ANILIST_BROWSE_QUERY = `
     $startDateLesser: FuzzyDateInt
     $chaptersGreater: Int
     $chaptersLesser: Int
+    $isAdult: Boolean
   ) {
     Page(page: $page, perPage: $perPage) {
       pageInfo {
@@ -104,7 +106,7 @@ const ANILIST_BROWSE_QUERY = `
       }
       media(
         type: MANGA
-        isAdult: false
+        isAdult: $isAdult
         search: $search
         countryOfOrigin: $country
         status: $status
@@ -141,13 +143,13 @@ const ANILIST_BROWSE_QUERY = `
   }
 `;
 
-const TYPE_OPTIONS: FilterOption[] = [
+const TYPE_OPTIONS: FilterOption[] =[
   { value: '', label: 'Type' },
   { value: 'manga', label: 'Manga' },
   { value: 'one-shot', label: 'One Shot' },
 ];
 
-const STATUS_OPTIONS: FilterOption[] = [
+const STATUS_OPTIONS: FilterOption[] =[
   { value: '', label: 'Status' },
   { value: 'publishing', label: 'Publishing' },
   { value: 'finished', label: 'Finished' },
@@ -156,7 +158,7 @@ const STATUS_OPTIONS: FilterOption[] = [
   { value: 'upcoming', label: 'Upcoming' },
 ];
 
-const LANGUAGE_OPTIONS: FilterOption[] = [
+const LANGUAGE_OPTIONS: FilterOption[] =[
   { value: '', label: 'Language' },
   { value: 'english', label: 'English' },
   { value: 'manga', label: 'Japanese' },
@@ -164,20 +166,20 @@ const LANGUAGE_OPTIONS: FilterOption[] = [
   { value: 'manhua', label: 'Chinese' },
 ];
 
-const LENGTH_OPTIONS: FilterOption[] = [
+const LENGTH_OPTIONS: FilterOption[] =[
   { value: '', label: 'Length' },
   { value: 'short', label: '1 - 49 Chapters' },
   { value: 'medium', label: '50 - 199 Chapters' },
   { value: 'long', label: '200+ Chapters' },
 ];
 
-const RELEASE_OPTIONS: FilterOption[] = [
+const RELEASE_OPTIONS: FilterOption[] =[
   { value: '', label: 'Release Date' },
   { value: 'newest', label: 'Newest First' },
   { value: 'oldest', label: 'Oldest First' },
 ];
 
-const GENRE_OPTIONS: GenreFilterOption[] = [
+const GENRE_OPTIONS: GenreFilterOption[] =[
   { value: '', label: 'Genre' },
   { value: 'action', label: 'Action', mode: 'genre', queryValue: 'Action' },
   { value: 'adventure', label: 'Adventure', mode: 'genre', queryValue: 'Adventure' },
@@ -220,6 +222,7 @@ const GENRE_OPTIONS: GenreFilterOption[] = [
   { value: 'suspense', label: 'Suspense', mode: 'genre', queryValue: 'Thriller' },
   { value: 'thriller', label: 'Thriller', mode: 'genre', queryValue: 'Thriller' },
   { value: 'vampire', label: 'Vampire', mode: 'tag', queryValue: 'Vampire' },
+  { value: 'secret-genre', label: 'Secret' },
 ];
 
 const PAGE_INFO_FALLBACK: BrowsePageInfo = {
@@ -400,7 +403,6 @@ const MangaListCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => 
               </span>
             ) : null}
           </div>
-          {/* Changed font-black to font-semibold and text-[1.08rem] to text-lg */}
           <h3 className="truncate pr-2 text-lg font-semibold leading-tight text-white transition-colors group-hover:text-white/90">
             {manga.title}
           </h3>
@@ -414,7 +416,6 @@ const MangaListCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => 
         <div className="grid grid-cols-[1.2fr_.8fr_1fr] gap-3">
           <div className="min-w-0 border-r border-white/[0.05] pr-3">
             <span className="block text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Status</span>
-            {/* Removed the intense uppercase tracking on values, changed to font-medium/semibold */}
             <span className={`mt-1 block text-sm font-semibold capitalize ${manga.statusLabel === 'Publishing' ? 'text-[var(--app-accent)]' : 'text-[var(--app-accent)]'}`}>
               {manga.statusLabel}
             </span>
@@ -469,12 +470,10 @@ const MangaGridCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => 
     </div>
 
     <div className="flex flex-1 flex-col p-3.5">
-      {/* Changed font-black to font-semibold */}
       <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-white transition-colors group-hover:text-[var(--app-accent)]">
         {manga.title}
       </h3>
       <div className="mt-auto pt-2">
-        {/* Removed uppercase and heavy tracking for a standard clean look */}
         <p className="truncate text-xs font-medium text-zinc-400">
           {manga.year || 'N/A'} • <span className={manga.statusLabel === 'Publishing' ? 'text-[var(--app-accent)]' : ''}>{manga.statusLabel}</span>
         </p>
@@ -485,10 +484,10 @@ const MangaGridCard: React.FC<{ manga: BrowseManga; navigate: (path: string) => 
 
 const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const[searchParams, setSearchParams] = useSearchParams();
 
   // Layout View State (persisted)
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+  const[viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
     return (localStorage.getItem('browseViewMode') as 'list' | 'grid') || 'list';
   });
 
@@ -500,7 +499,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
   const committedType = searchParams.get('format') || '';
   const committedGenres = parseMultiValueParam(searchParams.get('genres'));
   const legacyGenre = searchParams.get('genre') || '';
-  const committedGenre = committedGenres.length ? committedGenres : legacyGenre ? [legacyGenre] : [];
+  const committedGenre = committedGenres.length ? committedGenres : legacyGenre ? [legacyGenre] :[];
   const committedGenreKey = committedGenre.join(',');
   const committedStatus = searchParams.get('status') || '';
   const committedLanguage = searchParams.get('language') || '';
@@ -509,19 +508,19 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
   const committedRelease = searchParams.get('release') || '';
   const currentPage = resolvePageParam(searchParams.get('page'));
 
-  const [topbarQuery, setTopbarQuery] = useState('');
+  const[topbarQuery, setTopbarQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState(committedQuery);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState(committedType);
+  const[typeFilter, setTypeFilter] = useState(committedType);
   const [genreFilter, setGenreFilter] = useState(committedGenre);
   const [statusFilter, setStatusFilter] = useState(committedStatus);
   const [languageFilter, setLanguageFilter] = useState(committedLanguage);
-  const [yearFilter, setYearFilter] = useState(committedYear);
+  const[yearFilter, setYearFilter] = useState(committedYear);
   const [lengthFilter, setLengthFilter] = useState(committedLength);
   const [releaseFilter, setReleaseFilter] = useState(committedRelease);
 
-  const [mangaList, setMangaList] = useState<BrowseManga[]>([]);
-  const [pageInfo, setPageInfo] = useState<BrowsePageInfo>(PAGE_INFO_FALLBACK);
+  const[mangaList, setMangaList] = useState<BrowseManga[]>([]);
+  const[pageInfo, setPageInfo] = useState<BrowsePageInfo>(PAGE_INFO_FALLBACK);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -531,14 +530,13 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
   );
 
   const yearOptions = useMemo(
-    () => [
+    () =>[
       { value: '', label: 'Year' },
       ...Array.from({ length: 40 }, (_, index) => {
         const year = String(new Date().getFullYear() - index);
         return { value: year, label: year };
       }),
-    ],
-    []
+    ],[]
   );
 
   useEffect(() => {
@@ -576,7 +574,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       }
     `;
     document.head.appendChild(style);
-  }, []);
+  },[]);
 
   useEffect(() => {
     setSearchQuery(committedQuery);
@@ -587,7 +585,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
     setYearFilter(committedYear);
     setLengthFilter(committedLength);
     setReleaseFilter(committedRelease);
-  }, [
+  },[
     committedGenreKey,
     committedLanguage,
     committedLength,
@@ -600,7 +598,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
 
   useEffect(() => {
     setActiveDropdown(null);
-  }, [currentPage, committedLanguage, committedLength, committedQuery, committedRelease, committedStatus, committedType, committedYear]);
+  },[currentPage, committedLanguage, committedLength, committedQuery, committedRelease, committedStatus, committedType, committedYear]);
 
   const commitBrowseParams = useCallback(
     (overrides?: Partial<Record<'q' | 'format' | 'status' | 'language' | 'year' | 'length' | 'release', string> & { genres: string[] }> & { page?: number }) => {
@@ -648,8 +646,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       else nextParams.delete('page');
 
       setSearchParams(nextParams);
-    },
-    [
+    },[
       genreFilter,
       languageFilter,
       lengthFilter,
@@ -679,25 +676,24 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
     (rawQuery: string) => {
       setSearchQuery(rawQuery);
       commitBrowseParams({ q: rawQuery, page: 1 });
-    },
-    [commitBrowseParams]
+    },[commitBrowseParams]
   );
 
   const updateTypeFilter = useCallback((value: string) => {
     setTypeFilter(value);
     commitBrowseParams({ format: value, page: 1 });
-  }, [commitBrowseParams]);
+  },[commitBrowseParams]);
 
   const updateGenreFilter = useCallback((value: string) => {
     const nextValue = value === ''
-      ? []
+      ?[]
       : genreFilter.includes(value)
         ? genreFilter.filter((entry) => entry !== value)
         : [...genreFilter, value];
 
     setGenreFilter(nextValue);
     commitBrowseParams({ genres: nextValue, page: 1 });
-  }, [commitBrowseParams, genreFilter]);
+  },[commitBrowseParams, genreFilter]);
 
   const updateStatusFilter = useCallback((value: string) => {
     setStatusFilter(value);
@@ -732,8 +728,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
 
       commitBrowseParams({ page });
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    },
-    [commitBrowseParams, currentPage, pageInfo.lastPage]
+    },[commitBrowseParams, currentPage, pageInfo.lastPage]
   );
 
   useEffect(() => {
@@ -746,7 +741,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
     }, 260);
 
     return () => window.clearTimeout(timeoutId);
-  }, [commitBrowseParams, committedQuery, searchQuery]);
+  },[commitBrowseParams, committedQuery, searchQuery]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -756,7 +751,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       page: currentPage,
       perPage: ITEMS_PER_PAGE,
       formatNotIn: ['NOVEL'],
-      sort: [getSortKey(initialSort, committedRelease, Boolean(committedQuery.trim()))],
+      sort:[getSortKey(initialSort, committedRelease, Boolean(committedQuery.trim()))],
     };
 
     if (committedQuery.trim()) {
@@ -782,6 +777,11 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
 
     if (tagValues.length) {
       variables.tagIn = tagValues;
+    }
+
+    // Pass the isAdult parameter strictly when the "Secret" genre toggle is active
+    if (committedGenre.includes('secret-genre')) {
+      variables.isAdult = true;
     }
 
     if (committedStatus === 'publishing') {
@@ -845,7 +845,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
           ? pagePayload.media
               .map((entry: AniListMedia) => mapAniListMediaToBrowseManga(entry))
               .filter(Boolean) as BrowseManga[]
-          : [];
+          :[];
 
         setMangaList(mappedResults);
         setPageInfo({
@@ -871,7 +871,7 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       });
 
     return () => controller.abort();
-  }, [
+  },[
     committedGenreKey,
     committedLanguage,
     committedLength,
@@ -910,13 +910,13 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
       />
 
       <main className="mx-auto w-full max-w-[1420px] space-y-6 px-4 py-8">
-                <section className="flex items-end justify-between gap-4">
+        <section className="flex items-end justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">Library</p>
             <h1 className="mt-2 text-4xl font-bold uppercase tracking-tight text-white">BROWSE</h1>
           </div>
         </section>
-        {/* Wrapping the filters and layout toggles together so they sit cleanly on the same line */}
+        
         <div className="flex w-full flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">
             <DesktopBrowseFilters
@@ -980,7 +980,6 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
             />
           </div>
 
-          {/* Minimalist Layout Toggles - Placed precisely to the right of the desktop filters */}
           <div className="flex shrink-0 items-center justify-end">
             <div className="flex h-[42px] items-center gap-1 rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-1 shadow-sm xl:h-11">
               <button
@@ -1112,4 +1111,3 @@ const Browse: React.FC<BrowseProps> = ({ initialSort = 'popularity' }) => {
 };
 
 export default Browse;
-
