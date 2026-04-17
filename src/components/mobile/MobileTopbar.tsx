@@ -1,0 +1,252 @@
+import React, { useEffect, useState } from 'react';
+import { Menu, Palette, Search, X } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { handleRippleMouseDown } from '../../utils/ripple';
+import { BrandLogo, SearchResult, topbarNavItems, TopbarSearchResultsContent } from '../shared/topbarShared';
+import { getStoredTheme, setTheme, THEME_OPTIONS, ThemeKey } from '../../utils/theme';
+import { useContentMode } from '../../utils/contentMode';
+
+interface MobileTopbarProps {
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  clearSearch: () => void;
+  submitSearch: (query: string) => void;
+  openResult: (result: SearchResult) => void;
+  isSearching: boolean;
+  showSearch: boolean;
+  setShowSearch: (value: boolean) => void;
+  searchMounted: boolean;
+  searchResults: SearchResult[];
+}
+
+const MobileTopbar: React.FC<MobileTopbarProps> = ({
+  searchQuery,
+  onSearchQueryChange,
+  clearSearch,
+  submitSearch,
+  openResult,
+  isSearching,
+  showSearch,
+  setShowSearch,
+  searchMounted,
+  searchResults,
+}) => {
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [theme, setThemeState] = useState<ThemeKey>('emerald');
+  const { isAnimeMode, toggleMode, brandName } = useContentMode();
+
+  useEffect(() => {
+    setThemeState(getStoredTheme());
+  }, []);
+
+  useEffect(() => {
+    if (menuOpen) {
+      setMenuMounted(true);
+      return;
+    }
+    if (!menuMounted) return;
+    const timeoutId = window.setTimeout(() => setMenuMounted(false), 220);
+    return () => window.clearTimeout(timeoutId);
+  }, [menuMounted, menuOpen]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setSearchOpen(true);
+    }
+  }, [searchQuery]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setShowSearch(false);
+    clearSearch();
+  };
+
+  const handleThemeSelect = (nextTheme: ThemeKey) => {
+    setTheme(nextTheme);
+    setThemeState(nextTheme);
+  };
+
+  return (
+    <div className="relative lg:hidden">
+      <div className="mx-auto flex w-full max-w-[1420px] items-center justify-between gap-3 px-4 py-3">
+        <button onClick={() => navigate('/')} onMouseDown={handleRippleMouseDown} className="ripple-button px-1 py-1 transition-opacity hover:opacity-90">
+          <BrandLogo />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSearchOpen((current) => !current);
+              setMenuOpen(false);
+            }}
+            onMouseDown={handleRippleMouseDown}
+            className="ripple-button flex h-11 w-11 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-1)] text-zinc-300 transition-colors hover:text-white"
+          >
+            {searchOpen ? <X size={16} /> : <Search size={16} />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen((current) => !current);
+              setSearchOpen(false);
+              setShowSearch(false);
+            }}
+            onMouseDown={handleRippleMouseDown}
+            className="ripple-button flex h-11 w-11 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-1)] text-zinc-300 transition-colors hover:text-white"
+          >
+            {menuOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
+        </div>
+      </div>
+
+      <div
+        className={`mx-auto max-w-[1420px] overflow-hidden px-4 transition-[max-height,opacity,transform] duration-300 ${
+          searchOpen ? 'max-h-[28rem] translate-y-0 opacity-100 pb-3' : 'max-h-0 -translate-y-2 opacity-0'
+        }`}
+      >
+        <div className="rounded-[1.6rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 shadow-[0_22px_48px_-28px_rgba(0,0,0,0.92)]">
+          <div className="relative flex items-center overflow-hidden rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-surface-1)]">
+            <Search
+              className={`absolute left-4 transition-all duration-300 ${
+                searchQuery.trim() ? 'text-[var(--app-accent)]' : 'text-zinc-600'
+              }`}
+              size={14}
+            />
+            <input
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              onFocus={() => searchQuery.trim() && setShowSearch(true)}
+              onBlur={() => window.setTimeout(() => setShowSearch(false), 160)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  submitSearch(searchQuery);
+                }
+                if (event.key === 'Escape') {
+                  closeSearch();
+                }
+              }}
+              className="w-full bg-transparent py-3 pl-11 pr-12 text-[11px] font-black uppercase tracking-[0.18em] text-gray-200 outline-none placeholder:text-zinc-600"
+              placeholder="Search"
+              autoComplete="off"
+            />
+            {searchQuery ? (
+              <button type="button" onClick={clearSearch} onMouseDown={handleRippleMouseDown} className="ripple-button absolute right-2 rounded-full p-2 text-zinc-500 transition-colors hover:text-[var(--app-accent)]">
+                <X size={14} />
+              </button>
+            ) : null}
+          </div>
+
+          {searchMounted ? (
+            <div
+              className={`mt-3 overflow-hidden rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] transition-all duration-300 ${
+                showSearch ? 'pointer-events-auto translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-2 scale-95 opacity-0'
+              }`}
+            >
+              <TopbarSearchResultsContent
+                isSearching={isSearching}
+                searchQuery={searchQuery}
+                searchResults={searchResults}
+                onOpenResult={openResult}
+                onSubmitSearch={() => submitSearch(searchQuery)}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {menuMounted ? (
+        <div
+          className={`mx-auto max-w-[1420px] px-4 pb-3 transition-all duration-300 ${
+            menuOpen ? 'pointer-events-auto translate-y-0 opacity-100' : 'pointer-events-none -translate-y-2 opacity-0'
+          }`}
+        >
+          <div className="overflow-hidden rounded-[1.6rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-[0_22px_48px_-28px_rgba(0,0,0,0.92)]">
+            <nav className="grid grid-cols-2 gap-2 p-3">
+              {topbarNavItems.map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-[1.1rem] border px-3 py-3 text-sm font-black transition-all ${
+                        isActive
+                          ? 'border-[var(--app-border)] bg-[var(--app-accent-muted)] text-[var(--app-accent)]'
+                          : 'border-[var(--app-border)] bg-[var(--app-surface-2)] text-zinc-300'
+                      }`
+                    }
+                  >
+                    <Icon size={15} />
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
+
+            <div className="border-t border-white/[0.06] p-3">
+              <div className="mb-3 rounded-[1.1rem] border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">Mode</div>
+                    <div className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-white">{brandName}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleMode}
+                    onPointerDown={handleRippleMouseDown}
+                    className={`ripple-button relative flex h-9 w-[74px] items-center rounded-full border px-1 transition-colors ${
+                      isAnimeMode ? 'border-[var(--app-accent-soft)] bg-[var(--app-accent-muted)]' : 'border-[var(--app-border)] bg-black/20'
+                    }`}
+                  >
+                    <span
+                      className={`absolute h-7 w-7 rounded-full transition-transform ${
+                        isAnimeMode ? 'translate-x-[36px] bg-[var(--app-accent)]' : 'translate-x-0 bg-zinc-500'
+                      }`}
+                    />
+                    <span className="relative z-10 flex w-full items-center justify-between px-2 text-[9px] font-black uppercase tracking-[0.14em]">
+                      <span className={isAnimeMode ? 'text-zinc-500' : 'text-white'}>Web</span>
+                      <span className={isAnimeMode ? 'text-[#04110d]' : 'text-zinc-500'}>TV</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-3 rounded-[1.1rem] border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
+                <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400">
+                  <Palette size={14} style={{ color: 'var(--app-accent)' }} />
+                  Theme
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {THEME_OPTIONS.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => handleThemeSelect(option.key)}
+                      onPointerDown={handleRippleMouseDown}
+                      className={`ripple-button rounded-[0.95rem] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] transition-colors ${
+                        theme === option.key ? 'text-[var(--app-accent)]' : 'bg-black/20 text-zinc-300'
+                      }`}
+                      style={theme === option.key ? { backgroundColor: 'var(--app-accent-muted)' } : undefined}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+export default MobileTopbar;
