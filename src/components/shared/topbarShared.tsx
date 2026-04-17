@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bookmark, ChevronRight, Clock, Dices, FilterX, Folder, Home, Layers, Search, Star, Smartphone } from 'lucide-react';
+import { Bookmark, ChevronRight, Clock, Dices, FilterX, Folder, Home, Layers, Search, Star } from 'lucide-react';
 import { handleRippleMouseDown } from '../../utils/ripple';
 
 export interface SearchResult {
@@ -10,13 +10,11 @@ export interface SearchResult {
   type?: string;
   status?: string;
   images: {
-    jpg: {
-      image_url: string;
-    };
+    jpg: { image_url: string; };
   };
 }
 
-export const topbarNavItems: Array<{ icon: React.ElementType; label: string; to: string }> = [
+export const topbarNavItems = [
   { icon: Home, label: 'Home', to: '/' },
   { icon: Folder, label: 'Browse', to: '/browse' },
   { icon: Bookmark, label: 'Bookmarks', to: '/bookmarks' },
@@ -35,89 +33,53 @@ export const BrandLogo: React.FC = () => (
   </div>
 );
 
-interface TopbarSearchResultsProps {
+export const TopbarSearchResultsContent: React.FC<{
   isSearching: boolean;
   searchQuery: string;
   searchResults: SearchResult[];
   onOpenResult: (result: SearchResult) => void;
   onSubmitSearch: () => void;
-}
-
-export const TopbarSearchResultsContent: React.FC<TopbarSearchResultsProps> = ({
-  isSearching,
-  searchQuery,
-  searchResults,
-  onOpenResult,
-  onSubmitSearch,
-}) => (
+}> = ({ isSearching, searchQuery, searchResults, onOpenResult, onSubmitSearch }) => (
   <>
     <div className="relative border-b border-[var(--app-border)] bg-[var(--app-surface-2)] px-6 py-5">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <span className="text-[9px] font-black uppercase tracking-[0.28em] text-zinc-500">Search Library</span>
-          <p className="mt-2 text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300">
-            {isSearching ? 'Scanning' : searchQuery.trim() ? 'Results Ready' : 'Idle'}
-          </p>
+          <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Library</span>
+          <p className="text-[11px] font-black uppercase text-zinc-300">{isSearching ? 'Scanning...' : 'Results'}</p>
         </div>
-        <span className="rounded-full border px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.2em] text-[var(--app-accent)]" style={{ borderColor: 'var(--app-accent-soft)', backgroundColor: 'var(--app-accent-muted)' }}>
-          {searchResults.length} hits
+        <span className="rounded-full border border-[var(--app-accent-soft)] bg-[var(--app-accent-muted)] px-3 py-1 text-[8px] font-black text-[var(--app-accent)]">
+          {searchResults.length} Hits
         </span>
       </div>
     </div>
 
-    <div className="max-h-[62vh] space-y-2 overflow-y-auto px-3 py-3">
-      {searchResults.length > 0 ? (
-        searchResults.map((manga) => (
-          <button
-            key={`${manga.id}-${manga.mal_id}`}
-            type="button"
-            onClick={() => onOpenResult(manga)}
-            onMouseDown={handleRippleMouseDown}
-            className="ripple-button group/item relative flex w-full items-center gap-4 rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 text-left transition-all duration-300 hover:bg-[var(--app-surface-2)]"
-            style={{ borderColor: 'var(--app-border)' }}
-          >
-            <div className="relative h-16 w-12 flex-shrink-0 overflow-hidden rounded-[1rem] bg-[var(--app-card)]">
-              <img src={manga.images.jpg.image_url} className="h-full w-full object-cover transition-transform duration-500 group-hover/item:scale-105" alt={manga.title} />
-              <div className="absolute inset-0 rounded-[1rem] ring-1 ring-inset ring-white/[0.08] transition-all" style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }} />
+    <div className="max-h-[60vh] overflow-y-auto p-3 space-y-2">
+      {searchResults.map((manga) => (
+        <button
+          key={manga.id}
+          type="button"
+          // CRITICAL FIX: onMouseDown + preventDefault stops the search bar from closing before the click works
+          onMouseDown={(e) => { e.preventDefault(); onOpenResult(manga); }}
+          className="flex w-full items-center gap-4 rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 text-left transition-all hover:bg-[var(--app-surface-2)]"
+        >
+          <img src={manga.images.jpg.image_url} className="h-14 w-10 rounded-lg object-cover" alt="" />
+          <div className="flex-1 min-w-0">
+            <h4 className="truncate text-[11px] font-black uppercase text-white/90">{manga.title}</h4>
+            <div className="mt-1 flex items-center gap-2 text-[9px] font-bold text-zinc-500">
+              <Star size={10} className="text-[var(--app-accent)] fill-current" />
+              {manga.score || 'N/A'} • {manga.type}
             </div>
-
-            <div className="min-w-0 flex-1">
-              <h4 className="truncate pr-3 text-[11px] font-black uppercase tracking-tight text-white/90 transition-colors group-hover/item:text-white">
-                {manga.title}
-              </h4>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-1 text-[10px] font-black text-[var(--app-accent)]">
-                  <Star size={10} className="fill-current text-[var(--app-accent)]" />
-                  {manga.score ? manga.score.toFixed(1) : 'N/A'}
-                </div>
-                <span className="text-[8px] font-black uppercase tracking-[0.24em] text-zinc-500">
-                  {[manga.type || 'Manga', manga.status || 'Unknown'].join(' / ')}
-                </span>
-              </div>
-            </div>
-
-            <ChevronRight size={14} className="text-zinc-700 transition-all group-hover/item:translate-x-1 group-hover/item:text-[var(--app-accent)]" />
-          </button>
-        ))
-      ) : !isSearching ? (
-        <div className="flex flex-col items-center py-12 opacity-25">
-          <FilterX size={32} className="mb-2" />
-          <span className="text-[9px] font-black uppercase tracking-[0.32em]">No Matches</span>
-        </div>
-      ) : null}
+          </div>
+          <ChevronRight size={14} className="text-zinc-600" />
+        </button>
+      ))}
     </div>
 
     <button
-      type="button"
-      onClick={onSubmitSearch}
-      onMouseDown={handleRippleMouseDown}
-      className="ripple-button group w-full border-t border-[var(--app-border)] py-4 transition-colors"
-      style={{ backgroundColor: 'var(--app-accent-muted)' }}
+      onMouseDown={(e) => { e.preventDefault(); onSubmitSearch(); }}
+      className="w-full py-4 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--app-accent)] bg-[var(--app-accent-muted)] border-t border-[var(--app-border)]"
     >
-      <span className="text-[9px] font-black uppercase tracking-[0.32em] text-[var(--app-accent)] transition-all group-hover:tracking-[0.38em]">
-        Open Browse Results
-      </span>
+      Open All Results
     </button>
   </>
 );
