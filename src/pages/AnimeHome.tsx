@@ -115,7 +115,8 @@ const ContinueWatchingCard: React.FC<{
 }> = ({ entry, navigate, onClear }) => {
   return (
     <div
-      onClick={() => navigate(entry.href || `/watch/${entry.animeId}`)}
+      // CHANGED: Now it only navigates to the base anime page, not the episode link
+      onClick={() => navigate(`/watch/${entry.animeId}`)}
       style={{ fontFamily: APP_FONT }}
       className="group relative flex min-h-44 gap-3 overflow-hidden rounded-[1.4rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] p-3 transition-all duration-300 hover:bg-[var(--app-surface-2)] hover:shadow-[0_20px_55px_-30px_rgba(0,0,0,0.85)] cursor-pointer"
     >
@@ -148,7 +149,7 @@ const ContinueWatchingCard: React.FC<{
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                // Navigate directly to episode, no more saving progress/timestamps
+                // Resume button still navigates directly to the episode player
                 if (entry.href) {
                   navigate(entry.href);
                 } else {
