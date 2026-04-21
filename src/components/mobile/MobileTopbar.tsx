@@ -158,24 +158,6 @@ const MobileTopbar: React.FC<MobileTopbarProps> = ({
               </button>
             </div>
 
-            {/* Themes Section - RESTORED */}
-            <div className="rounded-[1.1rem] border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
-              <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                <Palette size={14} className="text-[var(--app-accent)]" />
-                System Appearance
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {THEME_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => handleThemeChange(option.key)}
-                    className={`rounded-[0.8rem] py-2 text-[9px] font-black uppercase transition-all ${theme === option.key ? 'bg-[var(--app-accent-muted)] text-[var(--app-accent)]' : 'bg-black/20 text-white hover:text-white-500'}`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>
