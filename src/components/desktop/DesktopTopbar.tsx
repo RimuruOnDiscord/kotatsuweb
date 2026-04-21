@@ -5,6 +5,8 @@ import { BrandLogo, SearchResult, topbarNavItems, TopbarSearchResultsContent } f
 import { useContentMode } from '../../utils/contentMode';
 import SettingsModal from '../shared/SettingsModal';
 
+const TOPBAR_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
+
 interface DesktopTopbarProps {
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
@@ -22,14 +24,20 @@ const DesktopNavLink: React.FC<{ icon: React.ElementType; label: string; to: str
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `group relative flex items-center gap-2.5 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300 ${isActive
-        ? 'bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)] text-[var(--app-accent)]'
-        : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+      `relative flex items-center gap-2 px-4 py-2.5 text-[14px] font-medium rounded-xl transition-all duration-200 ${
+        isActive ? 'text-[var(--app-accent)]' : 'text-zinc-500 hover:text-zinc-200'
       }`
     }
   >
-    <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
-    <span className="relative">{label}</span>
+    {({ isActive }) => (
+      <>
+        {isActive && (
+          <span className="absolute inset-0 rounded-xl" style={{ background: 'var(--app-accent-muted)' }} />
+        )}
+        <Icon size={15} strokeWidth={isActive ? 2 : 1.5} className="relative z-10 shrink-0" />
+        <span className="relative z-10">{label}</span>
+      </>
+    )}
   </NavLink>
 );
 
@@ -38,7 +46,6 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
   onSearchQueryChange,
   clearSearch,
   submitSearch,
-  openResult,
   isSearching,
   showSearch,
   setShowSearch,
@@ -53,132 +60,209 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
   const { isAnimeMode, toggleMode, brandName } = useContentMode();
 
   useEffect(() => {
-    if (isAnimeMode && location.pathname === '/') {
-      navigate('/anihome', { replace: true });
-    } else if (!isAnimeMode && location.pathname === '/anihome') {
-      navigate('/', { replace: true });
-    }
+    if (isAnimeMode && location.pathname === '/') navigate('/anihome', { replace: true });
+    else if (!isAnimeMode && location.pathname === '/anihome') navigate('/', { replace: true });
   }, [isAnimeMode, location.pathname, navigate]);
 
-  const getNavRoute = (originalPath: string) => {
-    if (isAnimeMode) {
-      switch (originalPath) {
-        case '/': return '/anihome';
-        case '/browse': return '/anibrowse';
-        case '/random': return '/anirandom';
-        default: return originalPath;
-      }
-    }
-    return originalPath;
+  const getNavRoute = (p: string) => {
+    if (!isAnimeMode) return p;
+    if (p === '/') return '/anihome';
+    if (p === '/browse') return '/anibrowse';
+    if (p === '/random') return '/anirandom';
+    return p;
   };
 
   const handleToggleMode = () => {
-    const current = location.pathname;
-    let nextPath = isAnimeMode ? '/' : '/anihome';
-    if (current.includes('/browse') || current.includes('/anibrowse')) {
-      nextPath = isAnimeMode ? '/browse' : '/anibrowse';
-    } else if (current.includes('/random') || current.includes('/anirandom')) {
-      nextPath = isAnimeMode ? '/random' : '/anirandom';
-    }
+    const cur = location.pathname;
+    let next = isAnimeMode ? '/' : '/anihome';
+    if (cur.includes('browse')) next = isAnimeMode ? '/browse' : '/anibrowse';
+    else if (cur.includes('random')) next = isAnimeMode ? '/random' : '/anirandom';
     toggleMode();
-    window.location.assign(nextPath);
+    window.location.assign(next);
   };
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setIsExpanded(false);
         setShowSearch(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [setShowSearch]);
 
-  return (
-    <div className="mx-auto hidden w-full max-w-[1420px] items-center justify-between gap-6 px-6 py-4 lg:flex">
-      <div className="flex min-w-0 items-center gap-8">
-        <button
-          onClick={() => navigate(getNavRoute('/'))}
-          className="flex items-center gap-3 transition-all duration-300 hover:opacity-80 active:scale-95 group"
-        >
-          <BrandLogo />
-          <span className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-[var(--app-accent)]">
-            {brandName}
-          </span>
-        </button>
-        <nav className="flex items-center gap-1">
-          {topbarNavItems.map((item) => (
-            <DesktopNavLink key={item.to} icon={item.icon} label={item.label} to={getNavRoute(item.to)} />
-          ))}
-        </nav>
-      </div>
+  // shared height for all right-side interactive elements
+  const H = 40;
 
-      <div className="flex shrink-0 items-center gap-2">
-        <div ref={searchRef} className="relative flex items-center">
-          <div className={`group relative flex items-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${isExpanded ? 'w-[320px]' : 'w-10'}`}>
-            <div className={`absolute -inset-[1px] rounded-[1.25rem] bg-[var(--app-accent)] blur-[2px] transition-opacity duration-500 ${isExpanded ? 'opacity-20' : 'opacity-0'}`} />
-            <button
-              onClick={() => {
-                setIsExpanded(true);
-                setTimeout(() => inputRef.current?.focus(), 100);
-              }}
-              className={`absolute left-0 z-20 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${isExpanded ? 'translate-x-0 text-[var(--app-accent)]' : 'text-zinc-400 hover:bg-white/5'}`}
+  return (
+    <>
+      <div
+        className="mx-auto hidden w-full max-w-[1420px] lg:flex items-center justify-between px-6 py-4"
+        style={{ fontFamily: TOPBAR_FONT }}
+      >
+        {/* ── Left ── */}
+        <div className="flex items-center gap-6 min-w-0">
+          {/* Brand */}
+          <button
+            onClick={() => navigate(getNavRoute('/'))}
+            className="flex items-center gap-3 shrink-0 transition-opacity hover:opacity-70 active:scale-95"
+          >
+            <BrandLogo />
+            <span
+              className="text-[19px] font-semibold tracking-tight text-white"
+              style={{ fontFamily: '"Syne", sans-serif' }}
             >
-              <Search size={16} className={isExpanded ? 'scale-110' : ''} />
-            </button>
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                onSearchQueryChange(e.target.value);
-                if (!showSearch && e.target.value.trim()) setShowSearch(true);
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && submitSearch(searchQuery)}
-              placeholder={isAnimeMode ? 'Search Anime...' : 'Search Manga...'}
-              className={`peer relative h-11 w-full rounded-[1.2rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] pl-11 text-[13px] font-medium text-white shadow-inner outline-none transition-all duration-500 placeholder:text-zinc-500 hover:bg-[var(--app-surface-2)] focus:border-[var(--app-accent)] ${isExpanded ? 'opacity-100 pr-10' : 'w-0 border-transparent bg-transparent opacity-0'}`}
-            />
-            {isExpanded && searchQuery && (
-              <button onClick={clearSearch} className="absolute right-3 z-10 flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 transition-all">
-                {isSearching ? <Loader2 size={14} className="animate-spin text-[var(--app-accent)]" /> : <X size={14} className="hover:text-[var(--app-accent)]" />}
+              {brandName}
+            </span>
+          </button>
+
+          <div className="h-5 w-px shrink-0" style={{ background: 'var(--app-border)' }} />
+
+          <nav className="flex items-center gap-0.5">
+            {topbarNavItems.map((item) => (
+              <DesktopNavLink key={item.to} icon={item.icon} label={item.label} to={getNavRoute(item.to)} />
+            ))}
+          </nav>
+        </div>
+
+        {/* ── Right ── */}
+        <div className="flex shrink-0 items-center gap-2.5">
+
+          {/* Search */}
+          <div ref={searchRef} className="relative flex items-center">
+            <div
+              className={`relative overflow-hidden flex items-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+                isExpanded ? 'w-[300px]' : 'w-10'
+              }`}
+              style={{ height: H }}
+            >
+
+              {/* Search icon / button */}
+              <button
+                onClick={() => { setIsExpanded(true); setTimeout(() => inputRef.current?.focus(), 80); }}
+                className={`absolute left-0 z-20 flex items-center justify-center transition-all duration-200 ${
+                  isExpanded ? 'text-[var(--app-accent)]' : 'text-zinc-400 hover:text-zinc-200 active:scale-90'
+                }`}
+                style={{
+                  width: H,
+                  height: H,
+                  borderRadius: 12,
+                  background: isExpanded ? 'transparent' : 'var(--app-surface-1)',
+                  border: isExpanded ? '1px solid transparent' : '1px solid var(--app-border)',
+                  transition: 'background 0.3s, border-color 0.3s',
+                }}
+              >
+                <Search size={16} />
               </button>
+
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  onSearchQueryChange(e.target.value);
+                  if (!showSearch && e.target.value.trim()) setShowSearch(true);
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && submitSearch(searchQuery)}
+                placeholder={isAnimeMode ? 'Search anime...' : 'Search manga...'}
+                className={`w-full text-[14px] text-white outline-none placeholder:text-zinc-600 transition-all duration-500 ${
+                  isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                }`}
+                style={{
+                  height: H,
+                  borderRadius: 12,
+                  paddingLeft: H + 2,
+                  paddingRight: 40,
+                  background: 'var(--app-surface-1)',
+                  border: '1px solid var(--app-border)',
+                }}
+              />
+
+              {isExpanded && searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 z-10 flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:text-zinc-300"
+                >
+                  {isSearching
+                    ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--app-accent)' }} />
+                    : <X size={14} />
+                  }
+                </button>
+              )}
+            </div>
+
+            {/* Dropdown */}
+            {isExpanded && showSearch && searchQuery.length >= 2 && (
+              <div
+                className="absolute top-full right-0 z-50 mt-2.5 w-[400px] overflow-hidden"
+                style={{
+                  borderRadius: 16,
+                  border: '1px solid var(--app-border)',
+                  background: 'var(--app-surface-1)',
+                  boxShadow: '0 32px 64px rgba(0,0,0,0.6)',
+                }}
+              >
+                <TopbarSearchResultsContent
+                  isSearching={isSearching}
+                  searchQuery={searchQuery}
+                  searchResults={searchResults}
+                  isAnimeMode={isAnimeMode}
+                  onOpenResult={(slug) => {
+                    navigate(`/watch/${slug}`);
+                    setIsExpanded(false);
+                    setShowSearch(false);
+                  }}
+                  onSubmitSearch={() => {
+                    submitSearch(searchQuery);
+                    setIsExpanded(false);
+                    setShowSearch(false);
+                  }}
+                />
+              </div>
             )}
           </div>
 
-          {isExpanded && showSearch && searchQuery.length >= 2 && (
-            <div className="absolute top-full right-0 z-50 mt-3 w-[400px] overflow-hidden rounded-[1.6rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-2xl backdrop-blur-xl">
-              <TopbarSearchResultsContent
-                isSearching={isSearching}
-                searchQuery={searchQuery}
-                searchResults={searchResults}
-                isAnimeMode={isAnimeMode}
-                onOpenResult={(slug: string) => {
-                  // This forces /watch regardless of params
-                  navigate(`/watch/${slug}`);
-                  setIsExpanded(false);
-                  setShowSearch(false);
-                }}
-                onSubmitSearch={() => {
-                  submitSearch(searchQuery);
-                  setIsExpanded(false);
-                  setShowSearch(false);
-                }}
-              />
-            </div>
-          )}
-        </div>
+          {/* Mode + Settings pill — same height as search */}
+          <div
+            className="flex items-center gap-1 px-1.5"
+            style={{
+              height: H,
+              borderRadius: 13,
+              background: 'var(--app-surface-1)',
+              border: '1px solid var(--app-border)',
+            }}
+          >
+            <button
+              onClick={handleToggleMode}
+              title={isAnimeMode ? 'Switch to Manga' : 'Switch to Anime'}
+              className="flex items-center justify-center rounded-[10px] text-zinc-400 transition-all hover:text-zinc-100 active:scale-90"
+              style={{ width: 32, height: 32 }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--app-surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {isAnimeMode ? <Tv size={16} strokeWidth={1.5} /> : <Book size={16} strokeWidth={1.5} />}
+            </button>
 
-        <button onClick={handleToggleMode} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-1)] text-zinc-400 transition-all hover:bg-[var(--app-surface-2)] active:scale-95">
-          {isAnimeMode ? <Tv size={16} /> : <Book size={16} />}
-        </button>
-        <button onClick={() => setIsSettingsOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-1)] text-zinc-400 transition-all hover:bg-[var(--app-surface-2)] hover:text-white active:scale-95">
-          <Settings size={16} />
-        </button>
+            <div className="h-4 w-px" style={{ background: 'var(--app-border)' }} />
+
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              title="Settings"
+              className="flex items-center justify-center rounded-[10px] text-zinc-400 transition-all hover:text-zinc-100 active:scale-90"
+              style={{ width: 32, height: 32 }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--app-surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Settings size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+
+        </div>
       </div>
 
       <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-    </div>
+    </>
   );
 };
 
