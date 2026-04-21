@@ -6,7 +6,7 @@ import { getStoredTheme, setTheme, THEME_OPTIONS, ThemeKey } from '../../utils/t
 import { useContentMode } from '../../utils/contentMode';
 import { useAuth } from '../../lib/AuthContext';
 import SettingsModal from '../shared/SettingsModal';
-import { User as UserIcon } from 'lucide-react';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 interface MobileTopbarProps {
   searchQuery: string;
@@ -85,7 +85,7 @@ const MobileTopbar: React.FC<MobileTopbarProps> = ({
                 alt="Profile"
               />
             ) : (
-              <UserIcon size={16} className="text-zinc-400 group-hover:text-white" />
+              <SettingsIcon size={16} className="text-zinc-400 group-hover:text-white" />
             )}
           </button>
           <button onClick={() => { setSearchOpen(!searchOpen); setMenuOpen(false); }} className="h-10 w-10 flex items-center justify-center rounded-full border border-[var(--app-border)] bg-[var(--app-surface-1)] text-zinc-300 transition-all hover:text-white">
