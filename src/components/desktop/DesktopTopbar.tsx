@@ -24,20 +24,14 @@ const DesktopNavLink: React.FC<{ icon: React.ElementType; label: string; to: str
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `relative flex items-center gap-2 px-4 py-2.5 text-[14px] font-medium rounded-xl transition-all duration-200 ${
-        isActive ? 'text-[var(--app-accent)]' : 'text-zinc-500 hover:text-zinc-200'
+      `group relative flex items-center gap-2.5 rounded-[10px] px-4 py-2 text-sm font-medium transition-all duration-300 ${isActive
+        ? 'bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)] text-[var(--app-accent)]'
+        : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
       }`
     }
   >
-    {({ isActive }) => (
-      <>
-        {isActive && (
-          <span className="absolute inset-0 rounded-xl" style={{ background: 'var(--app-accent-muted)' }} />
-        )}
-        <Icon size={15} strokeWidth={isActive ? 2 : 1.5} className="relative z-10 shrink-0" />
-        <span className="relative z-10">{label}</span>
-      </>
-    )}
+    <Icon className="h-4 w-4 transition-transform group-hover:scale-110" />
+    <span className="relative">{label}</span>
   </NavLink>
 );
 
@@ -106,13 +100,10 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
           {/* Brand */}
           <button
             onClick={() => navigate(getNavRoute('/'))}
-            className="flex items-center gap-3 shrink-0 transition-opacity hover:opacity-70 active:scale-95"
+            className="flex items-center gap-3 transition-all duration-300 hover:opacity-80 active:scale-95 group"
           >
             <BrandLogo />
-            <span
-              className="text-[19px] font-semibold tracking-tight text-white"
-              style={{ fontFamily: '"Syne", sans-serif' }}
-            >
+            <span className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-[var(--app-accent)]">
               {brandName}
             </span>
           </button>
