@@ -20,8 +20,8 @@ const ThemePicker: React.FC<{
           key={option.key}
           onClick={() => onThemeChange(option.key)}
           className={`group relative p-2 rounded-2xl border transition-all duration-300 hover:scale-[1.03] ${theme === option.key
-            ? 'border-[var(--app-accent)] bg-[var(--app-accent-muted)] shadow-[0_4px_24px_var(--app-accent-soft)] -translate-y-1'
-            : 'border-white/[0.05] bg-white/[0.01] hover:border-white/[0.12] hover:bg-white/[0.03]'
+              ? 'border-[var(--app-accent)] bg-[var(--app-accent-muted)] shadow-[0_4px_24px_var(--app-accent-soft)] -translate-y-1'
+              : 'border-white/[0.05] bg-white/[0.01] hover:border-white/[0.12] hover:bg-white/[0.03]'
             }`}
           style={{
             animationDelay: `${index * 50}ms`,
@@ -42,8 +42,8 @@ const ThemePicker: React.FC<{
           </div>
           <div className="pt-3 pb-1 px-1">
             <p className={`text-center text-[13px] font-medium transition-colors ${theme === option.key
-              ? 'text-[var(--app-accent)]'
-              : 'text-zinc-500 group-hover:text-zinc-300'
+                ? 'text-[var(--app-accent)]'
+                : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
               {option.label}
             </p>
@@ -60,8 +60,7 @@ async function uploadAvatarToSupabase(
   file: File
 ): Promise<{ url: string | null; error: string | null }> {
   const ext = file.name.split('.').pop() ?? 'jpg';
-  // Use a unique name each time to avoid browser/CDN caching issues with upsert
-  const path = `${userId}/avatar-${Date.now()}.${ext}`;
+  const path = `${userId}/avatar.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from('avatars')
@@ -70,7 +69,8 @@ async function uploadAvatarToSupabase(
   if (uploadError) return { url: null, error: uploadError.message };
 
   const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  return { url: data.publicUrl, error: null };
+  const url = `${data.publicUrl}?t=${Date.now()}`;
+  return { url, error: null };
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
@@ -209,7 +209,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
               {/* Header */}
               <div
                 className="flex flex-col px-7 pt-7 pb-0 flex-shrink-0"
-                style={{ background: 'var(--app-bg-2, #0f1014)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                style={{
+                  background: 'linear-gradient(160deg, var(--app-accent-muted) 0%, var(--app-bg-2, #0f1014) 100%)',
+                  borderBottom: '1px solid var(--app-accent-soft)',
+                }}
               >
                 <div className="flex justify-between items-start mb-7">
                   <div>
@@ -223,10 +226,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                   </div>
                   <button
                     onClick={onClose}
-                    className="p-2 rounded-xl text-zinc-500 hover:text-white transition-colors mt-0.5"
-                    style={{ background: 'rgba(255,255,255,0.04)' }}
+                    className="p-2 text-zinc-400 hover:text-white transition-all active:scale-90 mt-0.5"
+                    style={{
+                      background: 'var(--app-accent-muted)',
+                      border: '1px solid var(--app-accent-soft)',
+                      borderRadius: '50%',
+                    }}
                   >
-                    <X size={16} strokeWidth={2} />
+                    <X size={15} strokeWidth={2} />
                   </button>
                 </div>
 
