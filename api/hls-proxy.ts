@@ -15,6 +15,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'Accept-Language': 'en-US,en;q=0.9',
       'Origin': new URL(referer).origin,
       'Referer': referer,
+      'X-Forwarded-For': req.headers['x-forwarded-for'] as string || '8.8.8.8',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'cross-site'
     };
 
     if (req.headers['range']) {
