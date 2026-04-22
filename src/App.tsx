@@ -45,7 +45,7 @@ const PageWrapper = ({ children, showFooter = true }) => (
     exit={{ opacity: 0 }}
     transition={{ duration: 0.25, ease: "easeInOut" }}
     // Responsive padding: pt-[60px] for mobile, pt-[80px] for desktop
-    className="relative z-10 flex flex-col min-h-screen pt-[60px] lg:pt-[80px]" 
+    className="relative z-10 flex flex-col min-h-screen pt-[0px] lg:pt-[80px]" 
   >
     <div className="flex-1">
       {children}
