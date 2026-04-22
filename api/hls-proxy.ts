@@ -73,14 +73,20 @@ export default async function handler(request: Request) {
 
           const tagLine = line.replace(/URI="([^"]+)"/g, (_, uri) => {
             const absolute = new URL(uri, targetUrl).toString();
-            return `URI="/api/hls-proxy?url=${encodeURIComponent(absolute)}&referer=${encodedReferer}"`;
+            if (absolute.includes('.m3u8')) {
+              return `URI="/api/hls-proxy?url=${encodeURIComponent(absolute)}&referer=${encodedReferer}"`;
+            }
+            return `URI="${absolute}"`;
           });
           if (tagLine !== line) return tagLine;
 
           if (!trimmed || trimmed.startsWith('#')) return line;
 
           const absolute = new URL(trimmed, targetUrl).toString();
-          return `/api/hls-proxy?url=${encodeURIComponent(absolute)}&referer=${encodedReferer}`;
+          if (absolute.includes('.m3u8')) {
+            return `/api/hls-proxy?url=${encodeURIComponent(absolute)}&referer=${encodedReferer}`;
+          }
+          return absolute;
         })
         .join('\n');
 
