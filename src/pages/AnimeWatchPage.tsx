@@ -931,13 +931,6 @@ const AnimeWatch: React.FC = () => {
   // Generate HLS Url for Vidstack
   const finalStreamUrl = useMemo(() => {
     if (!activeStream || activeStream.type === 'embed') return null;
-    
-    const isM3U8 = activeStream.url.includes('.m3u8');
-    
-    if (activeStream.referer && isM3U8) {
-      return `/api/hls-proxy?url=${encodeURIComponent(activeStream.url)}&referer=${encodeURIComponent(activeStream.referer)}`;
-    }
-    
     return activeStream.url;
   }, [activeStream]);
 
