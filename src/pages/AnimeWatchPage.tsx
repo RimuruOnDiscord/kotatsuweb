@@ -423,7 +423,7 @@ const AnimeWatch: React.FC = () => {
           .select('episode_id, progress_time')
           .eq('user_id', user.id)
           .eq('anime_id', urlSlug)
-          .single();
+          .maybeSingle();
 
         if (error) {
           if (error.code !== 'PGRST116') console.warn('Failed to fetch remote progress:', error);
@@ -1186,7 +1186,7 @@ const AnimeWatch: React.FC = () => {
                   <MediaPlayer
                     ref={playerRef}
                     title={displayTitle}
-                    src={finalStreamUrl || activeStream.url}
+                    src={{ src: finalStreamUrl || activeStream.url, type: 'application/vnd.apple.mpegurl' }}
                     crossOrigin
                     autoPlay={autoPlay}
                     onTimeUpdate={(e: any) => {
