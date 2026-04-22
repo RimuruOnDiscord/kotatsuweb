@@ -8,14 +8,17 @@ const DESIGN_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Onest:wght@300;400;500;600;700&display=swap');
 
   :root {
-    --aw-bg:          #07070d;
-    --aw-s1:          #12121a;
-    --aw-s2:          #1a1a24;
-    --aw-card:        #161620;
-    --aw-border:      rgba(255,255,255,0.05);
-    --aw-border-hi:   rgba(255,255,255,0.15);
-    --aw-accent:      #8b5cf6;
-    --aw-accent-glow: rgba(139, 92, 246, 0.5);
+    --aw-bg:          var(--app-bg);
+    --aw-s1:          var(--app-bg-2);
+    --aw-s2:          var(--app-bg-3);
+    --aw-card:        var(--app-card);
+    --aw-border:      var(--app-border);
+    --aw-border-hi:   var(--app-border-hover);
+    --aw-accent:      var(--app-accent);
+    --aw-accent-2:    var(--app-accent);
+    --aw-accent-dim:  var(--app-accent-muted);
+    --aw-accent-glow: var(--app-accent);
+    --aw-muted:       #ffffffb7;
     --aw-text:        #ffffff;
     --aw-font-display: 'Syne', sans-serif;
     --aw-font-body:    'Onest', sans-serif;
