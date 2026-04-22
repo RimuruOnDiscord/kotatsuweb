@@ -688,7 +688,6 @@ const AnimeWatch: React.FC = () => {
   return (
     <div
       className="aw-root aw-noise min-h-screen flex flex-col relative"
-      style={{ background: 'var(--aw-bg)' }}
     >
 
       {lightsOff && (
@@ -1301,7 +1300,7 @@ const AnimeWatch: React.FC = () => {
                       padding: '10px 20px',
                       borderRadius: 10,
                       border: s.active ? '1px solid var(--aw-accent)' : '1px solid var(--aw-border)',
-                      background: s.active ? 'var(--aw-accent-dim)' : 'var(--aw-card)',
+                      background: s.active ? 'var(--aw-accent-dim)' : 'transparent',
                       color: s.active ? 'var(--aw-accent)' : 'var(--aw-text)',
                       fontFamily: 'var(--aw-font-display)',
                       fontSize: 12,
