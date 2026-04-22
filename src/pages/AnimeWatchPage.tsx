@@ -51,7 +51,21 @@ const DESIGN_STYLES = `
 
   .aw-layout { max-width: 1540px; margin: 0 auto; width: 100%; padding: 28px 24px; gap: 24px; position: relative; z-index: 10; display: grid; grid-template-columns: minmax(0, 1fr); }
   .aw-main { min-width: 0; width: 100%; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 50; }
-  .aw-sidebar { width: 100%; max-width: none; display: flex; flex-direction: column; background: var(--aw-s1); border: 1px solid var(--aw-border); border-radius: 16px; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6); }
+  .aw-sidebar {
+    width: 100%;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    /* Option 1: Standard semi-transparent white */
+    background: rgba(0, 0, 0, 0.1); 
+    /* Option 2: Standard semi-transparent black */
+    /* background: rgba(0, 0, 0, 0.5); */
+    
+    border: 1px solid var(--aw-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6);
+  }
 
   @media (min-width: 1180px) {
     .aw-layout { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
