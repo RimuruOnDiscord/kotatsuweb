@@ -13,7 +13,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'User-Agent': req.headers['user-agent'] as string || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
       'Accept': '*/*',
       'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
       'Origin': new URL(referer).origin,
       'Referer': referer,
     };
@@ -29,9 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const contentType = upstream.headers.get('content-type') || '';
-    const isManifest = new URL(targetUrl).pathname.endsWith('.m3u8') || 
-                       contentType.includes('mpegurl') || 
-                       contentType.includes('x-mpegURL');
+    const isManifest = new URL(targetUrl).pathname.endsWith('.m3u8') ||
+      contentType.includes('mpegurl') ||
+      contentType.includes('x-mpegURL');
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -89,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const arrayBuffer = await upstream.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
       res.setHeader('Content-Length', buffer.length.toString());
-      
+
       return res.send(buffer);
     }
   } catch (error: any) {
