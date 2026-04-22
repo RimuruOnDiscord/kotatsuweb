@@ -782,9 +782,6 @@ const AnimeWatch: React.FC = () => {
     if (!streamData?.streams) return null;
     const stream = streamData.streams[selectedStreamIndex] || streamData.streams[0];
     if (!stream) return null;
-    if ((stream.type === 'embed' || stream.url.includes('iframe') || stream.url.includes('/embed/')) && !stream.url.includes('.m3u8')) {
-      return { ...stream, type: 'embed' };
-    }
     return { ...stream, type: 'hls' };
   }, [streamData, selectedStreamIndex]);
 
@@ -928,16 +925,24 @@ const AnimeWatch: React.FC = () => {
     };
   }, [chapterTrackUrl]);
 
-  // Generate HLS Url for Vidstack
+  // Generate HLS Url for Vidstack using external CORS proxy
   const finalStreamUrl = useMemo(() => {
-    if (!activeStream || activeStream.type === 'embed') return null;
-    
+    if (!activeStream) return null;
+
     const isM3U8 = activeStream.url.includes('.m3u8');
-    
+
     if (activeStream.referer && isM3U8) {
-      return `/api/hls-proxy?url=${encodeURIComponent(activeStream.url)}&referer=${encodeURIComponent(activeStream.referer)}`;
+      const b64e = (str: string) => btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      // In dev, falls back to local Vite proxy. In production, use your Render.com proxy URL.
+      const PROXY_BASE = import.meta.env.VITE_HLS_PROXY_URL || '/api/hls-proxy';
+
+      let proxied = `${PROXY_BASE}/proxy?q=${b64e(activeStream.url)}`;
+      if (activeStream.referer) {
+        proxied += '&r=' + b64e(activeStream.referer);
+      }
+      return proxied;
     }
-    
+
     return activeStream.url;
   }, [activeStream]);
 
@@ -1180,9 +1185,6 @@ const AnimeWatch: React.FC = () => {
               </div>
             ) : activeStream ? (
               <>
-                {activeStream.type === 'embed' ? (
-                  <iframe src={activeStream.url} allowFullScreen style={{ width: '100%', height: '100%', border: 'none' }} />
-                ) : (
                   <MediaPlayer
                     ref={playerRef}
                     title={displayTitle}
@@ -1232,7 +1234,6 @@ const AnimeWatch: React.FC = () => {
                     </MediaProvider>
                     <DefaultVideoLayout icons={defaultLayoutIcons} />
                   </MediaPlayer>
-                )}
               </>
             ) : null}
           </div>
