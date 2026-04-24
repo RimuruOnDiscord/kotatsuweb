@@ -15,6 +15,7 @@ import AnimeHome from './pages/AnimeHome';
 import AnimeWatch from './pages/AnimeWatchPage';
 import AnimeRandom from './pages/AnimeRandom';
 import AnimeSchedule from './pages/AnimeSchedule';
+import ContinueWatchingPage from './pages/AnimeContinueWatching';
 
 // ─── IMPORT GLOBAL BACKGROUND ───
 import InteractiveBackground from './components/InteractiveBackground';
@@ -45,7 +46,7 @@ const PageWrapper = ({ children, showFooter = true }) => (
     exit={{ opacity: 0 }}
     transition={{ duration: 0.25, ease: "easeInOut" }}
     // Responsive padding: pt-[60px] for mobile, pt-[80px] for desktop
-    className="relative z-10 flex flex-col min-h-screen pt-[0px] lg:pt-[80px]" 
+    className="relative z-10 flex flex-col min-h-screen pt-[0px] lg:pt-[80px]"
   >
     <div className="flex-1">
       {children}
@@ -58,7 +59,7 @@ const PageWrapper = ({ children, showFooter = true }) => (
 function AppContent() {
   const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 1024px)'); // Detect mobile screens
-  
+
   // Lifted search state so the Topbar works globally
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -78,7 +79,7 @@ function AppContent() {
 
   return (
     <div className="relative w-full min-h-screen bg-[var(--app-bg)] text-white">
-      
+
       {/* ─── GLOBAL INTERACTIVE BACKGROUND ─── */}
       <InteractiveBackground />
 
@@ -104,15 +105,16 @@ function AppContent() {
           <Route path="/random" element={<PageWrapper><AnimeRandom /></PageWrapper>} />
           <Route path="/schedule" element={<PageWrapper><AnimeSchedule /></PageWrapper>} />
           <Route path="/bookmarks" element={<PageWrapper><BookmarksPage /></PageWrapper>} />
+          <Route path="/continuewatching" element={<PageWrapper><ContinueWatchingPage /></PageWrapper>} />
           <Route path="/watch/:animeId" element={<PageWrapper><AnimeDetail /></PageWrapper>} />
-          <Route 
-            path="/watch/:animeId/:provider/:category/:episodeId" 
-            element={<PageWrapper showFooter={false}><AnimeWatch /></PageWrapper>} 
+          <Route
+            path="/watch/:animeId/:provider/:category/:episodeId"
+            element={<PageWrapper showFooter={false}><AnimeWatch /></PageWrapper>}
           />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </AnimatePresence>
-      
+
     </div>
   );
 }
