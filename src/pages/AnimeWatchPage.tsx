@@ -565,25 +565,39 @@ const AnimeWatch: React.FC = () => {
         console.log('[STREAM FULL]', JSON.stringify(data, null, 2));
         if (mounted) setStreamData(data as any);
 
-        try {
-          const malId = animeInfo?.idMal; // AniSkip uses MAL IDs
-          if (malId && currentEpData?.number) {
-            const skipRes = await fetch(
-              `https://api.aniskip.com/v2/skip-times/${malId}/${currentEpData.number}?types[]=op&types[]=ed&episodeLength=0`
-            );
-            const skipJson = await skipRes.json();
-            if (skipJson.found) {
-              const op = skipJson.results?.find((r: any) => r.skipType === 'op');
-              const ed = skipJson.results?.find((r: any) => r.skipType === 'ed');
-              if (mounted) setStreamData((prev: any) => ({
-                ...prev,
-                intro: op ? { start: op.interval.startTime, end: op.interval.endTime } : undefined,
-                outro: ed ? { start: ed.interval.startTime, end: ed.interval.endTime } : undefined,
-              }));
+        // Locate the specific intro and outro fields for anime titles by checking designated providers
+        if (!data.intro && !data.outro && mounted) {
+          const skipProviders = ['arc', 'kiwi', 'animepahe', 'animekai', 'animedunya', 'anikoto'];
+          for (const sp of skipProviders) {
+            if (sp === currentProvider.toLowerCase()) continue;
+
+            const providerKey = Object.keys(episodesData).find(k => k.toLowerCase() === sp);
+            if (!providerKey) continue;
+
+            try {
+              const epList = getProviderEpisodes({ providers: episodesData }, providerKey, currentCategory as 'sub' | 'dub');
+              const matchEp = epList.find(e => e.number === currentEpData.number);
+
+              if (matchEp) {
+                const spPure = extractSlug(matchEp.id);
+                const spData = await fetchAnimeStreams(sp, resolvedId, currentCategory as 'sub' | 'dub', spPure);
+
+                if (spData.intro || spData.outro) {
+                  console.log(`[Skip Times] Found via ${sp}`, { intro: spData.intro, outro: spData.outro });
+                  if (mounted) {
+                    setStreamData((prev: any) => ({
+                      ...prev,
+                      intro: spData.intro || prev?.intro,
+                      outro: spData.outro || prev?.outro,
+                    }));
+                  }
+                  break; // Stop searching once fields are identified
+                }
+              }
+            } catch (e) {
+              console.warn(`[Skip Times] Failed checking ${sp}`, e);
             }
           }
-        } catch (e) {
-          console.warn('[AniSkip] Failed to fetch skip times', e);
         }
       } catch (err: any) {
         if (mounted) setStreamError(err.message || 'Failed to load media.');
