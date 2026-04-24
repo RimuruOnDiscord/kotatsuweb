@@ -4,18 +4,19 @@ export const config = {
   runtime: 'nodejs',
 };
 
-const PROXIES = [
-  'http://pubfjqal:v1aqmmstduee@31.59.20.176:6754',
-  'http://pubfjqal:v1aqmmstduee@198.23.239.134:6540',
-  'http://pubfjqal:v1aqmmstduee@45.38.107.97:6014',
-  'http://pubfjqal:v1aqmmstduee@107.172.163.27:6543',
-  'http://pubfjqal:v1aqmmstduee@198.105.121.200:6462',
-  'http://pubfjqal:v1aqmmstduee@216.10.27.159:6837',
-  'http://pubfjqal:v1aqmmstduee@142.111.67.146:5611',
-  'http://pubfjqal:v1aqmmstduee@191.96.254.138:6185',
-  'http://pubfjqal:v1aqmmstduee@31.58.9.4:6077',
-  'http://pubfjqal:v1aqmmstduee@104.239.107.47:5699',
-];
+const PROXIFY_URL = 'https://authentic-miracle-production.up.railway.app';
+
+async function getProxifiedUrl(targetUrl: string, referer: string): Promise<string> {
+  try {
+    const res = await fetch(`${PROXIFY_URL}/proxy?data=${encodeURIComponent(targetUrl + '|' + referer)}`);
+    const data = await res.json();
+    const sources = data?.proxifiedSource;
+    // Try each provider in order of reliability
+    return sources?.miruro || sources?.lunaranime || sources?.anikuro || sources?.animanga || targetUrl;
+  } catch {
+    return targetUrl;
+  }
+}
 
 export default async function handler(req: any, res: any) {
   try {
@@ -24,8 +25,8 @@ export default async function handler(req: any, res: any) {
 
     if (!targetUrl) return res.status(400).send('Missing url parameter');
 
-    const randomProxy = PROXIES[Math.floor(Math.random() * PROXIES.length)];
-    const agent = new HttpsProxyAgent(randomProxy);
+    // Get proxified URL from Railway
+    const proxifiedUrl = await getProxifiedUrl(targetUrl, referer);
 
     const upstreamHeaders: Record<string, string> = {
       'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
@@ -37,11 +38,7 @@ export default async function handler(req: any, res: any) {
 
     if (req.headers.range) upstreamHeaders['Range'] = req.headers.range;
 
-    const upstream = await fetch(targetUrl, {
-      headers: upstreamHeaders,
-      // @ts-ignore
-      agent,
-    });
+    const upstream = await fetch(proxifiedUrl, { headers: upstreamHeaders });
 
     if (!upstream.ok && upstream.status !== 206) {
       return res.status(upstream.status).send(`Stream error: ${upstream.status}`);
