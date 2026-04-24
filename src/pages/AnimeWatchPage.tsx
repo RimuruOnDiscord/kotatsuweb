@@ -611,16 +611,19 @@ const AnimeWatch: React.FC = () => {
 
   const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(-1);
 
-  // Auto-default to External Provider
+  // Auto-default to Internal Provider
   useEffect(() => {
     if (streamData?.streams && streamData.streams.length > 0 && selectedStreamIndex === -1) {
-      const externalIndex = streamData.streams.findIndex((s: any) =>
-        s.type === 'embed' || s.url.includes('iframe') || s.url.includes('/embed/')
+      // Look for an internal HLS stream first
+      const internalIndex = streamData.streams.findIndex((s: any) =>
+        s.type === 'hls' || (!s.url.includes('iframe') && !s.url.includes('/embed/') && s.url.includes('.m3u8'))
       );
-      if (externalIndex !== -1) {
-        console.log('[Source Selection] Defaulting to External Provider:', streamData.streams[externalIndex].quality);
-        setSelectedStreamIndex(externalIndex);
+
+      if (internalIndex !== -1) {
+        console.log('[Source Selection] Defaulting to Internal Provider:', streamData.streams[internalIndex].quality);
+        setSelectedStreamIndex(internalIndex);
       } else {
+        // Fallback to the first available stream if no internal stream is found
         setSelectedStreamIndex(0);
       }
     }
@@ -673,8 +676,16 @@ const AnimeWatch: React.FC = () => {
   const displayTitle = derivedTitle || (!/^\d+$/.test(String(urlSlug)) ? String(urlSlug).replace(/-/g, ' ') : 'Anime Details');
 
   const progressDataRef = useRef<any>(null);
-  const videoStateRef = useRef({ currentTime: 0, duration: 0 });
+  const playingEpisodeRef = useRef<string>(''); // Tracks strictly what stream is loaded
+  const videoStateRef = useRef({ episodeId: '', currentTime: 0, duration: 0 });
   const lastSavedTime = useRef<number>(-1);
+
+  // Safely lock the tracker to the currently playing video
+  useEffect(() => {
+    if (streamData && currentEpData?.id) {
+      playingEpisodeRef.current = extractSlug(currentEpData.id);
+    }
+  }, [streamData, currentEpData]);
 
   progressDataRef.current = {
     animeId: String(resolvedId || urlSlug),
@@ -690,10 +701,17 @@ const AnimeWatch: React.FC = () => {
     const payload = explicitPayload?.episodeId ? explicitPayload : progressDataRef.current;
     if (!payload?.episodeId) return;
 
-    let currentTime = videoStateRef.current.currentTime || 0;
-    let duration = videoStateRef.current.duration || 0;
+    let currentTime = 0;
+    let duration = 0;
 
-    if (playerRef.current) {
+    // 1. STRICT CHECK: Only use the saved time if it belongs to the episode we are saving!
+    if (videoStateRef.current.episodeId === payload.episodeId) {
+      currentTime = videoStateRef.current.currentTime || 0;
+      duration = videoStateRef.current.duration || 0;
+    }
+
+    // 2. Fallback to playerRef ONLY if we know it's currently playing this exact episode
+    if (currentTime === 0 && playingEpisodeRef.current === payload.episodeId && playerRef.current) {
       const vTime = playerRef.current.state.currentTime;
       const vDur = playerRef.current.state.duration;
       if (Number.isFinite(vTime) && vTime > 0) currentTime = vTime;
@@ -829,9 +847,12 @@ const AnimeWatch: React.FC = () => {
   const handleTimeUpdate = useCallback((e: any) => {
     const time = e?.currentTime ?? e?.currentTarget?.currentTime ?? 0;
     const duration = e?.duration ?? e?.currentTarget?.duration ?? 0;
+    const activeEpId = playingEpisodeRef.current;
 
-    if (time > 0 && duration > 0) {
-      videoStateRef.current = { currentTime: time, duration };
+    // Only track time if we know exactly what episode is actively loaded
+    if (time > 0 && duration > 0 && activeEpId) {
+      videoStateRef.current = { episodeId: activeEpId, currentTime: time, duration };
+
       const sec = Math.floor(time);
       if (sec % 5 === 0 && sec !== lastSavedTime.current) {
         lastSavedTime.current = sec;
