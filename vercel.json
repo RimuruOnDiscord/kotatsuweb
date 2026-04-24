@@ -1,0 +1,24 @@
+{
+  "rewrites": [
+    {
+      "source": "/railway-proxy/:path*",
+      "destination": "https://authentic-miracle-production-a6ca.up.railway.app/:path*"
+    },
+    {
+      "source": "/manga-scrapers/:path*",
+      "destination": "https://manga-scrapers-xi.vercel.app/:path*"
+    },
+    {
+      "source": "/api/hls-proxy",
+      "destination": "/api/hls-proxy"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://miruoapi.vercel.app/:path*"
+    },
+    {
+      "source": "/((?!api/|manga-scrapers/|railway-proxy/|assets/|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
