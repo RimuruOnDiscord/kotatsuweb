@@ -1,3 +1,4 @@
+/* --- START OF FILE AnimeHome.tsx --- */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,6 +8,7 @@ import {
   AnimeResult,
   fetchAnimePopular,
   fetchAnimeSpotlight,
+  fetchAnimeInfo, // <-- Added this!
   getAnimeCover,
   getAnimeDisplayTitle,
   getAnimeScore,
@@ -140,8 +142,6 @@ const DESIGN_STYLES = `
     background-size: 180px;
   }
 `;
-
-const APP_FONT = 'ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
 
 export interface ContinueWatchingEntry {
   kind: string;
@@ -314,15 +314,9 @@ const MediaCard: React.FC<MediaCardProps> = ({
   );
 };
 
-
-const GENRES = ["All Genres", "Action", "Fantasy", "Slice of Life", "Adventure", "Comedy", "Romance", "School", "Time Travel", "Comic Anime"];
-
-const token = localStorage.getItem('anilist_access_token');
-
 const AnimeHome: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [spotlight, setSpotlight] = useState<AnimeResult[]>([]);
   const [popularAnime, setPopularAnime] = useState<AnimeResult[]>([]);
@@ -454,20 +448,12 @@ const AnimeHome: React.FC = () => {
     const fetchDesc = async (item: AnimeResult) => {
       if (anilistDescriptions[item.id]) return null;
       try {
-        const response = await fetch('https://graphql.anilist.co', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({
-            query: `query ($search: String) { Media (search: $search, type: ANIME) { description(asHtml: false) } }`,
-            variables: { search: getAnimeDisplayTitle(item.title) }
-          })
-        });
-        const data = await response.json();
-        const cleanDesc = data?.data?.Media?.description?.replace(/<br><br>/g, ' ').replace(/<[^>]*>/g, '');
-        return { id: item.id, desc: cleanDesc || 'No description available for this series.' };
+        // --- USING YOUR ANIME API INSTEAD OF RAW FETCH ---
+        const info = await fetchAnimeInfo(Number(item.id));
+        let cleanDesc = info?.description || info?.synopsis || 'No description available for this series.';
+        cleanDesc = cleanDesc.replace(/<[^>]*>?/gm, ''); // Strip HTML tags
+        
+        return { id: item.id, desc: cleanDesc };
       } catch (e) {
         return { id: item.id, desc: 'No description available for this series.' };
       }
