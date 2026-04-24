@@ -452,7 +452,7 @@ const AnimeHome: React.FC = () => {
         const info = await fetchAnimeInfo(Number(item.id));
         let cleanDesc = info?.description || info?.synopsis || 'No description available for this series.';
         cleanDesc = cleanDesc.replace(/<[^>]*>?/gm, ''); // Strip HTML tags
-        
+
         return { id: item.id, desc: cleanDesc };
       } catch (e) {
         return { id: item.id, desc: 'No description available for this series.' };
