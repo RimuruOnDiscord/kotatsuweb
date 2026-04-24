@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase';
 
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance } from '@vidstack/react';
+import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance, isHLSProvider } from '@vidstack/react';
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 /* ─── Proxy Configuration ───────────────────────────────────────── */
@@ -319,6 +319,9 @@ const AnimeWatch: React.FC = () => {
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [showSkipOutro, setShowSkipOutro] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [proxyProvider, setProxyProvider] = useState<string>('lunaranime');
+  const [proxifiedSources, setProxifiedSources] = useState<Record<string, string>>({});
+  const [proxifiedStreamUrl, setProxifiedStreamUrl] = useState<string | null>(null);
 
   useEffect(() => { localStorage.setItem('watchAutoPlay', String(autoPlay)); }, [autoPlay]);
   useEffect(() => { localStorage.setItem('watchAutoSkip', String(autoSkip)); }, [autoSkip]);
@@ -522,6 +525,13 @@ const AnimeWatch: React.FC = () => {
 
   const currentIndex = providerEpisodes.findIndex(ep => extractSlug(ep.id) === episodeId);
   const currentEpData = currentIndex !== -1 ? providerEpisodes[currentIndex] : providerEpisodes[0];
+
+  useEffect(() => {
+    if (!loadingEpisodes && activeEpRef.current) {
+      activeEpRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [loadingEpisodes, episodeId, currentProvider, currentCategory]);
+
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < providerEpisodes.length - 1 && currentIndex !== -1;
 
@@ -548,32 +558,22 @@ const AnimeWatch: React.FC = () => {
     return () => { mounted = false; };
   }, [currentEpData?.id, resolvedId, currentProvider, currentCategory]);
 
-  const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(0);
+  const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(-1);
 
+  // Auto-default to External Provider
   useEffect(() => {
-    if (streamData?.streams) {
-      if (currentProvider?.toLowerCase() === 'kiwi') {
-        const firstEmbed = streamData.streams.findIndex(s => s.type === 'embed' && s.url);
-        if (firstEmbed !== -1) {
-          setSelectedStreamIndex(firstEmbed);
-          return;
-        }
-      }
-
-      const bestIndex = streamData.streams.findIndex(s => s.type === 'hls' && s.url && (s.quality === 'auto' || s.quality === '1080p'));
-      if (bestIndex !== -1) {
-        setSelectedStreamIndex(bestIndex);
+    if (streamData?.streams && streamData.streams.length > 0 && selectedStreamIndex === -1) {
+      const externalIndex = streamData.streams.findIndex((s: any) => 
+        s.type === 'embed' || s.url.includes('iframe') || s.url.includes('/embed/')
+      );
+      if (externalIndex !== -1) {
+        console.log('[Source Selection] Defaulting to External Provider:', streamData.streams[externalIndex].quality);
+        setSelectedStreamIndex(externalIndex);
       } else {
-        const firstHls = streamData.streams.findIndex(s => s.type === 'hls' && s.url);
-        if (firstHls !== -1) {
-          setSelectedStreamIndex(firstHls);
-        } else {
-          const firstEmbed = streamData.streams.findIndex(s => s.type === 'embed' && s.url);
-          setSelectedStreamIndex(firstEmbed !== -1 ? firstEmbed : 0);
-        }
+        setSelectedStreamIndex(0);
       }
     }
-  }, [streamData, currentProvider]);
+  }, [streamData, selectedStreamIndex]);
 
   const activeStream = useMemo<any>(() => {
     if (!streamData?.streams) return null;
@@ -584,6 +584,66 @@ const AnimeWatch: React.FC = () => {
     }
     return { ...stream, type: 'hls' };
   }, [streamData, selectedStreamIndex]);
+
+  const [isProxifying, setIsProxifying] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setProxifiedStreamUrl(null);
+    setProxifiedSources({});
+    if (!activeStream?.url?.includes('.m3u8') || !activeStream?.url) {
+      setIsProxifying(false);
+      return;
+    }
+
+    setIsProxifying(true);
+    const referer = activeStream.referer || 'https://kwik.cx/';
+    const data = encodeURIComponent(`${activeStream.url}|${referer}`);
+
+    fetch(`/railway-proxy/proxy?data=${data}`)
+      .then(async r => {
+        if (!r.ok) throw new Error(`Proxy status: ${r.status}`);
+        const text = await r.text();
+        try { return JSON.parse(text); } catch { return null; }
+      })
+      .then(d => {
+        if (!mounted || !d) return;
+        const sources: Record<string, string> = d?.proxifiedSource || {};
+        setProxifiedSources(sources);
+
+        // Pick the currently selected provider, fall back through options
+        const preferred = ['lunaranime', 'animanga', 'miruro', 'anikuro'];
+        const url = sources[proxyProvider] || preferred.map(p => sources[p]).find(Boolean);
+        if (url) setProxifiedStreamUrl(url);
+      })
+      .catch(() => {})
+      .finally(() => { if (mounted) setIsProxifying(false); });
+
+    return () => { mounted = false; };
+  }, [activeStream]);
+
+  useEffect(() => {
+    const url = proxifiedSources[proxyProvider];
+    if (url) {
+      // Prevent double-wrapping if the URL is already proxied
+      if (url.includes('/railway-proxy/')) {
+        setProxifiedStreamUrl(url);
+        return;
+      }
+
+      // Wrap external proxies in local universal proxy to fix CORS
+      if (url.startsWith('http') && !url.includes(window.location.host)) {
+        // Use window.location.host to ensure port (e.g. :5173) is preserved
+        const proto = window.location.protocol;
+        const host = window.location.host;
+        const wrapped = `${proto}//${host}/railway-proxy/proxy.m3u8?url=${encodeURIComponent(url)}`;
+        console.log('[PROXY WRAPPER] Wrapping external URL:', { original: url, wrapped });
+        setProxifiedStreamUrl(wrapped);
+      } else {
+        setProxifiedStreamUrl(url);
+      }
+    }
+  }, [proxyProvider, proxifiedSources]);
 
   // ─── BULLETPROOF CONTINUE WATCHING ENGINE ──────────────────────────────────────
   const derivedTitle = typeof animeInfo?.title === 'string'
@@ -729,15 +789,12 @@ const AnimeWatch: React.FC = () => {
 
     if (!activeStream || activeStream.type === 'embed') return null;
 
-    const isM3U8 = activeStream.url.includes('.m3u8');
+    if (isProxifying) return null;
 
-    if (activeStream.referer && isM3U8) {
-      const proxy = WORKER_PROXY_URL || '/api/hls-proxy';
-      return `${proxy}/?url=${encodeURIComponent(activeStream.url)}&referer=${encodeURIComponent(activeStream.referer)}`;
-    }
+    if (proxifiedStreamUrl) return proxifiedStreamUrl;
 
-    return activeStream.url;
-  }, [activeStream, customStreamUrl, customReferer]);
+    return activeStream.url || null;
+  }, [activeStream, customStreamUrl, customReferer, proxifiedStreamUrl, isProxifying]);
 
   useEffect(() => {
     const currentPayload = { ...progressDataRef.current };
@@ -917,12 +974,12 @@ const AnimeWatch: React.FC = () => {
               </button>
             )}
 
-            {(!customStreamUrl && (streamLoading || loadingEpisodes)) ? (
+            {(!customStreamUrl && (streamLoading || loadingEpisodes || isProxifying)) ? (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7,7,13,0.9)', backdropFilter: 'blur(4px)', zIndex: 10 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
                   <Loader2 style={{ width: 36, height: 36, color: 'var(--aw-accent)', animation: 'spin 1s linear infinite' }} />
                   <span style={{ fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)' }}>
-                    Loading Stream
+                    {isProxifying ? 'Redirecting Stream' : 'Loading Stream'}
                   </span>
                 </div>
               </div>
@@ -960,31 +1017,77 @@ const AnimeWatch: React.FC = () => {
               </div>
             ) : (activeStream || customStreamUrl) ? (
               <>
-                {(!customStreamUrl && activeStream.type === 'embed') ? (
-                  <iframe src={activeStream.url} allowFullScreen style={{ width: '100%', height: '100%', border: 'none' }} />
+                {(!customStreamUrl && activeStream?.type === 'embed' && activeStream?.url) ? (
+                  <iframe
+                    src={activeStream.url}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    allowFullScreen
+                    allow="autoplay; fullscreen"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  />
                 ) : (
                   <MediaPlayer
                     ref={playerRef}
                     title={customStreamUrl ? "Developer Stream Test" : displayTitle}
-                    src={{ src: finalStreamUrl || activeStream.url, type: 'application/vnd.apple.mpegurl' }}
-                    crossOrigin
-                    autoPlay={autoPlay}
+                    src={finalStreamUrl ? { src: finalStreamUrl, type: 'application/vnd.apple.mpegurl' } : undefined}
+                    onProviderChange={(provider) => {
+                      if (isHLSProvider(provider)) {
+                        provider.config = {
+                          enableWorker: true,
+                          backBufferLength: 0,
+                          maxBufferLength: 30,
+                          maxMaxBufferLength: 60,
+                          manifestLoadingMaxRetry: 3,
+                          levelLoadingMaxRetry: 3,
+                          fragLoadingMaxRetry: 6,
+                          appendErrorMaxRetry: 3,
+                          testBandwidth: false
+                        };
+                      }
+                    }}
                     onTimeUpdate={(e: any) => {
                       const time = typeof e === 'number' ? e : e?.currentTime || e?.detail || 0;
                       const duration = playerRef.current?.state?.duration || videoStateRef.current.duration || 0;
                       handleTimeUpdate({ currentTime: time, duration });
                     }}
                     onEnded={handleVideoEnd}
+                    onError={(e) => console.error('[MediaPlayer Error]:', e)}
+                    onHlsError={(event: any) => {
+                      const data = event.detail || event;
+                      console.warn('[HLS Error]:', data);
+                      
+                      const hls = event.target?.hls;
+                      
+                      // Handle Buffer/Codec errors aggressively
+                      if (data.type === 'mediaError' && hls) {
+                        switch (data.details) {
+                          case 'bufferAddCodecError':
+                          case 'bufferAppendError':
+                          case 'bufferInconsistentError':
+                            console.log('[HLS Recovery] Attempting to recover from buffer error...');
+                            hls.recoverMediaError();
+                            break;
+                        }
+                      }
+
+                      // Auto-recover from fatal network errors if possible
+                      if (data.fatal && data.type === 'networkError' && hls) {
+                        console.log('[HLS Recovery] Fatal network error, retrying...');
+                        hls.startLoad();
+                      }
+                    }}
                     onCanPlay={() => {
-                      if (customStreamUrl) return;
+                      if (customStreamUrl || !playerRef.current) return;
                       const epId = progressDataRef.current?.episodeId || episodeId;
                       if (!epId) return;
+
                       const savedTimeRaw = localStorage.getItem(`progress-${epId}`);
-                      if (savedTimeRaw && playerRef.current) {
+                      if (savedTimeRaw) {
                         const parsedTime = parseFloat(savedTimeRaw);
-                        if (parsedTime > 3 && playerRef.current.currentTime < 3) {
+                        // Only resume if we are at the very beginning and have significant progress
+                        if (parsedTime > 10 && playerRef.current.currentTime < 5) {
                           playerRef.current.currentTime = parsedTime;
-                          showToast(`Resumed from ${Math.floor(parsedTime / 60)}m`);
+                          showToast(`Resumed playback`);
                         }
                       }
                     }}
@@ -1157,7 +1260,7 @@ const AnimeWatch: React.FC = () => {
                   </p>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {rankedProviders.map((p, index) => {
+                    {rankedProviders.map((p) => {
                       const isActive = currentProvider === p && !customStreamUrl;
                       return (
                         <button
@@ -1302,12 +1405,59 @@ const AnimeWatch: React.FC = () => {
                     </div>
                   </>
                 )}
+                {Object.keys(proxifiedSources).length > 0 && (
+                  <>
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', margin: '22px 0' }} />
+                    <div>
+                      <p style={{
+                        display: 'flex', alignItems: 'center', gap: 7,
+                        fontFamily: 'var(--aw-font-display)',
+                        fontSize: 9, fontWeight: 700,
+                        letterSpacing: '0.22em', textTransform: 'uppercase',
+                        color: 'var(--aw-muted)', opacity: 0.6,
+                        marginBottom: 12,
+                      }}>
+                        <Activity size={10} />
+                        Proxy
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {(['lunaranime', 'animanga', 'miruro', 'anikuro'] as const).map(p => {
+                          const isActive = proxyProvider === p;
+                          const hasSource = !!proxifiedSources[p];
+                          if (!hasSource) return null;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => setProxyProvider(p)}
+                              className="aw-action-hover"
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: 10,
+                                border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
+                                background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
+                                color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
+                                fontSize: 12,
+                                fontFamily: 'var(--aw-font-display)',
+                                fontWeight: 700,
+                                textTransform: 'lowercase',
+                                cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: 6,
+                                position: 'relative',
+                              }}
+                            >
+                              {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
+                              {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
+                              {p}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
-              /* --- DEVELOPER TOOLS PANEL --- */
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-                {/* 1. Stream Injector / Proxy Test */}
                 <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
                   <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
                     <Link2 size={12} /> Test Proxy Worker / Inject HLS
@@ -1328,7 +1478,6 @@ const AnimeWatch: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 2. Dev Action Triggers */}
                 <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
                   <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
                     <Activity size={12} /> Quick Actions
@@ -1346,10 +1495,64 @@ const AnimeWatch: React.FC = () => {
                     <button className="aw-action-btn" onClick={() => console.log('EPISODE CONTEXT:', currentEpData)} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
                       Log Context Data
                     </button>
+                    <button className="aw-action-btn" onClick={() => {
+                      if (!activeStream?.url) return;
+                      const data = encodeURIComponent(`${activeStream.url}|${activeStream.referer || 'https://kwik.cx/'}`);
+                      fetch(`/railway-proxy/proxy?data=${data}`)
+                        .then(async r => {
+                          const text = await r.text();
+                          try {
+                            console.log('RAILWAY PROXY RESPONSE (JSON):', JSON.parse(text));
+                          } catch {
+                            console.log('RAILWAY PROXY RESPONSE (NON-JSON):', text);
+                          }
+                        })
+                        .catch(e => console.error('RAILWAY PROXY ERROR:', e));
+                    }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-accent)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
+                      Test Railway Proxy Endpoint
+                    </button>
                   </div>
                 </div>
 
-                {/* 3. JSON State Viewers */}
+                <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
+                    <Server size={12} /> HLS Proxy Provider
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {(['lunaranime', 'animanga', 'miruro', 'anikuro'] as const).map(p => {
+                      const isActive = proxyProvider === p;
+                      const hasSource = !!proxifiedSources[p];
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setProxyProvider(p)}
+                          disabled={!hasSource}
+                          className="aw-action-hover"
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 10,
+                            border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
+                            background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
+                            color: isActive ? 'var(--aw-accent)' : hasSource ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)',
+                            fontSize: 12,
+                            fontFamily: 'var(--aw-font-display)',
+                            fontWeight: 700,
+                            textTransform: 'lowercase',
+                            cursor: hasSource ? 'pointer' : 'not-allowed',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            position: 'relative',
+                          }}
+                        >
+                          {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
+                          {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
+                          {p}
+                          {!hasSource && <span style={{ fontSize: 8, opacity: 0.4 }}>—</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div style={{ padding: '16px', background: '#09090b', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
                     <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
@@ -1378,7 +1581,6 @@ const AnimeWatch: React.FC = () => {
                     </pre>
                   </div>
                 </div>
-
               </div>
             )}
           </div>
