@@ -24,7 +24,7 @@ import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance, isHLSProvi
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 /* ─── Proxy Configuration ───────────────────────────────────────── */
-const WORKER_PROXY_URL = "";
+const WORKER_PROXY_URL = "https://proxypipe.vercel.app";
 
 /* ─── Font & Design Tokens Injection ─────────────────────────────── */
 const DESIGN_STYLES = `
@@ -211,7 +211,7 @@ const getBaseTitle = (title: string) => {
   return t.replace(/\s+(I{1,3}|IV|V|VI{0,3}|IX|X|\d+)$/i, '').trim();
 };
 
-const generateTabLabel = (_title: string, _baseTitle: string, index: number) => {
+const generateTabLabel = (title: string, baseTitle: string, index: number) => {
   return `Season ${index + 1}`;
 };
 
@@ -283,6 +283,21 @@ const Toggle: React.FC<{
 /* ─── Main Component ──────────────────────────────────────────────── */
 const AnimeWatch: React.FC = () => {
   const { user } = useAuth();
+
+  // Patch MediaSource to remap unsupported AAC Main (mp4a.40.1) -> AAC-LC (mp4a.40.2).
+  // owocdn streams declare mp4a.40.1 which browsers reject in MSE — audio data is
+  // identical, only the profile flag differs. This prevents bufferAddCodecError loops.
+  useEffect(() => {
+    const original = MediaSource.prototype.addSourceBuffer;
+    MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
+      const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
+      if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
+      return original.call(this, fixed);
+    };
+    return () => {
+      MediaSource.prototype.addSourceBuffer = original;
+    };
+  }, []);
   const { animeId: urlSlug, provider, category, episodeId } = useParams<{
     animeId: string;
     provider?: string;
@@ -547,7 +562,29 @@ const AnimeWatch: React.FC = () => {
         // This maps to /watch/${provider}/${anilistId}/${category}/${slug}
         const data = await fetchAnimeStreams(currentProvider.toLowerCase(), resolvedId, currentCategory as 'sub' | 'dub', pure);
         if (!data.streams?.length) throw new Error('Server is not responding.');
+        console.log('[STREAM FULL]', JSON.stringify(data, null, 2));
         if (mounted) setStreamData(data as any);
+
+        try {
+          const malId = animeInfo?.idMal; // AniSkip uses MAL IDs
+          if (malId && currentEpData?.number) {
+            const skipRes = await fetch(
+              `https://api.aniskip.com/v2/skip-times/${malId}/${currentEpData.number}?types[]=op&types[]=ed&episodeLength=0`
+            );
+            const skipJson = await skipRes.json();
+            if (skipJson.found) {
+              const op = skipJson.results?.find((r: any) => r.skipType === 'op');
+              const ed = skipJson.results?.find((r: any) => r.skipType === 'ed');
+              if (mounted) setStreamData((prev: any) => ({
+                ...prev,
+                intro: op ? { start: op.interval.startTime, end: op.interval.endTime } : undefined,
+                outro: ed ? { start: ed.interval.startTime, end: ed.interval.endTime } : undefined,
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn('[AniSkip] Failed to fetch skip times', e);
+        }
       } catch (err: any) {
         if (mounted) setStreamError(err.message || 'Failed to load media.');
       } finally {
@@ -563,7 +600,7 @@ const AnimeWatch: React.FC = () => {
   // Auto-default to External Provider
   useEffect(() => {
     if (streamData?.streams && streamData.streams.length > 0 && selectedStreamIndex === -1) {
-      const externalIndex = streamData.streams.findIndex((s: any) => 
+      const externalIndex = streamData.streams.findIndex((s: any) =>
         s.type === 'embed' || s.url.includes('iframe') || s.url.includes('/embed/')
       );
       if (externalIndex !== -1) {
@@ -591,59 +628,29 @@ const AnimeWatch: React.FC = () => {
     let mounted = true;
     setProxifiedStreamUrl(null);
     setProxifiedSources({});
+
     if (!activeStream?.url?.includes('.m3u8') || !activeStream?.url) {
       setIsProxifying(false);
       return;
     }
 
     setIsProxifying(true);
-    const referer = activeStream.referer || 'https://kwik.cx/';
-    const data = encodeURIComponent(`${activeStream.url}|${referer}`);
-
-    fetch(`/railway-proxy/proxy?data=${data}`)
-      .then(async r => {
-        if (!r.ok) throw new Error(`Proxy status: ${r.status}`);
-        const text = await r.text();
-        try { return JSON.parse(text); } catch { return null; }
-      })
-      .then(d => {
-        if (!mounted || !d) return;
-        const sources: Record<string, string> = d?.proxifiedSource || {};
-        setProxifiedSources(sources);
-
-        // Pick the currently selected provider, fall back through options
-        const preferred = ['lunaranime', 'animanga', 'miruro', 'anikuro'];
-        const url = sources[proxyProvider] || preferred.map(p => sources[p]).find(Boolean);
-        if (url) setProxifiedStreamUrl(url);
-      })
-      .catch(() => {})
-      .finally(() => { if (mounted) setIsProxifying(false); });
+    try {
+      const b64 = btoa(activeStream.url)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+      const url = `https://proxypipe.vercel.app/proxy/${b64}`;
+      if (mounted) {
+        setProxifiedSources({ proxypipe: url });
+        setProxifiedStreamUrl(url);
+      }
+    } finally {
+      if (mounted) setIsProxifying(false);
+    }
 
     return () => { mounted = false; };
   }, [activeStream]);
-
-  useEffect(() => {
-    const url = proxifiedSources[proxyProvider];
-    if (url) {
-      // Prevent double-wrapping if the URL is already proxied
-      if (url.includes('/railway-proxy/')) {
-        setProxifiedStreamUrl(url);
-        return;
-      }
-
-      // Wrap external proxies in local universal proxy to fix CORS
-      if (url.startsWith('http') && !url.includes(window.location.host)) {
-        // Use window.location.host to ensure port (e.g. :5173) is preserved
-        const proto = window.location.protocol;
-        const host = window.location.host;
-        const wrapped = `${proto}//${host}/railway-proxy/proxy.m3u8?url=${encodeURIComponent(url)}`;
-        console.log('[PROXY WRAPPER] Wrapping external URL:', { original: url, wrapped });
-        setProxifiedStreamUrl(wrapped);
-      } else {
-        setProxifiedStreamUrl(url);
-      }
-    }
-  }, [proxyProvider, proxifiedSources]);
 
   // ─── BULLETPROOF CONTINUE WATCHING ENGINE ──────────────────────────────────────
   const derivedTitle = typeof animeInfo?.title === 'string'
@@ -782,9 +789,11 @@ const AnimeWatch: React.FC = () => {
   // Generate Proxy-Intercepted HLS Url for Vidstack
   const finalStreamUrl = useMemo(() => {
     if (customStreamUrl) {
-      const proxy = WORKER_PROXY_URL || '/api/hls-proxy';
-      const ref = customReferer || 'https://kwik.cx/';
-      return `${proxy}/?url=${encodeURIComponent(customStreamUrl)}&referer=${encodeURIComponent(ref)}`;
+      const b64 = btoa(customStreamUrl)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
+      return `https://proxypipe.vercel.app/proxy/${b64}`;
     }
 
     if (!activeStream || activeStream.type === 'embed') return null;
@@ -1053,28 +1062,8 @@ const AnimeWatch: React.FC = () => {
                     onEnded={handleVideoEnd}
                     onError={(e) => console.error('[MediaPlayer Error]:', e)}
                     onHlsError={(event: any) => {
-                      const data = event.detail || event;
-                      console.warn('[HLS Error]:', data);
-                      
-                      const hls = event.target?.hls;
-                      
-                      // Handle Buffer/Codec errors aggressively
-                      if (data.type === 'mediaError' && hls) {
-                        switch (data.details) {
-                          case 'bufferAddCodecError':
-                          case 'bufferAppendError':
-                          case 'bufferInconsistentError':
-                            console.log('[HLS Recovery] Attempting to recover from buffer error...');
-                            hls.recoverMediaError();
-                            break;
-                        }
-                      }
-
-                      // Auto-recover from fatal network errors if possible
-                      if (data.fatal && data.type === 'networkError' && hls) {
-                        console.log('[HLS Recovery] Fatal network error, retrying...');
-                        hls.startLoad();
-                      }
+                      if (!event.fatal) return;
+                      console.warn('[HLS] Fatal error:', event.type, event.details);
                     }}
                     onCanPlay={() => {
                       if (customStreamUrl || !playerRef.current) return;
@@ -1405,56 +1394,6 @@ const AnimeWatch: React.FC = () => {
                     </div>
                   </>
                 )}
-                {Object.keys(proxifiedSources).length > 0 && (
-                  <>
-                    <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', margin: '22px 0' }} />
-                    <div>
-                      <p style={{
-                        display: 'flex', alignItems: 'center', gap: 7,
-                        fontFamily: 'var(--aw-font-display)',
-                        fontSize: 9, fontWeight: 700,
-                        letterSpacing: '0.22em', textTransform: 'uppercase',
-                        color: 'var(--aw-muted)', opacity: 0.6,
-                        marginBottom: 12,
-                      }}>
-                        <Activity size={10} />
-                        Proxy
-                      </p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                        {(['lunaranime', 'animanga', 'miruro', 'anikuro'] as const).map(p => {
-                          const isActive = proxyProvider === p;
-                          const hasSource = !!proxifiedSources[p];
-                          if (!hasSource) return null;
-                          return (
-                            <button
-                              key={p}
-                              onClick={() => setProxyProvider(p)}
-                              className="aw-action-hover"
-                              style={{
-                                padding: '8px 16px',
-                                borderRadius: 10,
-                                border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                                background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                                color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                                fontSize: 12,
-                                fontFamily: 'var(--aw-font-display)',
-                                fontWeight: 700,
-                                textTransform: 'lowercase',
-                                cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', gap: 6,
-                                position: 'relative',
-                              }}
-                            >
-                              {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                              {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
-                              {p}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </>
-                )}
               </>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -1497,19 +1436,12 @@ const AnimeWatch: React.FC = () => {
                     </button>
                     <button className="aw-action-btn" onClick={() => {
                       if (!activeStream?.url) return;
-                      const data = encodeURIComponent(`${activeStream.url}|${activeStream.referer || 'https://kwik.cx/'}`);
-                      fetch(`/railway-proxy/proxy?data=${data}`)
-                        .then(async r => {
-                          const text = await r.text();
-                          try {
-                            console.log('RAILWAY PROXY RESPONSE (JSON):', JSON.parse(text));
-                          } catch {
-                            console.log('RAILWAY PROXY RESPONSE (NON-JSON):', text);
-                          }
-                        })
-                        .catch(e => console.error('RAILWAY PROXY ERROR:', e));
+                      const b64 = btoa(activeStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+                      const url = `https://proxypipe.vercel.app/proxy/${b64}`;
+                      console.log('PROXYPIPE URL:', url);
+                      fetch(url).then(r => console.log('PROXYPIPE STATUS:', r.status)).catch(e => console.error('PROXYPIPE ERROR:', e));
                     }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-accent)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Test Railway Proxy Endpoint
+                      Test Proxypipe Endpoint
                     </button>
                   </div>
                 </div>
@@ -1715,15 +1647,15 @@ const AnimeWatch: React.FC = () => {
 
           <div style={{ padding: '0 20px 20px' }}>
             {currentEpData && (
-              <CommentSection 
-                pageType="watch" 
-                pageId={`anime-${resolvedId || urlSlug}-ep-${currentEpData.number}`} 
+              <CommentSection
+                pageType="watch"
+                pageId={`anime-${resolvedId || urlSlug}-ep-${currentEpData.number}`}
               />
             )}
             {!currentEpData && loadingEpisodes && (
-               <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                 <Loader2 className="animate-spin text-[var(--aw-accent)]" size={24} />
-               </div>
+              <div style={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+                <Loader2 className="animate-spin text-[var(--aw-accent)]" size={24} />
+              </div>
             )}
           </div>
         </main>
