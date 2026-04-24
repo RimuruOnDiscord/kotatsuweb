@@ -160,7 +160,6 @@ const BookmarkCard: React.FC<{
 const BookmarksPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
   const [bookmarks, setBookmarks] = useState<BookmarkEntry[]>([]);
 
   // Force one-time reload on initial visit to bookmarks page to ensure full state sync
@@ -178,6 +177,46 @@ const BookmarksPage: React.FC = () => {
       const isAnime = true;
 
       if (isAnime && user) {
+        
+        // --- 1. LOCAL TO SUPABASE MIGRATION ROUTINE ---
+        try {
+          const localBookmarks = readBookmarks();
+          const localAnimeBookmarks = localBookmarks.filter(b => 
+            !b.type || b.type.toLowerCase().includes('anime') || b.type.toLowerCase() === 'tv' || b.type.toLowerCase() === 'movie'
+          );
+
+          if (localAnimeBookmarks.length > 0) {
+            // Convert local array into Supabase payload
+            const migrationPayload = localAnimeBookmarks.map(b => ({
+              user_id: user.id,
+              mal_id: String(b.malId),
+              title: b.title,
+              cover: b.cover,
+              type: b.type || 'Anime',
+              status: b.status,
+              score: b.score,
+              author: b.author,
+              created_at: b.updatedAt ? new Date(b.updatedAt).toISOString() : new Date().toISOString()
+            }));
+
+            // Upsert entries into DB
+            const { error: upsertError } = await supabase
+              .from('anime_bookmarks')
+              .upsert(migrationPayload, { onConflict: 'user_id, mal_id' });
+
+            if (!upsertError) {
+              // Successfully migrated - remove them from local storage so we don't duplicate
+              localAnimeBookmarks.forEach(b => removeBookmark(b.malId));
+            } else {
+              console.warn("Failed to migrate local bookmarks:", upsertError);
+            }
+          }
+        } catch (e) {
+          console.warn("Error during bookmark migration:", e);
+        }
+        // --- END MIGRATION ROUTINE ---
+
+        // 2. FETCH CLOUD DATA
         const { data, error } = await supabase
           .from('anime_bookmarks')
           .select('*')
@@ -199,6 +238,7 @@ const BookmarksPage: React.FC = () => {
         }
       }
 
+      // 3. FALLBACK FOR LOGGED OUT USERS
       setBookmarks(readBookmarks().filter(b =>
         !b.type || b.type.toLowerCase().includes('anime') || b.type.toLowerCase() === 'tv' || b.type.toLowerCase() === 'movie'
       ));
