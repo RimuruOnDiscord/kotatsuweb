@@ -8,7 +8,7 @@ import {
   AnimeResult,
   fetchAnimePopular,
   fetchAnimeSpotlight,
-  fetchAnimeInfo, // <-- Added this!
+  fetchAnimeInfo,
   getAnimeCover,
   getAnimeDisplayTitle,
   getAnimeScore,
@@ -739,7 +739,11 @@ const AnimeHome: React.FC = () => {
             flexDirection: 'column',
             gap: 20
           }}>
-            <SectionHeader title="Continue Watching" subtitle={`${continueWatching.length} in progress`} />
+            <SectionHeader
+              title="Continue Watching"
+              subtitle={`${continueWatching.length} in progress`}
+              onViewMore={() => navigate('/continuewatching')}
+            />
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {continueWatching.slice(0, 6).map((entry) => {
                 const progressNum = entry.currentTime && entry.duration ? (entry.currentTime / entry.duration) * 100 : Math.floor(Math.random() * 60) + 20;
