@@ -5,12 +5,16 @@
       "destination": "https://manga-scrapers-xi.vercel.app/:path*"
     },
     {
-      "source": "/((?!api/|manga-scrapers/|assets/|.*\\..*).*)",
-      "destination": "/index.html"
+      "source": "/api/hls-proxy",
+      "destination": "/api/hls-proxy"
     },
     {
       "source": "/api/:path*",
       "destination": "https://miruoapi.vercel.app/:path*"
+    },
+    {
+      "source": "/((?!api/|manga-scrapers/|assets/|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }
