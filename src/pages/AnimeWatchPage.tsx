@@ -618,7 +618,7 @@ const AnimeWatch: React.FC = () => {
       const internalIndex = streamData.streams.findIndex((s: any) =>
         s.type === 'hls' || (!s.url.includes('iframe') && !s.url.includes('/embed/') && s.url.includes('.m3u8'))
       );
-
+      
       if (internalIndex !== -1) {
         console.log('[Source Selection] Defaulting to Internal Provider:', streamData.streams[internalIndex].quality);
         setSelectedStreamIndex(internalIndex);
@@ -852,7 +852,7 @@ const AnimeWatch: React.FC = () => {
     // Only track time if we know exactly what episode is actively loaded
     if (time > 0 && duration > 0 && activeEpId) {
       videoStateRef.current = { episodeId: activeEpId, currentTime: time, duration };
-
+      
       const sec = Math.floor(time);
       if (sec % 5 === 0 && sec !== lastSavedTime.current) {
         lastSavedTime.current = sec;
