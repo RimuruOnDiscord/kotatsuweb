@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 import {
-  fetchAnimeInfo, // Make sure to add this to your animeApi.ts!
+  fetchAnimeInfo,
   fetchAnimeEpisodes,
   fetchAnimeSearch,
   getProviderEpisodes,
@@ -47,7 +47,7 @@ const DESIGN_STYLES = `
     --aw-font-body:    'Onest', sans-serif;
   }
 
-    .aw-root { font-family: var(--aw-font-body); background: transparent; color: var(--aw-text); }
+  .aw-root { font-family: var(--aw-font-body); background: transparent; color: var(--aw-text); }
 
   .aw-layout { 
     max-width: 1460px; 
@@ -56,7 +56,6 @@ const DESIGN_STYLES = `
     padding: 32px 16px; 
     gap: 32px; 
     position: relative; 
-    z-index: 10; 
     z-index: 10; 
     display: grid; 
     grid-template-columns: 1fr; 
@@ -285,8 +284,6 @@ const AnimeWatch: React.FC = () => {
   const { user } = useAuth();
 
   // Patch MediaSource to remap unsupported AAC Main (mp4a.40.1) -> AAC-LC (mp4a.40.2).
-  // owocdn streams declare mp4a.40.1 which browsers reject in MSE — audio data is
-  // identical, only the profile flag differs. This prevents bufferAddCodecError loops.
   useEffect(() => {
     const original = MediaSource.prototype.addSourceBuffer;
     MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
@@ -298,6 +295,7 @@ const AnimeWatch: React.FC = () => {
       MediaSource.prototype.addSourceBuffer = original;
     };
   }, []);
+
   const { animeId: urlSlug, provider, category, episodeId } = useParams<{
     animeId: string;
     provider?: string;
@@ -356,7 +354,7 @@ const AnimeWatch: React.FC = () => {
 
         if (error && error.code !== 'PGRST116') return;
         if (data && data.episode_id === episodeId && data.progress_time > 3) {
-          localStorage.setItem(`progress-${episodeId}`, data.progress_time.toString());
+          localStorage.setItem(`progress-${urlSlug}-${episodeId}`, data.progress_time.toString());
         }
       } catch (e) {
         console.warn('Sync Remote Progress error:', e);
@@ -394,10 +392,8 @@ const AnimeWatch: React.FC = () => {
       setLoadingEpisodes(true);
 
       try {
-        // 1. Resolve Anilist ID
         let anilistId = Number(urlSlug);
         if (isNaN(anilistId)) {
-          // Fallback search if a text slug was passed
           const searchRes = await fetchAnimeSearch(urlSlug, 1);
           if (searchRes?.results?.length) {
             anilistId = searchRes.results[0].id;
@@ -409,7 +405,6 @@ const AnimeWatch: React.FC = () => {
         if (!isMounted) return;
         setResolvedId(anilistId);
 
-        // 2. Fetch /info/{id} and /episodes/{id} concurrently
         const [info, epsPayload] = await Promise.all([
           fetchAnimeInfo(anilistId),
           fetchAnimeEpisodes(anilistId)
@@ -420,7 +415,6 @@ const AnimeWatch: React.FC = () => {
         setAnimeInfo(info);
         setEpisodesData(epsPayload?.providers || {});
 
-        // 3. Build Seasons (Recursive-like Iterative Deep Search)
         const allowedRelations = ['SEQUEL', 'PREQUEL', 'ALTERNATIVE', 'PARENT', 'SIDE_STORY'];
         const excludedFormats = ['SPECIAL', 'MUSIC', 'TV_SHORT', 'OVA', 'ONA', 'MOVIE'];
         const currentTitle = info.title?.english || info.title?.romaji || info.title?.native || '?';
@@ -435,16 +429,13 @@ const AnimeWatch: React.FC = () => {
           displayLabel: '',
         }];
 
-        // Queue for deep exploration
         let queue = [info];
         let depth = 0;
-        const MAX_DEPTH = 3; // Explore up to 3 levels deep (e.g. S1 -> S2 -> S3 -> S4)
-        const MAX_TOTAL = 15; // Safeguard against massive franchises
+        const MAX_DEPTH = 3;
+        const MAX_TOTAL = 15;
 
         while (queue.length > 0 && depth < MAX_DEPTH && tabs.length < MAX_TOTAL) {
           const nextQueue: any[] = [];
-
-          // Collect all valid related IDs from current queue
           const idsToFetch: number[] = [];
           queue.forEach(item => {
             item.relations?.edges?.forEach((edge: any) => {
@@ -463,9 +454,8 @@ const AnimeWatch: React.FC = () => {
 
           if (idsToFetch.length === 0) break;
 
-          // Fetch info for this level's new IDs
           const results = await Promise.allSettled(
-            idsToFetch.slice(0, 5).map(id => fetchAnimeInfo(id)) // Cap per-level fetch
+            idsToFetch.slice(0, 5).map(id => fetchAnimeInfo(id))
           );
 
           results.forEach(res => {
@@ -487,10 +477,7 @@ const AnimeWatch: React.FC = () => {
 
         if (!isMounted) return;
 
-        // Sort by AniList ID (Release Order)
         tabs.sort((a: any, b: any) => a.id - b.id);
-
-        // Assign labels
         tabs.forEach((tab, idx) => {
           tab.displayLabel = generateTabLabel(tab.title, baseTitle, idx);
         });
@@ -509,7 +496,6 @@ const AnimeWatch: React.FC = () => {
     return () => { isMounted = false; };
   }, [urlSlug]);
 
-  // Auto-redirect to best server
   useEffect(() => {
     if (loadingEpisodes || availableProviders.length === 0 || !urlSlug || provider) return;
     const best = rankedProviders[0];
@@ -559,31 +545,23 @@ const AnimeWatch: React.FC = () => {
       setShowSkipIntro(false); setShowSkipOutro(false);
       try {
         const pure = extractSlug(currentEpData.id);
-        // This maps to /watch/${provider}/${anilistId}/${category}/${slug}
         const data = await fetchAnimeStreams(currentProvider.toLowerCase(), resolvedId, currentCategory as 'sub' | 'dub', pure);
         if (!data.streams?.length) throw new Error('Server is not responding.');
-        console.log('[STREAM FULL]', JSON.stringify(data, null, 2));
         if (mounted) setStreamData(data as any);
 
-        // Locate the specific intro and outro fields for anime titles by checking designated providers
         if (!data.intro && !data.outro && mounted) {
           const skipProviders = ['arc', 'kiwi', 'animepahe', 'animekai', 'animedunya', 'anikoto'];
           for (const sp of skipProviders) {
             if (sp === currentProvider.toLowerCase()) continue;
-
             const providerKey = Object.keys(episodesData).find(k => k.toLowerCase() === sp);
             if (!providerKey) continue;
-
             try {
               const epList = getProviderEpisodes({ providers: episodesData }, providerKey, currentCategory as 'sub' | 'dub');
               const matchEp = epList.find(e => e.number === currentEpData.number);
-
               if (matchEp) {
                 const spPure = extractSlug(matchEp.id);
                 const spData = await fetchAnimeStreams(sp, resolvedId, currentCategory as 'sub' | 'dub', spPure);
-
                 if (spData.intro || spData.outro) {
-                  console.log(`[Skip Times] Found via ${sp}`, { intro: spData.intro, outro: spData.outro });
                   if (mounted) {
                     setStreamData((prev: any) => ({
                       ...prev,
@@ -591,12 +569,10 @@ const AnimeWatch: React.FC = () => {
                       outro: spData.outro || prev?.outro,
                     }));
                   }
-                  break; // Stop searching once fields are identified
+                  break;
                 }
               }
-            } catch (e) {
-              console.warn(`[Skip Times] Failed checking ${sp}`, e);
-            }
+            } catch (e) { }
           }
         }
       } catch (err: any) {
@@ -611,21 +587,13 @@ const AnimeWatch: React.FC = () => {
 
   const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(-1);
 
-  // Auto-default to Internal Provider
   useEffect(() => {
     if (streamData?.streams && streamData.streams.length > 0 && selectedStreamIndex === -1) {
-      // Look for an internal HLS stream first
       const internalIndex = streamData.streams.findIndex((s: any) =>
         s.type === 'hls' || (!s.url.includes('iframe') && !s.url.includes('/embed/') && s.url.includes('.m3u8'))
       );
-      
-      if (internalIndex !== -1) {
-        console.log('[Source Selection] Defaulting to Internal Provider:', streamData.streams[internalIndex].quality);
-        setSelectedStreamIndex(internalIndex);
-      } else {
-        // Fallback to the first available stream if no internal stream is found
-        setSelectedStreamIndex(0);
-      }
+      if (internalIndex !== -1) setSelectedStreamIndex(internalIndex);
+      else setSelectedStreamIndex(0);
     }
   }, [streamData, selectedStreamIndex]);
 
@@ -647,16 +615,12 @@ const AnimeWatch: React.FC = () => {
     setProxifiedSources({});
 
     if (!activeStream?.url?.includes('.m3u8') || !activeStream?.url) {
-      setIsProxifying(false);
-      return;
+      setIsProxifying(false); return;
     }
 
     setIsProxifying(true);
     try {
-      const b64 = btoa(activeStream.url)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+      const b64 = btoa(activeStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
       const url = `https://proxypipe.vercel.app/proxy/${b64}`;
       if (mounted) {
         setProxifiedSources({ proxypipe: url });
@@ -665,9 +629,9 @@ const AnimeWatch: React.FC = () => {
     } finally {
       if (mounted) setIsProxifying(false);
     }
-
     return () => { mounted = false; };
   }, [activeStream]);
+
 
   // ─── BULLETPROOF CONTINUE WATCHING ENGINE ──────────────────────────────────────
   const derivedTitle = typeof animeInfo?.title === 'string'
@@ -676,16 +640,22 @@ const AnimeWatch: React.FC = () => {
   const displayTitle = derivedTitle || (!/^\d+$/.test(String(urlSlug)) ? String(urlSlug).replace(/-/g, ' ') : 'Anime Details');
 
   const progressDataRef = useRef<any>(null);
-  const playingEpisodeRef = useRef<string>(''); // Tracks strictly what stream is loaded
+  const playingEpisodeRef = useRef<string>('');
   const videoStateRef = useRef({ episodeId: '', currentTime: 0, duration: 0 });
   const lastSavedTime = useRef<number>(-1);
 
-  // Safely lock the tracker to the currently playing video
+  // Critical State: Completely lock tracking until the new episode fires `canplay`
+  const [isVideoReady, setIsVideoReady] = useState(false);
+
   useEffect(() => {
+    setIsVideoReady(false);
+    videoStateRef.current = { episodeId: '', currentTime: 0, duration: 0 };
+    lastSavedTime.current = -1;
+
     if (streamData && currentEpData?.id) {
       playingEpisodeRef.current = extractSlug(currentEpData.id);
     }
-  }, [streamData, currentEpData]);
+  }, [episodeId, streamData, currentEpData]);
 
   progressDataRef.current = {
     animeId: String(resolvedId || urlSlug),
@@ -699,18 +669,16 @@ const AnimeWatch: React.FC = () => {
 
   const forceSaveProgress = useCallback(async (explicitPayload?: any) => {
     const payload = explicitPayload?.episodeId ? explicitPayload : progressDataRef.current;
-    if (!payload?.episodeId) return;
+    if (!payload?.episodeId || !payload?.animeId) return;
 
     let currentTime = 0;
     let duration = 0;
 
-    // 1. STRICT CHECK: Only use the saved time if it belongs to the episode we are saving!
     if (videoStateRef.current.episodeId === payload.episodeId) {
       currentTime = videoStateRef.current.currentTime || 0;
       duration = videoStateRef.current.duration || 0;
     }
 
-    // 2. Fallback to playerRef ONLY if we know it's currently playing this exact episode
     if (currentTime === 0 && playingEpisodeRef.current === payload.episodeId && playerRef.current) {
       const vTime = playerRef.current.state.currentTime;
       const vDur = playerRef.current.state.duration;
@@ -740,7 +708,9 @@ const AnimeWatch: React.FC = () => {
         }, { onConflict: 'user_id, anime_id' });
       }
 
-      localStorage.setItem(`progress-${payload.episodeId}`, safeTime.toString());
+      // ISOLATED STORAGE KEY TO PREVENT BLEEDING ACROSS ANIME
+      const progressKey = `progress-${payload.animeId}-${payload.episodeId}`;
+      localStorage.setItem(progressKey, safeTime.toString());
 
       const raw = localStorage.getItem('anime-continue-watching');
       const entries = raw ? JSON.parse(raw) : [];
@@ -775,7 +745,98 @@ const AnimeWatch: React.FC = () => {
     };
   }, [forceSaveProgress]);
 
-  // Generate WebVTT Chapters for Intro/Outro markers on Vidstack Timeline
+  // ─── 2X SPEED HOLD FUNCTIONALITY ──────────────────────────────────────
+  const [isSpeeding, setIsSpeeding] = useState(false);
+  const isSpeedingRef = useRef(false);
+  const normalSpeedRef = useRef(1);
+  const wasPausedRef = useRef(false);
+  const preventClickRef = useRef(false);
+  const speedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleVideoPointerDown = useCallback((e: React.PointerEvent) => {
+    // Only accept left mouse button or touch
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    // Ignore if clicking on player controls
+    const target = e.target as HTMLElement;
+    if (target.closest('button, [role="button"], [role="slider"], [role="menu"], input, .vds-controls-group')) {
+      return;
+    }
+
+    // Remember if it was paused before we started holding
+    if (playerRef.current) {
+      wasPausedRef.current = playerRef.current.state.paused;
+    }
+
+    speedTimeoutRef.current = setTimeout(() => {
+      if (playerRef.current) {
+        preventClickRef.current = true; // Block the next click event from toggling play/pause
+        normalSpeedRef.current = playerRef.current.state.playbackRate || 1;
+
+        // If it was paused, start playing!
+        if (wasPausedRef.current) {
+          playerRef.current.play();
+        }
+
+        playerRef.current.playbackRate = 2;
+        isSpeedingRef.current = true;
+        setIsSpeeding(true);
+      }
+    }, 350); // Activate after 350ms hold
+  }, []);
+
+  const stopSpeeding = useCallback((e?: React.PointerEvent | PointerEvent | Event) => {
+    if (speedTimeoutRef.current) {
+      clearTimeout(speedTimeoutRef.current);
+      speedTimeoutRef.current = null;
+    }
+
+    if (isSpeedingRef.current && playerRef.current) {
+      // Stop the pointer up from registering with the player
+      if (e && 'stopPropagation' in e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+
+      playerRef.current.playbackRate = normalSpeedRef.current;
+
+      // If it was originally paused, pause it again. Otherwise, keep playing!
+      if (wasPausedRef.current) {
+        playerRef.current.pause();
+      }
+
+      isSpeedingRef.current = false;
+      setIsSpeeding(false);
+
+      // Block the 'click' event that fires immediately after pointerup
+      preventClickRef.current = true;
+      setTimeout(() => { preventClickRef.current = false; }, 100);
+    }
+  }, []);
+
+  const handleVideoPointerUp = useCallback((e: React.PointerEvent) => {
+    stopSpeeding(e);
+  }, [stopSpeeding]);
+
+  // Catches and kills the click event that fires after you let go
+  const handleVideoClickCapture = useCallback((e: React.MouseEvent) => {
+    if (preventClickRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('pointerup', stopSpeeding);
+    window.addEventListener('blur', stopSpeeding);
+    return () => {
+      window.removeEventListener('pointerup', stopSpeeding);
+      window.removeEventListener('blur', stopSpeeding);
+    };
+  }, [stopSpeeding]);
+  // ──────────────────────────────────────────────────────────────────────
+
+  // ─── VTT / URL HELPERS ──────────────────────────────────────
   const chapterTrackUrl = useMemo(() => {
     if (!streamData) return null;
     const { intro, outro } = streamData;
@@ -799,60 +860,42 @@ const AnimeWatch: React.FC = () => {
 
     if (intro) {
       vtt += `${formatVtt(intro.start)} --> ${formatVtt(intro.end)}\nIntro\n\n`;
-      if (outro) {
-        vtt += `${formatVtt(intro.end)} --> ${formatVtt(outro.start)}\nEpisode\n\n`;
-      }
+      if (outro) vtt += `${formatVtt(intro.end)} --> ${formatVtt(outro.start)}\nEpisode\n\n`;
     }
-
-    if (outro) {
-      vtt += `${formatVtt(outro.start)} --> ${formatVtt(outro.end)}\nOutro\n\n`;
-    }
+    if (outro) vtt += `${formatVtt(outro.start)} --> ${formatVtt(outro.end)}\nOutro\n\n`;
 
     const blob = new Blob([vtt], { type: 'text/vtt;charset=utf-8' });
     return URL.createObjectURL(blob);
   }, [streamData]);
 
-  useEffect(() => {
-    return () => {
-      if (chapterTrackUrl) URL.revokeObjectURL(chapterTrackUrl);
-    };
-  }, [chapterTrackUrl]);
+  useEffect(() => { return () => { if (chapterTrackUrl) URL.revokeObjectURL(chapterTrackUrl); }; }, [chapterTrackUrl]);
 
-  // Generate Proxy-Intercepted HLS Url for Vidstack
   const finalStreamUrl = useMemo(() => {
     if (customStreamUrl) {
-      const b64 = btoa(customStreamUrl)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+      const b64 = btoa(customStreamUrl).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
       return `https://proxypipe.vercel.app/proxy/${b64}`;
     }
-
     if (!activeStream || activeStream.type === 'embed') return null;
-
     if (isProxifying) return null;
-
     if (proxifiedStreamUrl) return proxifiedStreamUrl;
-
     return activeStream.url || null;
   }, [activeStream, customStreamUrl, customReferer, proxifiedStreamUrl, isProxifying]);
 
   useEffect(() => {
     const currentPayload = { ...progressDataRef.current };
-    return () => {
-      forceSaveProgress(currentPayload);
-    };
+    return () => forceSaveProgress(currentPayload);
   }, [activeStream, forceSaveProgress]);
 
   const handleTimeUpdate = useCallback((e: any) => {
+    if (!isVideoReady) return; // Strict lock prevents old video's dying updates from bleeding
+
     const time = e?.currentTime ?? e?.currentTarget?.currentTime ?? 0;
     const duration = e?.duration ?? e?.currentTarget?.duration ?? 0;
     const activeEpId = playingEpisodeRef.current;
 
-    // Only track time if we know exactly what episode is actively loaded
     if (time > 0 && duration > 0 && activeEpId) {
       videoStateRef.current = { episodeId: activeEpId, currentTime: time, duration };
-      
+
       const sec = Math.floor(time);
       if (sec % 5 === 0 && sec !== lastSavedTime.current) {
         lastSavedTime.current = sec;
@@ -869,7 +912,7 @@ const AnimeWatch: React.FC = () => {
       if (autoSkip) { if (playerRef.current) playerRef.current.currentTime = streamData.outro.end; showToast('Outro Skipped'); }
       else if (!showSkipOutro) setShowSkipOutro(true);
     } else if (showSkipOutro) setShowSkipOutro(false);
-  }, [streamData, autoSkip, showSkipIntro, showSkipOutro, showToast, forceSaveProgress]);
+  }, [streamData, autoSkip, showSkipIntro, showSkipOutro, showToast, forceSaveProgress, isVideoReady]);
 
   const handleEpisodeClick = useCallback((targetId: string) => {
     forceSaveProgress();
@@ -909,17 +952,10 @@ const AnimeWatch: React.FC = () => {
     <div
       className="aw-root aw-noise min-h-screen flex flex-col relative"
     >
-
       {lightsOff && (
         <div
           onClick={() => setLightsOff(false)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 40,
-            background: 'rgba(0,0,0,0.92)',
-            backdropFilter: 'blur(2px)',
-            cursor: 'pointer',
-            transition: 'opacity 0.5s',
-          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(2px)', cursor: 'pointer', transition: 'opacity 0.5s' }}
         />
       )}
 
@@ -928,93 +964,54 @@ const AnimeWatch: React.FC = () => {
       <div className="aw-layout">
         <main className="aw-main">
           {/* Video Container */}
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            aspectRatio: '16/9',
-            background: '#000',
-            borderRadius: 16,
-            overflow: 'hidden',
-            boxShadow: lightsOff
-              ? '0 0 0 2px var(--aw-accent), 0 0 80px 8px var(--aw-accent-glow), 0 30px 80px -20px rgba(0,0,0,0.9)'
-              : '0 24px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)',
-            zIndex: lightsOff ? 50 : 'auto',
-            transition: 'box-shadow 0.5s',
-          }}>
+          <div
+            style={{
+              position: 'relative', width: '100%', aspectRatio: '16/9', background: '#000',
+              borderRadius: 16, overflow: 'hidden', zIndex: lightsOff ? 50 : 'auto', transition: 'box-shadow 0.5s',
+              boxShadow: lightsOff
+                ? '0 0 0 2px var(--aw-accent), 0 0 80px 8px var(--aw-accent-glow), 0 30px 80px -20px rgba(0,0,0,0.9)'
+                : '0 24px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)'
+            }}
+            onPointerDownCapture={handleVideoPointerDown}
+            onPointerUpCapture={handleVideoPointerUp}
+            onPointerLeaveCapture={handleVideoPointerUp}
+            onClickCapture={handleVideoClickCapture} /* ADD THIS LINE */
+            onContextMenu={(e) => { if (isSpeeding) e.preventDefault(); }}
+          >
+            {/* 2X SPEED OVERLAY */}
+            {isSpeeding && (
+              <div style={{
+                position: 'absolute', top: 32, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)',
+                padding: '8px 20px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 8,
+                color: 'white', fontWeight: 700, fontSize: 13, letterSpacing: '0.1em', textTransform: 'uppercase',
+                fontFamily: 'var(--aw-font-display)', pointerEvents: 'none', border: '1px solid rgba(255,255,255,0.1)'
+              }}>
+                <FastForward size={16} style={{ color: 'var(--aw-accent)' }} />
+                2x Speed
+              </div>
+            )}
 
             {toastMessage && (
               <div className="aw-toast" style={{
-                position: 'absolute', top: 20, left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'rgba(0,0,0,0.75)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: 'white',
-                padding: '8px 20px',
-                borderRadius: 100,
-                fontSize: 11,
-                fontFamily: 'var(--aw-font-display)',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                zIndex: 60,
-                whiteSpace: 'nowrap',
+                position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.12)',
+                color: 'white', padding: '8px 20px', borderRadius: 100, fontSize: 11, fontFamily: 'var(--aw-font-display)',
+                fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', zIndex: 60, whiteSpace: 'nowrap',
               }}>
                 {toastMessage}
               </div>
             )}
 
             {showSkipIntro && streamData?.intro && !autoSkip && !customStreamUrl && (
-              <button
-                className="skip-btn"
-                onClick={() => skipTo(streamData.intro!.end)}
-                style={{
-                  position: 'absolute', bottom: 90, right: 32, zIndex: 100,
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: 8,
-                  padding: '12px 24px',
-                  color: 'white',
-                  fontSize: 14,
-                  fontFamily: 'var(--aw-font-display)',
-                  fontWeight: 700,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)',
-                  textTransform: 'uppercase',
-                }}
-              >
-                <FastForward size={16} style={{ color: 'var(--aw-accent)' }} />
-                <span style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>Skip Intro</span>
+              <button className="skip-btn" onClick={() => skipTo(streamData.intro!.end)} style={{ position: 'absolute', bottom: 90, right: 32, zIndex: 100, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 24px', color: 'white', fontSize: 14, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer', boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)', textTransform: 'uppercase' }}>
+                <FastForward size={16} style={{ color: 'var(--aw-accent)' }} /> <span style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>Skip Intro</span>
               </button>
             )}
 
             {showSkipOutro && streamData?.outro && !autoSkip && !customStreamUrl && (
-              <button
-                className="skip-btn"
-                onClick={() => skipTo(streamData.outro!.end)}
-                style={{
-                  position: 'absolute', bottom: 90, right: 32, zIndex: 100,
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: 8,
-                  padding: '12px 24px',
-                  color: 'white',
-                  fontSize: 14,
-                  fontFamily: 'var(--aw-font-display)',
-                  fontWeight: 700,
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)',
-                  textTransform: 'uppercase',
-                }}
-              >
-                <FastForward size={16} style={{ color: 'var(--aw-accent)' }} />
-                <span style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>Skip Outro</span>
+              <button className="skip-btn" onClick={() => skipTo(streamData.outro!.end)} style={{ position: 'absolute', bottom: 90, right: 32, zIndex: 100, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: 8, padding: '12px 24px', color: 'white', fontSize: 14, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.05em', cursor: 'pointer', boxShadow: '0 8px 32px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.05)', textTransform: 'uppercase' }}>
+                <FastForward size={16} style={{ color: 'var(--aw-accent)' }} /> <span style={{ textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>Skip Outro</span>
               </button>
             )}
 
@@ -1029,46 +1026,15 @@ const AnimeWatch: React.FC = () => {
               </div>
             ) : (!customStreamUrl && streamError) ? (
               <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(7,7,13,0.95)', padding: 32, textAlign: 'center', gap: 16, zIndex: 10 }}>
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(232,54,93,0.1)', border: '1px solid rgba(232,54,93,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                  <AlertCircle style={{ color: 'var(--aw-accent)', width: 24, height: 24 }} />
-                </div>
-                <p style={{ fontFamily: 'var(--aw-font-display)', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)' }}>
-                  Stream Failed
-                </p>
-                <p style={{ fontSize: 13, color: 'var(--aw-muted)', maxWidth: 320, lineHeight: 1.6, fontWeight: 300 }}>
-                  {streamError}
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  style={{
-                    marginTop: 8,
-                    padding: '10px 28px',
-                    background: 'var(--aw-card)',
-                    border: '1px solid var(--aw-border-hi)',
-                    borderRadius: 100,
-                    color: 'var(--aw-text)',
-                    fontSize: 11,
-                    fontFamily: 'var(--aw-font-display)',
-                    fontWeight: 600,
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                  }}
-                >
-                  Reload Player
-                </button>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(232,54,93,0.1)', border: '1px solid rgba(232,54,93,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}><AlertCircle style={{ color: 'var(--aw-accent)', width: 24, height: 24 }} /></div>
+                <p style={{ fontFamily: 'var(--aw-font-display)', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)' }}>Stream Failed</p>
+                <p style={{ fontSize: 13, color: 'var(--aw-muted)', maxWidth: 320, lineHeight: 1.6, fontWeight: 300 }}>{streamError}</p>
+                <button onClick={() => window.location.reload()} style={{ marginTop: 8, padding: '10px 28px', background: 'var(--aw-card)', border: '1px solid var(--aw-border-hi)', borderRadius: 100, color: 'var(--aw-text)', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'background 0.2s' }}>Reload Player</button>
               </div>
             ) : (activeStream || customStreamUrl) ? (
               <>
                 {(!customStreamUrl && activeStream?.type === 'embed' && activeStream?.url) ? (
-                  <iframe
-                    src={activeStream.url}
-                    style={{ width: '100%', height: '100%', border: 'none' }}
-                    allowFullScreen
-                    allow="autoplay; fullscreen"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                  />
+                  <iframe src={activeStream.url} style={{ width: '100%', height: '100%', border: 'none' }} allowFullScreen allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
                 ) : (
                   <MediaPlayer
                     ref={playerRef}
@@ -1077,15 +1043,9 @@ const AnimeWatch: React.FC = () => {
                     onProviderChange={(provider) => {
                       if (isHLSProvider(provider)) {
                         provider.config = {
-                          enableWorker: true,
-                          backBufferLength: 0,
-                          maxBufferLength: 30,
-                          maxMaxBufferLength: 60,
-                          manifestLoadingMaxRetry: 3,
-                          levelLoadingMaxRetry: 3,
-                          fragLoadingMaxRetry: 6,
-                          appendErrorMaxRetry: 3,
-                          testBandwidth: false
+                          enableWorker: true, backBufferLength: 0, maxBufferLength: 30, maxMaxBufferLength: 60,
+                          manifestLoadingMaxRetry: 3, levelLoadingMaxRetry: 3, fragLoadingMaxRetry: 6,
+                          appendErrorMaxRetry: 3, testBandwidth: false
                         };
                       }
                     }}
@@ -1096,19 +1056,17 @@ const AnimeWatch: React.FC = () => {
                     }}
                     onEnded={handleVideoEnd}
                     onError={(e) => console.error('[MediaPlayer Error]:', e)}
-                    onHlsError={(event: any) => {
-                      if (!event.fatal) return;
-                      console.warn('[HLS] Fatal error:', event.type, event.details);
-                    }}
+                    onHlsError={(event: any) => { if (event.fatal) console.warn('[HLS] Fatal error:', event.type, event.details); }}
                     onCanPlay={() => {
+                      setIsVideoReady(true); // RELEASES THE LOCK! Tracking safely begins again.
                       if (customStreamUrl || !playerRef.current) return;
                       const epId = progressDataRef.current?.episodeId || episodeId;
-                      if (!epId) return;
+                      const aId = progressDataRef.current?.animeId || urlSlug;
+                      if (!epId || !aId) return;
 
-                      const savedTimeRaw = localStorage.getItem(`progress-${epId}`);
+                      const savedTimeRaw = localStorage.getItem(`progress-${aId}-${epId}`);
                       if (savedTimeRaw) {
                         const parsedTime = parseFloat(savedTimeRaw);
-                        // Only resume if we are at the very beginning and have significant progress
                         if (parsedTime > 10 && playerRef.current.currentTime < 5) {
                           playerRef.current.currentTime = parsedTime;
                           showToast(`Resumed playback`);
@@ -1118,24 +1076,9 @@ const AnimeWatch: React.FC = () => {
                     style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', outline: 'none' }}
                   >
                     <MediaProvider>
-                      {chapterTrackUrl && !customStreamUrl && (
-                        <Track
-                          src={chapterTrackUrl}
-                          kind="chapters"
-                          label="Chapters"
-                          language="en"
-                          default
-                        />
-                      )}
+                      {chapterTrackUrl && !customStreamUrl && <Track src={chapterTrackUrl} kind="chapters" label="Chapters" language="en" default />}
                       {!customStreamUrl && streamData?.subtitles?.map((sub, i) => (
-                        <Track
-                          key={String(i)}
-                          src={sub.file}
-                          kind="subtitles"
-                          label={sub.label}
-                          language={sub.label.substring(0, 2).toLowerCase()}
-                          default={sub.label.toLowerCase().includes('english')}
-                        />
+                        <Track key={String(i)} src={sub.file} kind="subtitles" label={sub.label} language={sub.label.substring(0, 2).toLowerCase()} default={sub.label.toLowerCase().includes('english')} />
                       ))}
                     </MediaProvider>
                     <DefaultVideoLayout icons={defaultLayoutIcons} />
@@ -1145,117 +1088,36 @@ const AnimeWatch: React.FC = () => {
             ) : null}
           </div>
 
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: 16,
-            padding: '14px 20px',
-            background: 'var(--aw-s1)',
-            borderRadius: 12,
-            border: '1px solid var(--aw-border)',
-          }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '14px 20px', background: 'var(--aw-s1)', borderRadius: 12, border: '1px solid var(--aw-border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
               <Toggle checked={autoPlay} onChange={setAutoPlay} label="Autoplay" />
               <Toggle checked={autoSkip} onChange={setAutoSkip} label="Auto Skip" />
             </div>
-
             <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.07)', margin: '0 4px' }} />
-
             <div style={{ display: 'flex', gap: 8 }}>
               {[
                 { label: 'Prev', icon: <ChevronsLeft size={14} />, disabled: !hasPrev || streamLoading, onClick: () => hasPrev && handleEpisodeClick(providerEpisodes[currentIndex - 1].id) },
                 { label: 'Next', icon: <ChevronsRight size={14} />, disabled: !hasNext || streamLoading, onClick: () => hasNext && handleEpisodeClick(providerEpisodes[currentIndex + 1].id) },
               ].map(btn => (
-                <button
-                  key={btn.label}
-                  className="aw-action-btn"
-                  onClick={btn.onClick}
-                  disabled={btn.disabled}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    height: 34,
-                    padding: '0 16px',
-                    borderRadius: 100,
-                    background: btn.disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)',
-                    border: '1px solid var(--aw-border)',
-                    color: btn.disabled ? 'rgba(255,255,255,0.25)' : 'var(--aw-text)',
-                    fontSize: 11,
-                    fontFamily: 'var(--aw-font-display)',
-                    fontWeight: 600,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    cursor: btn.disabled ? 'not-allowed' : 'pointer',
-                    transition: 'background 0.2s, border-color 0.2s',
-                  }}
-                >
-                  {btn.label === 'Prev' && btn.icon}
-                  {btn.label}
-                  {btn.label === 'Next' && btn.icon}
+                <button key={btn.label} className="aw-action-btn" onClick={btn.onClick} disabled={btn.disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 16px', borderRadius: 100, background: btn.disabled ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.05)', border: '1px solid var(--aw-border)', color: btn.disabled ? 'rgba(255,255,255,0.25)' : 'var(--aw-text)', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: btn.disabled ? 'not-allowed' : 'pointer', transition: 'background 0.2s, border-color 0.2s' }}>
+                  {btn.label === 'Prev' && btn.icon}{btn.label}{btn.label === 'Next' && btn.icon}
                 </button>
               ))}
             </div>
-
           </div>
 
-          <div style={{
-            padding: '28px 28px',
-            background: 'var(--aw-s1)',
-            borderRadius: 16,
-            border: '1px solid var(--aw-border)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0,
-          }}>
+          <div style={{ padding: '28px 28px', background: 'var(--aw-s1)', borderRadius: 16, border: '1px solid var(--aw-border)', display: 'flex', flexDirection: 'column', gap: 0 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 28 }}>
               <div>
-                <p className="aw-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <MonitorPlay size={11} /> Now Playing
-                </p>
-                <h1 style={{
-                  fontFamily: 'var(--aw-font-display)',
-                  fontSize: 'clamp(20px, 3vw, 28px)',
-                  fontWeight: 700,
-                  color: 'var(--aw-text)',
-                  letterSpacing: '-0.01em',
-                  lineHeight: 1.2,
-                  margin: 0,
-                }}>
+                <p className="aw-label" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}><MonitorPlay size={11} /> Now Playing</p>
+                <h1 style={{ fontFamily: 'var(--aw-font-display)', fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 700, color: 'var(--aw-text)', letterSpacing: '-0.01em', lineHeight: 1.2, margin: 0 }}>
                   {currentEpData?.title || `Episode ${currentEpData?.number || '?'}`}
                 </h1>
               </div>
 
-              {/* USER / DEV Toggles (Replaces SUB/DUB) */}
-              <div style={{
-                display: 'flex',
-                background: 'var(--aw-bg)',
-                border: '1px solid var(--aw-border)',
-                borderRadius: 100,
-                padding: 4,
-                gap: 2,
-              }}>
+              <div style={{ display: 'flex', background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', borderRadius: 100, padding: 4, gap: 2 }}>
                 {(['user', 'dev'] as const).map(mode => (
-                  <button
-                    key={mode}
-                    className="aw-segment-btn"
-                    data-active={viewMode === mode}
-                    onClick={() => setViewMode(mode)}
-                    style={{
-                      padding: '6px 22px',
-                      borderRadius: 100,
-                      border: 'none',
-                      background: viewMode === mode ? 'var(--aw-s2)' : 'transparent',
-                      color: viewMode === mode ? 'var(--aw-accent)' : 'var(--aw-muted)',
-                      fontSize: 11,
-                      fontFamily: 'var(--aw-font-display)',
-                      fontWeight: 700,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: viewMode === mode ? '0 2px 12px rgba(0,0,0,0.3)' : 'none',
-                    }}
-                  >
+                  <button key={mode} className="aw-segment-btn" data-active={viewMode === mode} onClick={() => setViewMode(mode)} style={{ padding: '6px 22px', borderRadius: 100, border: 'none', background: viewMode === mode ? 'var(--aw-s2)' : 'transparent', color: viewMode === mode ? 'var(--aw-accent)' : 'var(--aw-muted)', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s', boxShadow: viewMode === mode ? '0 2px 12px rgba(0,0,0,0.3)' : 'none' }}>
                     {mode}
                   </button>
                 ))}
@@ -1264,58 +1126,17 @@ const AnimeWatch: React.FC = () => {
 
             <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', marginBottom: 24 }} />
 
-            {/* Render conditional UI based on view mode */}
             {viewMode === 'user' ? (
               <>
-                {/* Servers List */}
                 <div>
-                  <p style={{
-                    display: 'flex', alignItems: 'center', gap: 7,
-                    fontFamily: 'var(--aw-font-display)',
-                    fontSize: 9, fontWeight: 700,
-                    letterSpacing: '0.22em',
-                    textTransform: 'uppercase',
-                    color: 'var(--aw-muted)',
-                    opacity: 0.6,
-                    marginBottom: 12,
-                  }}>
-                    <Server size={10} />
-                    Video Servers
-                  </p>
-
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}><Server size={10} /> Video Servers</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {rankedProviders.map((p) => {
                       const isActive = currentProvider === p && !customStreamUrl;
                       return (
-                        <button
-                          key={p}
-                          onClick={() => { setCustomStreamUrl(''); handleProviderSwitch(p); }}
-                          onMouseDown={handleRippleMouseDown}
-                          className="aw-action-hover"
-                          style={{
-                            position: 'relative',
-                            padding: '8px 16px',
-                            borderRadius: 10,
-                            border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                            background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                            color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                            fontSize: 12,
-                            fontFamily: 'var(--aw-font-display)',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            textTransform: 'lowercase',
-                            display: 'flex', alignItems: 'center', gap: 6,
-                          }}
-                        >
+                        <button key={p} onClick={() => { setCustomStreamUrl(''); handleProviderSwitch(p); }} onMouseDown={handleRippleMouseDown} className="aw-action-hover" style={{ position: 'relative', padding: '8px 16px', borderRadius: 10, border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700, cursor: 'pointer', textTransform: 'lowercase', display: 'flex', alignItems: 'center', gap: 6 }}>
                           {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                          {isActive && (
-                            <span style={{
-                              width: 5, height: 5,
-                              borderRadius: '50%',
-                              background: 'var(--aw-accent)',
-                              flexShrink: 0,
-                            }} />
-                          )}
+                          {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
                           {p}
                         </button>
                       );
@@ -1325,52 +1146,19 @@ const AnimeWatch: React.FC = () => {
 
                 {streamData && streamData.streams && streamData.streams.length > 0 && (
                   <>
-                    <div style={{
-                      height: 1,
-                      background: 'rgba(255,255,255,0.04)',
-                      margin: '22px 0',
-                    }} />
-
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', margin: '22px 0' }} />
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 32 }}>
-
                       {streamData.streams.some(s => s.type === 'hls' && s.url) && (
                         <div>
-                          <p style={{
-                            display: 'flex', alignItems: 'center', gap: 7,
-                            fontFamily: 'var(--aw-font-display)',
-                            fontSize: 9, fontWeight: 700,
-                            letterSpacing: '0.22em', textTransform: 'uppercase',
-                            color: 'var(--aw-muted)', opacity: 0.6,
-                            marginBottom: 12,
-                          }}>
-                            <MonitorPlay size={10} />
-                            Internal
-                          </p>
+                          <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}><MonitorPlay size={10} /> Internal</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {streamData.streams.map((s, idx) => {
                               if (s.type !== 'hls' || !s.url) return null;
                               const isActive = selectedStreamIndex === idx && !customStreamUrl;
                               return (
-                                <button
-                                  key={idx}
-                                  onClick={() => { setCustomStreamUrl(''); setSelectedStreamIndex(idx); }}
-                                  className="aw-action-hover"
-                                  style={{
-                                    padding: '8px 16px',
-                                    borderRadius: 10,
-                                    border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                                    background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                                    color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                                    fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700,
-                                    textTransform: 'lowercase', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 6,
-                                    position: 'relative',
-                                  }}
-                                >
+                                <button key={idx} onClick={() => { setCustomStreamUrl(''); setSelectedStreamIndex(idx); }} className="aw-action-hover" style={{ padding: '8px 16px', borderRadius: 10, border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700, textTransform: 'lowercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
                                   {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                                  {isActive && (
-                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />
-                                  )}
+                                  {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
                                   {s.quality || 'auto'}
                                   <span style={{ fontSize: 8, letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase' }}>HLS</span>
                                 </button>
@@ -1382,42 +1170,15 @@ const AnimeWatch: React.FC = () => {
 
                       {streamData.streams.some(s => s.type === 'embed' && s.url) && (
                         <div>
-                          <p style={{
-                            display: 'flex', alignItems: 'center', gap: 7,
-                            fontFamily: 'var(--aw-font-display)',
-                            fontSize: 9, fontWeight: 700,
-                            letterSpacing: '0.22em', textTransform: 'uppercase',
-                            color: 'var(--aw-muted)', opacity: 0.6,
-                            marginBottom: 12,
-                          }}>
-                            <MonitorPlay size={10} />
-                            External
-                          </p>
+                          <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}><MonitorPlay size={10} /> External</p>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             {streamData.streams.map((s, idx) => {
                               if (s.type !== 'embed' || !s.url) return null;
                               const isActive = selectedStreamIndex === idx && !customStreamUrl;
                               return (
-                                <button
-                                  key={idx}
-                                  onClick={() => { setCustomStreamUrl(''); setSelectedStreamIndex(idx); }}
-                                  className="aw-action-hover"
-                                  style={{
-                                    padding: '8px 16px',
-                                    borderRadius: 10,
-                                    border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                                    background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                                    color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                                    fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700,
-                                    textTransform: 'lowercase', cursor: 'pointer',
-                                    display: 'flex', alignItems: 'center', gap: 6,
-                                    position: 'relative',
-                                  }}
-                                >
+                                <button key={idx} onClick={() => { setCustomStreamUrl(''); setSelectedStreamIndex(idx); }} className="aw-action-hover" style={{ padding: '8px 16px', borderRadius: 10, border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700, textTransform: 'lowercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
                                   {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                                  {isActive && (
-                                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />
-                                  )}
+                                  {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
                                   {s.quality || 'auto'}
                                   <span style={{ fontSize: 8, letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase' }}>EMBED</span>
                                 </button>
@@ -1433,119 +1194,33 @@ const AnimeWatch: React.FC = () => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
-                    <Link2 size={12} /> Test Proxy Worker / Inject HLS
-                  </p>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}><Link2 size={12} /> Test Proxy Worker / Inject HLS</p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <input
-                      placeholder="Paste raw .m3u8 URL here to test player..."
-                      value={customStreamUrl}
-                      onChange={e => setCustomStreamUrl(e.target.value)}
-                      style={{ flex: '1 1 200px', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'var(--aw-bg)', color: 'white', fontSize: 12, outline: 'none', fontFamily: 'var(--aw-font-body)' }}
-                    />
-                    <input
-                      placeholder="Referer (e.g. https://kwik.cx/)"
-                      value={customReferer}
-                      onChange={e => setCustomReferer(e.target.value)}
-                      style={{ flex: '1 1 150px', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'var(--aw-bg)', color: 'white', fontSize: 12, outline: 'none', fontFamily: 'var(--aw-font-body)' }}
-                    />
+                    <input placeholder="Paste raw .m3u8 URL here to test player..." value={customStreamUrl} onChange={e => setCustomStreamUrl(e.target.value)} style={{ flex: '1 1 200px', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'var(--aw-bg)', color: 'white', fontSize: 12, outline: 'none', fontFamily: 'var(--aw-font-body)' }} />
+                    <input placeholder="Referer (e.g. https://kwik.cx/)" value={customReferer} onChange={e => setCustomReferer(e.target.value)} style={{ flex: '1 1 150px', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'var(--aw-bg)', color: 'white', fontSize: 12, outline: 'none', fontFamily: 'var(--aw-font-body)' }} />
                   </div>
                 </div>
-
                 <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
-                    <Activity size={12} /> Quick Actions
-                  </p>
+                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}><Activity size={12} /> Quick Actions</p>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <button className="aw-action-btn" onClick={() => { forceSaveProgress(); showToast("Progress Force Saved"); }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Force Sync Progress
-                    </button>
-                    <button className="aw-action-btn" onClick={() => { if (episodeId) { localStorage.removeItem(`progress-${episodeId}`); showToast("Progress Wiped"); } }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Clear Episode Progress
-                    </button>
-                    <button className="aw-action-btn" onClick={() => console.log('STREAM DATA:', streamData)} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Log Stream Data
-                    </button>
-                    <button className="aw-action-btn" onClick={() => console.log('EPISODE CONTEXT:', currentEpData)} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Log Context Data
-                    </button>
+                    <button className="aw-action-btn" onClick={() => { forceSaveProgress(); showToast("Progress Force Saved"); }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>Force Sync Progress</button>
+                    <button className="aw-action-btn" onClick={() => { if (episodeId) { localStorage.removeItem(`progress-${urlSlug}-${episodeId}`); showToast("Progress Wiped"); } }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>Clear Episode Progress</button>
+                    <button className="aw-action-btn" onClick={() => console.log('STREAM DATA:', streamData)} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-text)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>Log Stream Data</button>
                     <button className="aw-action-btn" onClick={() => {
                       if (!activeStream?.url) return;
                       const b64 = btoa(activeStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-                      const url = `https://proxypipe.vercel.app/proxy/${b64}`;
-                      console.log('PROXYPIPE URL:', url);
-                      fetch(url).then(r => console.log('PROXYPIPE STATUS:', r.status)).catch(e => console.error('PROXYPIPE ERROR:', e));
-                    }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-accent)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>
-                      Test Proxypipe Endpoint
-                    </button>
+                      fetch(`https://proxypipe.vercel.app/proxy/${b64}`).then(r => console.log('PROXYPIPE STATUS:', r.status));
+                    }} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--aw-bg)', border: '1px solid var(--aw-border)', color: 'var(--aw-accent)', fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', cursor: 'pointer' }}>Test Proxypipe Endpoint</button>
                   </div>
                 </div>
-
-                <div style={{ padding: '16px 20px', background: 'var(--aw-s2)', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
-                  <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-accent)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
-                    <Server size={12} /> HLS Proxy Provider
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {(['lunaranime', 'animanga', 'miruro', 'anikuro'] as const).map(p => {
-                      const isActive = proxyProvider === p;
-                      const hasSource = !!proxifiedSources[p];
-                      return (
-                        <button
-                          key={p}
-                          onClick={() => setProxyProvider(p)}
-                          disabled={!hasSource}
-                          className="aw-action-hover"
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 10,
-                            border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                            background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                            color: isActive ? 'var(--aw-accent)' : hasSource ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)',
-                            fontSize: 12,
-                            fontFamily: 'var(--aw-font-display)',
-                            fontWeight: 700,
-                            textTransform: 'lowercase',
-                            cursor: hasSource ? 'pointer' : 'not-allowed',
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            position: 'relative',
-                          }}
-                        >
-                          {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                          {isActive && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--aw-accent)', flexShrink: 0 }} />}
-                          {p}
-                          {!hasSource && <span style={{ fontSize: 8, opacity: 0.4 }}>—</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
                   <div style={{ padding: '16px', background: '#09090b', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
-                      <Terminal size={12} /> Player State Dump
-                    </p>
-                    <pre className="aw-scroll" style={{ margin: 0, fontSize: 11, color: '#a1a1aa', maxHeight: 180, overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                      {JSON.stringify({
-                        currentTime: playerRef.current?.state?.currentTime || videoStateRef.current.currentTime || 0,
-                        duration: playerRef.current?.state?.duration || videoStateRef.current.duration || 0,
-                        paused: playerRef.current?.state?.paused ?? true,
-                        autoPlay: autoPlay,
-                        autoSkip: autoSkip,
-                        hasIntroData: !!streamData?.intro,
-                        hasOutroData: !!streamData?.outro,
-                        activeStreamType: activeStream?.type || 'none'
-                      }, null, 2)}
-                    </pre>
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}><Terminal size={12} /> Player State Dump</p>
+                    <pre className="aw-scroll" style={{ margin: 0, fontSize: 11, color: '#a1a1aa', maxHeight: 180, overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify({ currentTime: playerRef.current?.state?.currentTime || videoStateRef.current.currentTime || 0, duration: playerRef.current?.state?.duration || videoStateRef.current.duration || 0, paused: playerRef.current?.state?.paused ?? true, autoPlay, autoSkip, activeStreamType: activeStream?.type || 'none' }, null, 2)}</pre>
                   </div>
-
                   <div style={{ padding: '16px', background: '#09090b', border: '1px solid var(--aw-border)', borderRadius: 12 }}>
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}>
-                      <Database size={12} /> Raw Stream API Data
-                    </p>
-                    <pre className="aw-scroll" style={{ margin: 0, fontSize: 11, color: '#a1a1aa', maxHeight: 180, overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                      {JSON.stringify(streamData, null, 2) || 'No stream data loaded...'}
-                    </pre>
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)', marginBottom: 12, fontFamily: 'var(--aw-font-display)' }}><Database size={12} /> Raw Stream API Data</p>
+                    <pre className="aw-scroll" style={{ margin: 0, fontSize: 11, color: '#a1a1aa', maxHeight: 180, overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(streamData, null, 2) || 'No stream data loaded...'}</pre>
                   </div>
                 </div>
               </div>
@@ -1553,51 +1228,11 @@ const AnimeWatch: React.FC = () => {
           </div>
 
           {seasons.length > 1 && (
-            <div style={{
-              padding: '24px 28px',
-              background: 'var(--aw-s1)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}>
-              <p style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                fontFamily: 'var(--aw-font-display)',
-                fontSize: 10, fontWeight: 600,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                color: 'var(--aw-muted)',
-              }}>
-                <Layers size={11} style={{ opacity: 0.7 }} /> Seasons
-              </p>
+            <div style={{ padding: '24px 28px', background: 'var(--aw-s1)', backdropFilter: 'blur(8px)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--aw-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--aw-muted)' }}><Layers size={11} style={{ opacity: 0.7 }} /> Seasons</p>
               <div className="aw-scroll" style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '10px 4px 18px', margin: '-10px -4px 0' }}>
                 {seasons.map(s => (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      if (!s.active) {
-                        navigate(`/watch/${s.id}/kiwi/sub/animepahe-1`);
-                      }
-                    }}
-                    className="aw-action-hover"
-                    style={{
-                      flexShrink: 0,
-                      padding: '10px 20px',
-                      borderRadius: 10,
-                      border: s.active ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                      background: s.active ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                      color: s.active ? 'var(--aw-accent)' : 'var(--aw-text)',
-                      fontFamily: 'var(--aw-font-display)',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      letterSpacing: '0.05em',
-                      cursor: s.active ? 'default' : 'pointer',
-                      position: 'relative',
-                    }}
-                  >
+                  <button key={s.id} onClick={() => { if (!s.active) navigate(`/watch/${s.id}/kiwi/sub/animepahe-1`); }} className="aw-action-hover" style={{ flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: s.active ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: s.active ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: s.active ? 'var(--aw-accent)' : 'var(--aw-text)', fontFamily: 'var(--aw-font-display)', fontSize: 12, fontWeight: 600, letterSpacing: '0.05em', cursor: s.active ? 'default' : 'pointer', position: 'relative' }}>
                     {s.active && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
                     {s.displayLabel}
                   </button>
@@ -1606,224 +1241,53 @@ const AnimeWatch: React.FC = () => {
             </div>
           )}
 
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 28,
-            padding: '28px 28px',
-            background: 'transparent',
-            borderRadius: 16,
-            border: '1px solid rgba(255,255,255,0.08)',
-            marginBottom: 32,
-          }}>
+          <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 28, padding: '28px 28px', background: 'transparent', borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 32 }}>
             <div style={{ flexShrink: 0, width: 150 }}>
-              <div style={{
-                borderRadius: 12,
-                overflow: 'hidden',
-                aspectRatio: '2/3',
-                boxShadow: '0 16px 48px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)',
-                position: 'relative',
-              }}>
-                <img
-                  src={animeInfo?.image || animeInfo?.coverImage?.large || 'https://via.placeholder.com/300x450/0d0d1a/3f3f56?text=N/A'}
-                  alt="Cover"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
-                  background: 'transparent',
-                }} />
+              <div style={{ borderRadius: 12, overflow: 'hidden', aspectRatio: '2/3', boxShadow: '0 16px 48px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)', position: 'relative' }}>
+                <img src={animeInfo?.image || animeInfo?.coverImage?.large || 'https://via.placeholder.com/300x450/0d0d1a/3f3f56?text=N/A'} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: 'transparent' }} />
               </div>
             </div>
-
             <div style={{ flex: 1, minWidth: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-              <h1 style={{
-                fontFamily: 'var(--aw-font-display)',
-                fontSize: 'clamp(22px, 3.5vw, 38px)',
-                fontWeight: 800,
-                fontStyle: 'italic',
-                letterSpacing: '-0.02em',
-                color: 'white',
-                margin: '0 0 16px',
-                lineHeight: 1.05,
-                textTransform: 'uppercase',
-              }}>
-                {displayTitle}
-              </h1>
-
+              <h1 style={{ fontFamily: 'var(--aw-font-display)', fontSize: 'clamp(22px, 3.5vw, 38px)', fontWeight: 800, fontStyle: 'italic', letterSpacing: '-0.02em', color: 'white', margin: '0 0 16px', lineHeight: 1.05, textTransform: 'uppercase' }}>{displayTitle}</h1>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
                 {(animeInfo?.genres || ['Anime']).map((g: string) => (
-                  <button
-                    key={g}
-                    onClick={() => navigate(`/browse?genres=${encodeURIComponent(g)}`)}
-                    className="genre-pill"
-                  >
-                    {g}
-                  </button>
+                  <button key={g} onClick={() => navigate(`/browse?genres=${encodeURIComponent(g)}`)} className="genre-pill">{g}</button>
                 ))}
               </div>
-
-              <p style={{
-                fontSize: 13,
-                fontWeight: 300,
-                lineHeight: 1.7,
-                color: 'var(--aw-muted)',
-                margin: 0,
-                display: '-webkit-box',
-                WebkitLineClamp: 5,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}>
+              <p style={{ fontSize: 13, fontWeight: 300, lineHeight: 1.7, color: 'var(--aw-muted)', margin: 0, display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {animeInfo?.description?.replace(/<[^>]*>?/gm, '') || animeInfo?.synopsis || 'No description available for this anime.'}
               </p>
             </div>
           </div>
 
           <div style={{ padding: '0 20px 20px' }}>
-            {currentEpData && (
-              <CommentSection
-                pageType="watch"
-                pageId={`anime-${resolvedId || urlSlug}-ep-${currentEpData.number}`}
-              />
-            )}
-            {!currentEpData && loadingEpisodes && (
-              <div style={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-                <Loader2 className="animate-spin text-[var(--aw-accent)]" size={24} />
-              </div>
-            )}
+            {currentEpData && <CommentSection pageType="watch" pageId={`anime-${resolvedId || urlSlug}-ep-${currentEpData.number}`} />}
+            {!currentEpData && loadingEpisodes && <div style={{ display: 'flex', justifyContent: 'center', py: 10 }}><Loader2 className="animate-spin text-[var(--aw-accent)]" size={24} /></div>}
           </div>
         </main>
 
         <aside className="aw-sidebar" style={{ zIndex: 40 }}>
-          <div style={{
-            padding: '18px 20px',
-            background: 'rgba(255,255,255,0.03)',
-            backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            flexShrink: 0,
-          }}>
+          <div style={{ padding: '18px 20px', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h3 style={{
-                fontFamily: 'var(--aw-font-display)',
-                fontSize: 15,
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                color: 'white',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10
-              }}>
-                Episodes
-                {providerEpisodes.length > 0 && (
-                  <span style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'var(--aw-accent)',
-                    background: 'rgba(255,255,255,0.06)',
-                    padding: '2px 8px',
-                    borderRadius: 100,
-                  }}>
-                    {providerEpisodes.length}
-                  </span>
-                )}
+              <h3 style={{ fontFamily: 'var(--aw-font-display)', fontSize: 15, fontWeight: 700, letterSpacing: '0.04em', color: 'white', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>Episodes
+                {providerEpisodes.length > 0 && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--aw-accent)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 100 }}>{providerEpisodes.length}</span>}
               </h3>
-
-              <div style={{
-                display: 'flex',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 100,
-                padding: 4,
-                gap: 2,
-              }}>
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 100, padding: 4, gap: 2 }}>
                 {(['sub', 'dub'] as const).map(cat => (
-                  <button
-                    key={cat}
-                    className="aw-segment-btn"
-                    data-active={currentCategory === cat}
-                    onClick={() => handleCategorySwitch(cat)}
-                    style={{
-                      padding: '4px 14px',
-                      borderRadius: 100,
-                      border: 'none',
-                      background: currentCategory === cat ? 'rgba(255,255,255,0.1)' : 'transparent',
-                      color: currentCategory === cat ? 'var(--aw-accent)' : 'var(--aw-muted)',
-                      fontSize: 10,
-                      fontFamily: 'var(--aw-font-display)',
-                      fontWeight: 700,
-                      letterSpacing: '0.12em',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: currentCategory === cat ? '0 2px 12px rgba(0,0,0,0.3)' : 'none',
-                    }}
-                  >
-                    {cat}
-                  </button>
+                  <button key={cat} className="aw-segment-btn" data-active={currentCategory === cat} onClick={() => handleCategorySwitch(cat)} style={{ padding: '4px 14px', borderRadius: 100, border: 'none', background: currentCategory === cat ? 'rgba(255,255,255,0.1)' : 'transparent', color: currentCategory === cat ? 'var(--aw-accent)' : 'var(--aw-muted)', fontSize: 10, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s', boxShadow: currentCategory === cat ? '0 2px 12px rgba(0,0,0,0.3)' : 'none' }}>{cat}</button>
                 ))}
               </div>
             </div>
-
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
-                <input
-                  type="text"
-                  placeholder="Search episodes…"
-                  value={epSearchQuery}
-                  onChange={e => setEpSearchQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: 8,
-                    padding: '8px 14px',
-                    color: 'var(--aw-text)',
-                    fontSize: 12,
-                    fontFamily: 'var(--aw-font-body)',
-                    fontWeight: 400,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    transition: 'all 0.2s',
-                  }}
-                  onFocus={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'}
-                  onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
-                />
+                <input type="text" placeholder="Search episodes…" value={epSearchQuery} onChange={e => setEpSearchQuery(e.target.value)} style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 14px', color: 'var(--aw-text)', fontSize: 12, fontFamily: 'var(--aw-font-body)', fontWeight: 400, outline: 'none', boxSizing: 'border-box', transition: 'all 0.2s' }} onFocus={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'} onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'} />
               </div>
-              <button
-                onClick={() => setEpisodeSortOrder((current) => current === 'desc' ? 'asc' : 'desc')}
-                title="Sort Episodes"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 34,
-                  height: 34,
-                  flexShrink: 0,
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: 8,
-                  color: 'var(--aw-muted)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
-                  e.currentTarget.style.color = 'white';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                  e.currentTarget.style.color = 'var(--aw-muted)';
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                }}
-              >
+              <button onClick={() => setEpisodeSortOrder((current) => current === 'desc' ? 'asc' : 'desc')} title="Sort Episodes" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, flexShrink: 0, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, color: 'var(--aw-muted)', cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = 'var(--aw-muted)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}>
                 {episodeSortOrder === 'desc' ? <ArrowDownUp size={14} /> : <ArrowDownUp size={14} style={{ transform: 'rotate(180deg)' }} />}
               </button>
             </div>
           </div>
-
           <div className="aw-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
             {loadingEpisodes ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1834,7 +1298,6 @@ const AnimeWatch: React.FC = () => {
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 }}>
                       <div className="aw-skeleton" style={{ width: '60%', height: 12, borderRadius: 4 }} />
                       <div className="aw-skeleton" style={{ width: '80%', height: 10, borderRadius: 4 }} />
-                      <div className="aw-skeleton" style={{ width: '50%', height: 10, borderRadius: 4 }} />
                     </div>
                   </div>
                 ))}
@@ -1843,121 +1306,19 @@ const AnimeWatch: React.FC = () => {
               visibleEpisodes.map((ep, idx) => {
                 const isActive = extractSlug(ep.id) === episodeId && !customStreamUrl;
                 return (
-                  <div
-                    key={`${episodeSortOrder}-${ep.id}`}
-                    ref={isActive ? activeEpRef : null}
-                    onClick={() => handleEpisodeClick(ep.id)}
-                    className={`ep-item ep-slide-in`}
-                    style={{
-                      animationDelay: `${Math.min(idx * 0.03, 0.4)}s`,
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 12,
-                      padding: '12px 16px',
-                      borderBottom: '1px solid var(--aw-border)',
-                      cursor: 'pointer',
-                      background: isActive ? 'var(--aw-accent-dim)' : 'transparent',
-                    }}
-                    onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'; }}
-                    onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
-                  >
-                    {isActive && (
-                      <div className="ep-active-marker" style={{
-                        position: 'absolute', left: 0, top: 0, bottom: 0,
-                        width: 3,
-                        background: 'linear-gradient(180deg, var(--aw-accent), var(--aw-accent-2))',
-                        borderRadius: '0 2px 2px 0',
-                      }} />
-                    )}
-
-                    <div style={{
-                      width: 28,
-                      height: 64,
-                      flexShrink: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 18,
-                      fontFamily: 'var(--aw-font-display)',
-                      fontWeight: isActive ? 700 : 500,
-                      color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.25)',
-                      transition: 'color 0.2s',
-                    }}>
-                      {ep.number || '–'}
+                  <div key={`${episodeSortOrder}-${ep.id}`} ref={isActive ? activeEpRef : null} onClick={() => handleEpisodeClick(ep.id)} className={`ep-item ep-slide-in`} style={{ animationDelay: `${Math.min(idx * 0.03, 0.4)}s`, position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--aw-border)', cursor: 'pointer', background: isActive ? 'var(--aw-accent-dim)' : 'transparent' }} onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'; }} onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
+                    {isActive && <div className="ep-active-marker" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: 'linear-gradient(180deg, var(--aw-accent), var(--aw-accent-2))', borderRadius: '0 2px 2px 0' }} />}
+                    <div style={{ width: 28, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'var(--aw-font-display)', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.25)', transition: 'color 0.2s' }}>{ep.number || '–'}</div>
+                    <div style={{ width: 110, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: 'var(--aw-card)', boxShadow: isActive ? '0 0 0 1.5px var(--aw-accent)' : '0 0 0 1px rgba(255,255,255,0.06)', position: 'relative' }}>
+                      <img src={ep.image || 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'} alt="" className="ep-thumb" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isActive ? 1 : 0.75 }} onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'; }} />
+                      {ep.filler && <div style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.8)', fontSize: 9, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', padding: '2px 5px', borderRadius: 3, textTransform: 'uppercase' }}>Filler</div>}
                     </div>
-
-                    <div style={{
-                      width: 110,
-                      height: 64,
-                      flexShrink: 0,
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      background: 'var(--aw-card)',
-                      boxShadow: isActive ? '0 0 0 1.5px var(--aw-accent)' : '0 0 0 1px rgba(255,255,255,0.06)',
-                      position: 'relative',
-                    }}>
-                      <img
-                        src={ep.image || 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'}
-                        alt=""
-                        className="ep-thumb"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isActive ? 1 : 0.75 }}
-                        onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'; }}
-                      />
-                      {ep.filler && (
-                        <div style={{
-                          position: 'absolute', bottom: 4, right: 4,
-                          background: 'rgba(0,0,0,0.8)',
-                          fontSize: 9,
-                          fontFamily: 'var(--aw-font-display)',
-                          fontWeight: 700,
-                          letterSpacing: '0.08em',
-                          color: 'rgba(255,255,255,0.7)',
-                          padding: '2px 5px',
-                          borderRadius: 3,
-                          textTransform: 'uppercase',
-                        }}>
-                          Filler
-                        </div>
-                      )}
-                    </div>
-
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: 64 }}>
                       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6, marginBottom: 5 }}>
-                        <h4 style={{
-                          margin: 0,
-                          fontSize: 13,
-                          fontFamily: 'var(--aw-font-display)',
-                          fontWeight: isActive ? 700 : 600,
-                          color: isActive ? 'white' : 'rgba(255,255,255,0.8)',
-                          letterSpacing: '0.01em',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {ep.title || `Episode ${ep.number || '?'}`}
-                        </h4>
-                        {ep.duration && (
-                          <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--aw-muted)', fontWeight: 400 }}>
-                            {Math.round(ep.duration / 60)}m
-                          </span>
-                        )}
+                        <h4 style={{ margin: 0, fontSize: 13, fontFamily: 'var(--aw-font-display)', fontWeight: isActive ? 700 : 600, color: isActive ? 'white' : 'rgba(255,255,255,0.8)', letterSpacing: '0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title || `Episode ${ep.number || '?'}`}</h4>
+                        {ep.duration && <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--aw-muted)', fontWeight: 400 }}>{Math.round(ep.duration / 60)}m</span>}
                       </div>
-                      <p style={{
-                        margin: 0,
-                        fontSize: 11,
-                        fontWeight: 300,
-                        color: 'var(--aw-muted)',
-                        lineHeight: 1.4,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}>
-                        {ep.description ||
-                          `Episode ${ep.number}. ${ep.airDate ? `Aired ${formatEpisodeDate(ep.airDate)}.` : 'No synopsis available.'}`
-                        }
-                      </p>
+                      <p style={{ margin: 0, fontSize: 11, fontWeight: 300, color: 'var(--aw-muted)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ep.description || `Episode ${ep.number}. ${ep.airDate ? `Aired ${formatEpisodeDate(ep.airDate)}.` : 'No synopsis available.'}`}</p>
                     </div>
                   </div>
                 );
@@ -1965,16 +1326,7 @@ const AnimeWatch: React.FC = () => {
             ) : (
               <div style={{ padding: '48px 0', textAlign: 'center' }}>
                 <AlertCircle size={22} style={{ color: 'var(--aw-muted)', margin: '0 auto 12px', display: 'block', opacity: 0.5 }} />
-                <p style={{
-                  fontFamily: 'var(--aw-font-display)',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: 'var(--aw-muted)',
-                }}>
-                  No Matches
-                </p>
+                <p style={{ fontFamily: 'var(--aw-font-display)', fontSize: 11, fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--aw-muted)' }}>No Matches</p>
               </div>
             )}
           </div>
