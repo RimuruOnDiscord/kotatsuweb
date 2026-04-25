@@ -176,6 +176,33 @@ const DESIGN_STYLES = `
     transform: translateY(0);
   }
 
+  @keyframes seekFlash {
+    0%   { opacity: 0; transform: translateY(-50%) scale(0.85); }
+    15%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    70%  { opacity: 1; transform: translateY(-50%) scale(1); }
+    100% { opacity: 0; transform: translateY(-50%) scale(0.95); }
+  }
+  .aw-seek-overlay {
+    position: absolute;
+    top: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: white;
+    pointer-events: none;
+    z-index: 100;
+    animation: seekFlash 0.55s ease-out forwards;
+    font-family: var(--aw-font-display);
+    background: transparent;
+    padding: 10px 16px;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.9);
+    white-space: nowrap;
+  }
+  .aw-seek-left { left: 20px; }
+  .aw-seek-right { right: 20px; }
+
   /* ─── Vidstack Player Theme Overrides ─── */
   media-player[data-view-type="video"] {
     --media-brand: var(--aw-accent);
@@ -325,6 +352,7 @@ const AnimeWatch: React.FC = () => {
 
   const navigate = useNavigate();
   const activeEpRef = useRef<HTMLDivElement>(null);
+  const epListScrollRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<MediaPlayerInstance>(null);
 
   const [loadingEpisodes, setLoadingEpisodes] = useState(true);
@@ -354,6 +382,19 @@ const AnimeWatch: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [proxifiedSources, setProxifiedSources] = useState<Record<string, string>>({});
   const [proxifiedStreamUrl, setProxifiedStreamUrl] = useState<string | null>(null);
+
+  // Double Tap Seek State
+  const [seekIndicator, setSeekIndicator] = useState<'rewind' | 'forward' | null>(null);
+  const pointerStateRef = useRef({
+    downTime: 0,
+    downX: 0,
+    downY: 0,
+    lastTapTime: 0,
+    lastTapX: 0,
+    lastTapY: 0,
+    clickTimeout: null as any
+  });
+  const seekIndicatorTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { localStorage.setItem('watchAutoPlay', String(autoPlay)); }, [autoPlay]);
   useEffect(() => { localStorage.setItem('watchAutoSkip', String(autoSkip)); }, [autoSkip]);
@@ -529,42 +570,33 @@ const AnimeWatch: React.FC = () => {
 
   // ─── TIME UPDATE & SKIP LOGIC ────────────────────────────────────────
   const handleTimeUpdate = useCallback(({ currentTime, duration }: { currentTime: number, duration: number }) => {
-    // 1. Save time for "Continue Watching" progress
     videoStateRef.current.currentTime = currentTime;
     if (duration > 0) videoStateRef.current.duration = duration;
 
-    // 2. Handle Skip Intro
     if (streamData?.intro) {
       const { start, end } = streamData.intro;
       const isWithinIntro = currentTime >= start && currentTime < end;
 
       if (isWithinIntro) {
-        if (autoSkip) {
-          skipTo(end);
-        } else {
-          setShowSkipIntro(true);
-        }
+        if (autoSkip) skipTo(end);
+        else setShowSkipIntro(true);
       } else {
         setShowSkipIntro(false);
       }
     }
 
-    // 3. Handle Skip Outro
     if (streamData?.outro) {
       const { start, end } = streamData.outro;
       const isWithinOutro = currentTime >= start && currentTime < end;
 
       if (isWithinOutro) {
-        if (autoSkip) {
-          skipTo(end);
-        } else {
-          setShowSkipOutro(true);
-        }
+        if (autoSkip) skipTo(end);
+        else setShowSkipOutro(true);
       } else {
         setShowSkipOutro(false);
       }
     }
-  }, [streamData, autoSkip]); // Dependencies needed for logic
+  }, [streamData, autoSkip]);
 
   const providerEpisodes = useMemo(() => {
     if (!currentProvider) return [];
@@ -582,7 +614,6 @@ const AnimeWatch: React.FC = () => {
     return filtered;
   }, [providerEpisodes, epSearchQuery, episodeSortOrder]);
 
-  // SMART MATCHING: If episodeId was manually prefix-swapped, we match by episode number fallback so it doesn't break
   const currentIndex = useMemo(() => {
     if (!episodeId) return -1;
     let idx = providerEpisodes.findIndex(ep => extractSlug(ep.id) === episodeId);
@@ -598,15 +629,22 @@ const AnimeWatch: React.FC = () => {
   const currentEpData = currentIndex !== -1 ? providerEpisodes[currentIndex] : providerEpisodes[0];
 
   useEffect(() => {
-    if (!loadingEpisodes && activeEpRef.current) {
-      activeEpRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!loadingEpisodes || !activeEpRef.current) return;
+    const el = activeEpRef.current;
+    const container = epListScrollRef.current;
+    // Scroll only within the episode list container — never the page.
+    // This prevents the jarring page-scroll-down on mobile when switching episodes.
+    if (container) {
+      const elTop = el.offsetTop;
+      const elHeight = el.offsetHeight;
+      const containerHeight = container.clientHeight;
+      container.scrollTop = elTop - containerHeight / 2 + elHeight / 2;
     }
   }, [loadingEpisodes, episodeId, currentProvider, currentCategory]);
 
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex < providerEpisodes.length - 1 && currentIndex !== -1;
 
-  // Fetch streaming data
   useEffect(() => {
     if (!currentEpData?.id || !resolvedId || !currentProvider || !episodeId) return;
     let mounted = true;
@@ -713,7 +751,6 @@ const AnimeWatch: React.FC = () => {
   const videoStateRef = useRef({ episodeId: '', currentTime: 0, duration: 0 });
   const lastSavedTime = useRef<number>(-1);
 
-  // Critical State: Completely lock tracking until the new episode fires `canplay`
   const [isVideoReady, setIsVideoReady] = useState(false);
 
   useEffect(() => {
@@ -777,7 +814,6 @@ const AnimeWatch: React.FC = () => {
         }, { onConflict: 'user_id, anime_id' });
       }
 
-      // ISOLATED STORAGE KEY TO PREVENT BLEEDING ACROSS ANIME
       const progressKey = `progress-${payload.animeId}-${payload.episodeId}`;
       localStorage.setItem(progressKey, safeTime.toString());
 
@@ -814,7 +850,7 @@ const AnimeWatch: React.FC = () => {
     };
   }, [forceSaveProgress]);
 
-  // ─── 2X SPEED HOLD FUNCTIONALITY ──────────────────────────────────────
+  // ─── 2X SPEED & DOUBLE TAP LOGIC ──────────────────────────────────────
   const [isSpeeding, setIsSpeeding] = useState(false);
   const isSpeedingRef = useRef(false);
   const normalSpeedRef = useRef(1);
@@ -824,10 +860,16 @@ const AnimeWatch: React.FC = () => {
 
   const handleVideoPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (!e.isPrimary) return; // Only process the first finger touching down
+
     const target = e.target as HTMLElement;
     if (target.closest('button, [role="button"], [role="slider"], [role="menu"], input, .vds-controls-group')) {
       return;
     }
+
+    pointerStateRef.current.downTime = Date.now();
+    pointerStateRef.current.downX = e.clientX;
+    pointerStateRef.current.downY = e.clientY;
 
     if (playerRef.current) {
       wasPausedRef.current = playerRef.current.state.paused;
@@ -861,28 +903,146 @@ const AnimeWatch: React.FC = () => {
       setIsSpeeding(false);
       preventClickRef.current = true;
       setTimeout(() => { preventClickRef.current = false; }, 100);
+      return true; // Indicates speed was active
     }
+    return false;
   }, []);
 
   const handleVideoPointerUp = useCallback((e: React.PointerEvent) => {
-    stopSpeeding(e);
+    if (!e.isPrimary) return;
+
+    const wasSpeeding = stopSpeeding(e);
+
+    // If it was just released from a speed-up hold, it's not a tap
+    if (wasSpeeding) {
+      pointerStateRef.current.lastTapTime = 0;
+      return;
+    }
+
+    // Double-tap seek is MOBILE/TOUCH ONLY
+    if (e.pointerType !== 'touch') return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('button, [role="button"], [role="slider"], [role="menu"], input, .vds-controls-group')) {
+      return;
+    }
+
+    const upTime = Date.now();
+    const upX = e.clientX;
+    const upY = e.clientY;
+    const pState = pointerStateRef.current;
+
+    // A valid tap: brief duration, minimal movement
+    const isTap = (upTime - pState.downTime < 300) &&
+      Math.abs(upX - pState.downX) < 15 &&
+      Math.abs(upY - pState.downY) < 15;
+
+    if (!isTap) {
+      pState.lastTapTime = 0;
+      return;
+    }
+
+    const timeSinceLastTap = upTime - pState.lastTapTime;
+    const distFromLastTap = Math.sqrt(
+      Math.pow(upX - pState.lastTapX, 2) + Math.pow(upY - pState.lastTapY, 2)
+    );
+
+    // Double tap detect logic
+    if (timeSinceLastTap < 350 && distFromLastTap < 40) {
+      if (pState.clickTimeout) {
+        clearTimeout(pState.clickTimeout);
+        pState.clickTimeout = null;
+      }
+
+      if (playerRef.current) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = upX - rect.left;
+        const width = rect.width;
+
+        // Ignore middle 20% to allow normal play/pause toggling
+        if (clickX < width * 0.4) {
+          e.stopPropagation();
+          e.preventDefault();
+          preventClickRef.current = true;
+          setTimeout(() => { preventClickRef.current = false; }, 200);
+
+          playerRef.current.currentTime = Math.max(0, playerRef.current.currentTime - 10);
+          setSeekIndicator('rewind');
+
+          if (seekIndicatorTimeout.current) clearTimeout(seekIndicatorTimeout.current);
+          seekIndicatorTimeout.current = setTimeout(() => setSeekIndicator(null), 550);
+        } else if (clickX > width * 0.6) {
+          e.stopPropagation();
+          e.preventDefault();
+          preventClickRef.current = true;
+          setTimeout(() => { preventClickRef.current = false; }, 200);
+
+          playerRef.current.currentTime = Math.min(playerRef.current.state.duration || 0, playerRef.current.currentTime + 10);
+          setSeekIndicator('forward');
+
+          if (seekIndicatorTimeout.current) clearTimeout(seekIndicatorTimeout.current);
+          seekIndicatorTimeout.current = setTimeout(() => setSeekIndicator(null), 550);
+        }
+      }
+
+      // Update tap time instead of resetting to allow continuous skipping
+      pState.lastTapTime = upTime;
+      pState.lastTapX = upX;
+      pState.lastTapY = upY;
+    } else {
+      pState.lastTapTime = upTime;
+      pState.lastTapX = upX;
+      pState.lastTapY = upY;
+
+      // Single tap on side logic: manual toggle with delay to allow double tap
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = upX - rect.left;
+      const width = rect.width;
+      const isSide = clickX < width * 0.4 || clickX > width * 0.6;
+
+      if (isSide && playerRef.current) {
+        if (pState.clickTimeout) clearTimeout(pState.clickTimeout);
+        pState.clickTimeout = setTimeout(() => {
+          if (playerRef.current) {
+            if (playerRef.current.state.paused) playerRef.current.play();
+            else playerRef.current.pause();
+          }
+          pState.clickTimeout = null;
+        }, 360); // Increased timeout to prevent race condition with 350ms max gap
+      }
+    }
+  }, [stopSpeeding]);
+
+  // Dedicated leave handler — ONLY stops the speed hold, never touches tap state.
+  // This prevents the false double-tap that happened because onPointerLeave was
+  // reusing handleVideoPointerUp and setting lastTapTime right after a real tap.
+  const handleVideoPointerLeave = useCallback((e: React.PointerEvent | PointerEvent | Event) => {
+    stopSpeeding(e as PointerEvent);
   }, [stopSpeeding]);
 
   const handleVideoClickCapture = useCallback((e: React.MouseEvent) => {
-    if (preventClickRef.current) {
+    const target = e.target as HTMLElement;
+    const isControl = !!target.closest('button, [role="button"], [role="slider"], [role="menu"], input, .vds-controls-group');
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const w = rect.width;
+    const isSide = x < w * 0.4 || x > w * 0.6;
+
+    if ((preventClickRef.current || isSide) && !isControl) {
       e.stopPropagation();
       e.preventDefault();
     }
   }, []);
 
   useEffect(() => {
-    window.addEventListener('pointerup', stopSpeeding);
-    window.addEventListener('blur', stopSpeeding);
+    window.addEventListener('pointerup', handleVideoPointerLeave);
+    window.addEventListener('blur', handleVideoPointerLeave);
     return () => {
-      window.removeEventListener('pointerup', stopSpeeding);
-      window.removeEventListener('blur', stopSpeeding);
+      window.removeEventListener('pointerup', handleVideoPointerLeave);
+      window.removeEventListener('blur', handleVideoPointerLeave);
     };
-  }, [stopSpeeding]);
+  }, [handleVideoPointerLeave]);
 
   // ─── VTT / URL HELPERS ──────────────────────────────────────
   const chapterTrackUrl = useMemo(() => {
@@ -941,7 +1101,6 @@ const AnimeWatch: React.FC = () => {
 
     let finalTargetId = extractSlug(targetId);
 
-    // Check if the current episodeId in URL has one of the custom prefixes to preserve it!
     const customPrefixes = ['animepahe', 'animekai', 'animedunya', 'anikoto'];
     const activePrefix = customPrefixes.find(p => episodeId?.toLowerCase().startsWith(p));
 
@@ -1018,12 +1177,14 @@ const AnimeWatch: React.FC = () => {
               borderRadius: 16, overflow: 'hidden', zIndex: lightsOff ? 50 : 'auto', transition: 'box-shadow 0.5s',
               boxShadow: lightsOff
                 ? '0 0 0 2px var(--aw-accent), 0 0 80px 8px var(--aw-accent-glow), 0 30px 80px -20px rgba(0,0,0,0.9)'
-                : '0 24px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)'
+                : '0 24px 80px -20px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)',
+              userSelect: 'none'
             }}
             onPointerDownCapture={handleVideoPointerDown}
             onPointerUpCapture={handleVideoPointerUp}
-            onPointerLeave={handleVideoPointerUp}
+            onPointerLeave={handleVideoPointerLeave}
             onClickCapture={handleVideoClickCapture}
+            onDoubleClickCapture={handleVideoClickCapture}
             onContextMenu={(e) => { if (isSpeeding) e.preventDefault(); }}
           >
             {/* 2X SPEED OVERLAY */}
@@ -1037,6 +1198,20 @@ const AnimeWatch: React.FC = () => {
               }}>
                 <FastForward size={16} style={{ color: 'var(--aw-accent)' }} />
                 2x Speed
+              </div>
+            )}
+
+            {/* DOUBLE TAP SEEK OVERLAYS — mobile only, small flash pill */}
+            {seekIndicator === 'rewind' && (
+              <div className="aw-seek-overlay aw-seek-left">
+                <ChevronsLeft size={20} style={{ color: 'white' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>-10s</span>
+              </div>
+            )}
+            {seekIndicator === 'forward' && (
+              <div className="aw-seek-overlay aw-seek-right">
+                <ChevronsRight size={20} style={{ color: 'white' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>+10s</span>
               </div>
             )}
 
@@ -1098,7 +1273,6 @@ const AnimeWatch: React.FC = () => {
                       }
                     }}
                     onTimeUpdate={(e: any) => {
-                      // Vidstack passes time in detail.currentTime or detail
                       const time = typeof e === 'number'
                         ? e
                         : e?.detail?.currentTime || e?.detail || e?.currentTime || 0;
@@ -1110,7 +1284,7 @@ const AnimeWatch: React.FC = () => {
                     onError={(e) => console.error('[MediaPlayer Error]:', e)}
                     onHlsError={(event: any) => { if (event.fatal) console.warn('[HLS] Fatal error:', event.type, event.details); }}
                     onCanPlay={() => {
-                      setIsVideoReady(true); // RELEASES THE LOCK! Tracking safely begins again.
+                      setIsVideoReady(true);
                       if (customStreamUrl || !playerRef.current) return;
                       const epId = progressDataRef.current?.episodeId || episodeId;
                       const aId = progressDataRef.current?.animeId || urlSlug;
@@ -1181,7 +1355,6 @@ const AnimeWatch: React.FC = () => {
             {viewMode === 'user' ? (
               <>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 48, marginBottom: 8, alignItems: 'flex-start' }}>
-                  {/* Original API Providers list exactly as it was */}
                   <div style={{ flex: '0 0 auto' }}>
                     <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}>
                       <Server size={10} /> Video Servers
@@ -1200,7 +1373,6 @@ const AnimeWatch: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* New Feature: Internal Episode Prefix Overrides */}
                   <div style={{ flex: '1 1 auto' }}>
                     <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}>
                       <MonitorPlay size={10} /> Stream Providers
@@ -1321,7 +1493,7 @@ const AnimeWatch: React.FC = () => {
               <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--aw-font-display)', fontSize: 10, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--aw-muted)' }}><Layers size={11} style={{ opacity: 0.7 }} /> Seasons</p>
               <div className="aw-scroll" style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '10px 4px 18px', margin: '-10px -4px 0' }}>
                 {seasons.map(s => (
-                  <button key={s.id} onClick={() => { if (!s.active) navigate(`/watch/${s.id}/kiwi/sub/animepahe-1`); }} className="aw-action-hover" style={{ flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: s.active ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: s.active ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: s.active ? 'var(--aw-accent)' : 'var(--aw-text)', fontFamily: 'var(--aw-font-display)', fontSize: 12, fontWeight: 600, letterSpacing: '0.05em', cursor: s.active ? 'default' : 'pointer', position: 'relative' }}>
+                  <button key={s.id} onClick={() => { if (!s.active) navigate(`/watch/${s.id}/kiwi/sub/animepahe-1`); }} className="aw-action-hover" style={{ flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: s.active ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: s.active ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: s.active ? 'var(--aw-accent)' : 'var(--aw-text)', fontFamily: 'var(--aw-font-display)', fontSize: 12, fontWeight: 600, letterSpacing: '0.05em', cursor: s.active ? 'default' : 'position: relative' }}>
                     {s.active && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
                     {s.displayLabel}
                   </button>
@@ -1377,7 +1549,7 @@ const AnimeWatch: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="aw-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <div ref={epListScrollRef} className="aw-scroll" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
             {loadingEpisodes ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {[...Array(7)].map((_, i) => (
@@ -1426,3 +1598,4 @@ const AnimeWatch: React.FC = () => {
 };
 
 export default AnimeWatch;
+/* ─── END OF FILE AnimeWatchPage.tsx ────────────────────────────── */
