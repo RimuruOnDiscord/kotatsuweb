@@ -1,8 +1,8 @@
 /* --- START OF FILE AnimeHome.tsx --- */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Star, MonitorPlay, Search, X, BookOpen, BadgeCheck, Flame, StepForward, ChevronRight, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Play, Star, MonitorPlay, Search, X, BookOpen, BadgeCheck, Flame, StepForward, ChevronRight, ChevronDown, SlidersHorizontal, Bookmark, BookmarkCheck } from 'lucide-react';
 import AppTopbar from '../components/AppTopbar';
 import {
   AnimeResult,
@@ -142,6 +142,107 @@ const DESIGN_STYLES = `
     background-repeat: repeat;
     background-size: 180px;
   }
+
+  /* Quick Filter Styles */
+  .qf-section {
+    padding: 20px 24px;
+    background: var(--aw-s1);
+    border-radius: 16px;
+    border: 1px solid var(--aw-border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .qf-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  @media (min-width: 640px) {
+    .qf-grid {
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    }
+  }
+  .qf-select-wrap {
+    position: relative;
+  }
+  .qf-select-wrap .qf-chevron {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--aw-muted);
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+  .qf-select-wrap:hover .qf-chevron {
+    opacity: 0.8;
+  }
+  .qf-select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--aw-border);
+    background: var(--aw-s2);
+    color: var(--aw-muted);
+    font-family: var(--aw-font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .qf-select:hover {
+    border-color: var(--aw-accent-dim);
+    background: color-mix(in srgb, var(--aw-accent), transparent 94%);
+    color: white;
+  }
+  .qf-filter-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 40px;
+    border-radius: 10px;
+    border: none;
+    background: var(--aw-accent);
+    color: #04110d;
+    font-family: var(--aw-font-display);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+  }
+  .qf-filter-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.1);
+  }
+  .qf-filter-btn:active {
+    transform: translateY(0) scale(0.96);
+  }
+
+  .qf-dropdown-glass {
+    background-color: color-mix(in srgb, var(--aw-accent), #09090e 92%);
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 24px 60px -10px rgba(0,0,0,0.95);
+  }
+
+  @keyframes qf-pop {
+    0% { opacity: 0; transform: translateY(10px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .qf-animate-pop {
+    animation: qf-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  }
 `;
 
 export interface ContinueWatchingEntry {
@@ -182,8 +283,9 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, onViewMo
         fontWeight: 700,
         color: 'var(--aw-text)',
         letterSpacing: '-0.01em',
-        lineHeight: 1.2,
-        margin: 0,
+        lineHeight: 1.4,
+        margin: 1,
+        paddingBottom: 4,
       }}>
         {title}
       </h2>
@@ -242,7 +344,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
         {/* Badge */}
         {badge && (
-          <div className="absolute top-2 left-2 z-20 rounded-md border border-white/10 bg-black/60 px-2 py-1 backdrop-blur-md">
+          <div className="absolute top-2 left-2 z-20 rounded-md border border-white/10 bg-black/80 px-2 py-1">
             <span className="block text-[9px] font-black uppercase tracking-wider" style={{ color: 'var(--aw-accent)', fontFamily: 'var(--aw-font-display)' }}>
               {badge}
             </span>
@@ -266,7 +368,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
               e.stopPropagation();
               onClear();
             }}
-            className="absolute top-2 right-2 z-20 rounded-full border border-white/10 bg-black/60 p-1.5 text-white/70 backdrop-blur-md shadow-lg opacity-0 transition-all duration-300 hover:bg-white hover:text-black group-hover:opacity-100 pointer-events-auto"
+            className="absolute top-2 right-2 z-20 rounded-full border border-white/10 bg-black/80 p-1.5 text-white/70 shadow-lg opacity-0 transition-all duration-300 hover:bg-white hover:text-black group-hover:opacity-100 pointer-events-auto"
           >
             <X size={14} strokeWidth={3} />
           </button>
@@ -274,7 +376,7 @@ const MediaCard: React.FC<MediaCardProps> = ({
 
         {/* Progress Rail */}
         {clampedProgress !== undefined && (
-          <div className="absolute bottom-0 left-0 right-0 z-20 h-1.5 bg-black/50 backdrop-blur-sm">
+          <div className="absolute bottom-0 left-0 right-0 z-20 h-1.5 bg-black/80">
             <div
               className="h-full rounded-r-full shadow-[0_0_10px_var(--aw-accent-glow)] transition-all duration-500 ease-out"
               style={{ width: `${clampedProgress}%`, background: 'var(--aw-accent)' }}
@@ -284,16 +386,13 @@ const MediaCard: React.FC<MediaCardProps> = ({
       </div>
 
       {/* Text Info */}
-      <div className="flex flex-col gap-1 px-0.5">
-        <h3 style={{
+      <div className="flex flex-col gap-1 px-0.5 mt-1">
+        <h3 className="line-clamp-2 pb-1" style={{
           fontFamily: 'var(--aw-font-display)',
           fontSize: 13,
           fontWeight: 700,
           color: 'var(--aw-text)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          lineHeight: 1.2
+          lineHeight: 1.4
         }}>
           {title}
         </h3>
@@ -315,6 +414,172 @@ const MediaCard: React.FC<MediaCardProps> = ({
   );
 };
 
+// ─────────────────────────────────────────
+// QUICK FILTER OPTIONS
+// ─────────────────────────────────────────
+
+const QF_GENRE_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'Action', label: 'Action' },
+  { value: 'Adventure', label: 'Adventure' },
+  { value: 'Comedy', label: 'Comedy' },
+  { value: 'Drama', label: 'Drama' },
+  { value: 'Fantasy', label: 'Fantasy' },
+  { value: 'Horror', label: 'Horror' },
+  { value: 'Mecha', label: 'Mecha' },
+  { value: 'Music', label: 'Music' },
+  { value: 'Mystery', label: 'Mystery' },
+  { value: 'Psychological', label: 'Psychological' },
+  { value: 'Romance', label: 'Romance' },
+  { value: 'Sci-Fi', label: 'Sci-Fi' },
+  { value: 'Slice of Life', label: 'Slice of Life' },
+  { value: 'Sports', label: 'Sports' },
+  { value: 'Supernatural', label: 'Supernatural' },
+  { value: 'Thriller', label: 'Thriller' },
+];
+
+const QF_THEME_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'Isekai', label: 'Isekai' },
+  { value: 'Reincarnation', label: 'Reincarnation' },
+  { value: 'School', label: 'School' },
+  { value: 'Military', label: 'Military' },
+  { value: 'Martial Arts', label: 'Martial Arts' },
+  { value: 'Super Power', label: 'Super Power' },
+  { value: 'Vampire', label: 'Vampire' },
+  { value: 'Demons', label: 'Demons' },
+  { value: 'Historical', label: 'Historical' },
+  { value: 'Space', label: 'Space' },
+  { value: 'Survival', label: 'Survival' },
+];
+
+const QF_COUNTRY_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'JP', label: 'Japan' },
+  { value: 'KR', label: 'South Korea' },
+  { value: 'CN', label: 'China' },
+];
+
+const QF_SEASON_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'WINTER', label: 'Winter' },
+  { value: 'SPRING', label: 'Spring' },
+  { value: 'SUMMER', label: 'Summer' },
+  { value: 'FALL', label: 'Fall' },
+];
+
+const QF_YEAR_OPTIONS = (() => {
+  const opts = [{ value: '', label: 'All' }];
+  for (let y = new Date().getFullYear(); y >= 1990; y--) {
+    opts.push({ value: String(y), label: String(y) });
+  }
+  return opts;
+})();
+
+const QF_TYPE_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'TV', label: 'TV' },
+  { value: 'MOVIE', label: 'Movie' },
+  { value: 'OVA', label: 'OVA' },
+  { value: 'ONA', label: 'ONA' },
+  { value: 'SPECIAL', label: 'Special' },
+  { value: 'MUSIC', label: 'Music' },
+];
+
+const QF_STATUS_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'RELEASING', label: 'Releasing' },
+  { value: 'FINISHED', label: 'Finished' },
+  { value: 'HIATUS', label: 'Hiatus' },
+  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'NOT_YET_RELEASED', label: 'Upcoming' },
+];
+
+const QF_LANGUAGE_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'sub', label: 'Sub' },
+  { value: 'dub', label: 'Dub' },
+];
+
+const QF_SORT_OPTIONS = [
+  { value: '', label: 'Default' },
+  { value: 'POPULARITY_DESC', label: 'Popular' },
+  { value: 'START_DATE_DESC', label: 'Newest' },
+  { value: 'START_DATE', label: 'Oldest' },
+];
+
+interface QFSelectProps {
+  id: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  activeId: string | null;
+  setActiveId: (id: string | null) => void;
+}
+
+const QFSelect: React.FC<QFSelectProps> = ({ id, label, value, options, onChange, activeId, setActiveId }) => {
+  const isOpen = activeId === id;
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        if (isOpen) setActiveId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, setActiveId]);
+
+  const displayLabel = options.find(o => o.value === value)?.label || 'All';
+
+  return (
+    <div className="flex flex-col gap-1 relative" ref={dropdownRef}>
+      <span style={{
+        fontFamily: 'var(--aw-font-display)',
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase' as const,
+        color: 'var(--aw-muted)',
+        opacity: 0.6,
+      }}>{label}</span>
+      <div className="qf-select-wrap">
+        <button
+          type="button"
+          onClick={() => setActiveId(isOpen ? null : id)}
+          className={`qf-select flex items-center justify-between text-left transition-all duration-300 ${isOpen ? 'border-[var(--aw-accent-dim)] bg-white/5' : ''}`}
+        >
+          <span className="truncate">{displayLabel}</span>
+          <ChevronDown size={12} className={`transition-transform duration-300 ${isOpen ? 'rotate-180 text-[var(--aw-accent)]' : 'opacity-50'}`} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[100] max-h-[220px] overflow-y-auto rounded-xl border border-white/10 p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full qf-animate-pop qf-dropdown-glass">
+            {options.map(o => (
+              <button
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setActiveId(null);
+                }}
+                className={`w-full px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${value === o.value
+                  ? 'bg-[var(--aw-accent)] text-[#04110d]'
+                  : 'text-zinc-400 hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_85%)] hover:text-white'
+                  }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
 const AnimeHome: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -324,7 +589,8 @@ const AnimeHome: React.FC = () => {
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingEntry[]>([]);
 
   // Hero Carousel State
-  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const [internalIndex, setInternalIndex] = useState(1);
+  const [isTransitioning, setIsTransitioning] = useState(true);
   const [anilistDescriptions, setAnilistDescriptions] = useState<Record<string, string>>({});
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<number>>(new Set());
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
@@ -334,6 +600,33 @@ const AnimeHome: React.FC = () => {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragDistance, setDragDistance] = useState(0);
+
+  // Quick Filter State
+  const [qfGenre, setQfGenre] = useState('');
+  const [qfTheme, setQfTheme] = useState('');
+  const [qfCountry, setQfCountry] = useState('');
+  const [qfSeason, setQfSeason] = useState('');
+  const [qfYear, setQfYear] = useState('');
+  const [qfType, setQfType] = useState('');
+  const [qfStatus, setQfStatus] = useState('');
+  const [qfLanguage, setQfLanguage] = useState('');
+  const [qfSort, setQfSort] = useState('');
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  const handleQuickFilter = useCallback(() => {
+    const params = new URLSearchParams();
+    if (qfGenre) {
+      const slug = qfGenre.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      params.set('genres', slug);
+    }
+    if (qfType) params.set('format', qfType);
+    if (qfStatus) params.set('status', qfStatus);
+    if (qfSeason) params.set('language', qfSeason); // "language" param is used for season in browse
+    if (qfYear) params.set('year', qfYear);
+    if (qfSort) params.set('release', qfSort);
+    // Country & Theme & Language (sub/dub) are for future API expansion, but still pass what we can
+    navigate(`/browse?${params.toString()}`);
+  }, [navigate, qfGenre, qfType, qfStatus, qfSeason, qfYear, qfSort]);
 
   // Inject Design Styles
   useEffect(() => {
@@ -523,6 +816,18 @@ const AnimeHome: React.FC = () => {
     return items.slice(0, 6);
   }, [spotlight, popularAnime]);
 
+  const carouselItems = useMemo(() => {
+    if (heroItems.length <= 1) return heroItems;
+    return [heroItems[heroItems.length - 1], ...heroItems, heroItems[0]];
+  }, [heroItems]);
+
+  const activeHeroIndex = useMemo(() => {
+    if (heroItems.length <= 1) return 0;
+    if (internalIndex === 0) return heroItems.length - 1;
+    if (internalIndex === heroItems.length + 1) return 0;
+    return internalIndex - 1;
+  }, [internalIndex, heroItems.length]);
+
   useEffect(() => {
     if (heroItems.length === 0) return;
 
@@ -556,10 +861,31 @@ const AnimeHome: React.FC = () => {
   useEffect(() => {
     if (heroItems.length <= 1 || isDragging) return;
     const intervalId = setInterval(() => {
-      setActiveHeroIndex((current) => (current + 1) % heroItems.length);
+      if (document.hidden) return;
+      if (isTransitioning) {
+        setInternalIndex((current) => {
+          if (current >= heroItems.length + 1) return current;
+          return current + 1;
+        });
+      }
     }, 7000);
     return () => clearInterval(intervalId);
-  }, [heroItems.length, activeHeroIndex, isDragging]);
+  }, [heroItems.length, isDragging, isTransitioning]);
+
+  useEffect(() => {
+    if (!isTransitioning) {
+      let raf2: number;
+      const raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          setIsTransitioning(true);
+        });
+      });
+      return () => {
+        cancelAnimationFrame(raf1);
+        if (raf2) cancelAnimationFrame(raf2);
+      };
+    }
+  }, [isTransitioning]);
 
   const handleDragStart = (clientX: number) => {
     setTouchStart(clientX);
@@ -580,9 +906,9 @@ const AnimeHome: React.FC = () => {
     setDragDistance(Math.abs(dragOffset));
 
     if (dragOffset > 75) {
-      setActiveHeroIndex((prev) => (prev - 1 + heroItems.length) % heroItems.length);
+      setInternalIndex((prev) => prev - 1);
     } else if (dragOffset < -75) {
-      setActiveHeroIndex((prev) => (prev + 1) % heroItems.length);
+      setInternalIndex((prev) => prev + 1);
     }
 
     setDragOffset(0);
@@ -628,16 +954,27 @@ const AnimeHome: React.FC = () => {
               onTouchEnd={handleDragEnd}
             >
               <div
-                className={`flex w-full h-full ${isDragging ? '' : 'transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]'}`}
-                style={{ transform: `translateX(calc(-${activeHeroIndex * 100}% + ${dragOffset}px))` }}
+                className={`flex w-full h-full ${isDragging || !isTransitioning ? '' : 'transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]'}`}
+                style={{ transform: `translateX(calc(-${(heroItems.length <= 1 ? 0 : internalIndex) * 100}% + ${dragOffset}px))` }}
+                onTransitionEnd={() => {
+                  if (heroItems.length <= 1) return;
+                  if (internalIndex === 0) {
+                    setIsTransitioning(false);
+                    setInternalIndex(heroItems.length);
+                  } else if (internalIndex === carouselItems.length - 1) {
+                    setIsTransitioning(false);
+                    setInternalIndex(1);
+                  }
+                }}
               >
-                {heroItems.map((anime, index) => {
+                {carouselItems.map((anime, index) => {
+                  const key = heroItems.length > 1 ? (index === 0 ? `${anime.id}-clone-start` : index === carouselItems.length - 1 ? `${anime.id}-clone-end` : anime.id) : anime.id;
                   const title = getAnimeDisplayTitle(anime.title);
                   const score = getAnimeScore(anime);
                   const desc = anilistDescriptions[anime.id] || anime.description || (anime as any).synopsis || 'Loading synopsis...';
 
                   return (
-                    <div key={anime.id} className="w-full h-full flex-shrink-0 relative flex flex-col md:flex-row items-center justify-between gap-10 lg:gap-14 p-8 md:p-12 lg:p-16 min-h-[400px] lg:min-h-[480px]">
+                    <div key={key} className="w-full h-full flex-shrink-0 relative flex flex-col md:flex-row items-center justify-between gap-10 lg:gap-14 p-8 md:p-12 lg:p-16 min-h-[400px] lg:min-h-[480px]">
 
                       {/* Immersive Cinematic Background */}
                       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
@@ -663,7 +1000,7 @@ const AnimeHome: React.FC = () => {
 
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           <span
-                            className="bg-[var(--app-accent)] text-[#04110d] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md shadow-[0_0_15px_var(--app-accent-muted)] tracking-[0.2em]"
+                            className="bg-[var(--app-accent)] text-[#04110d] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md shadow-[0_0_15px_var(--app-accent-muted)] tracking-wider"
                             style={{ fontFamily: 'var(--aw-font-display)' }}
                           >
                             #{index + 1} Spotlight
@@ -708,7 +1045,7 @@ const AnimeHome: React.FC = () => {
                           <button
                             onClick={(e) => handleNavigation(e, `/watch/${anime.id}`)}
                             onMouseDown={handleRippleMouseDown}
-                            className="ripple-button group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl px-7 py-3.5 text-[12px] font-black uppercase tracking-[0.18em] text-[#04110d] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            className="ripple-button group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl px-7 py-3.5 text-[12px] font-black uppercase tracking-wider text-[#04110d] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                             style={{ backgroundColor: 'var(--app-accent)', fontFamily: 'var(--aw-font-display)' }}
                           >
                             <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
@@ -737,11 +1074,10 @@ const AnimeHome: React.FC = () => {
                                   toggleBookmark(currentAnime);
                                 }}
                                 disabled={bookmarkLoading}
-                                className={`group relative flex h-[46px] w-[46px] items-center justify-center rounded-xl border transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] ${
-                                  isBookmarked
-                                    ? 'border-[var(--app-accent)] bg-[var(--app-accent)]/15 text-[var(--app-accent)] shadow-[0_0_20px_rgba(var(--app-accent-rgb),0.25)]'
-                                    : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/20 hover:bg-white/[0.08]'
-                                } ${bookmarkLoading ? 'opacity-50 cursor-wait' : ''}`}
+                                className={`group relative flex h-[46px] w-[46px] items-center justify-center rounded-xl border transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] ${isBookmarked
+                                  ? 'border-[var(--app-accent)] bg-[var(--app-accent)]/15 text-[var(--app-accent)] shadow-[0_0_20px_rgba(var(--app-accent-rgb),0.25)]'
+                                  : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/20 hover:bg-white/[0.08]'
+                                  } ${bookmarkLoading ? 'opacity-50 cursor-wait' : ''}`}
                                 title={isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'}
                               >
                                 {isBookmarked ? (
@@ -790,7 +1126,11 @@ const AnimeHome: React.FC = () => {
                 {heroItems.map((_, index) => (
                   <button
                     key={`dot-${index}`}
-                    onClick={() => setActiveHeroIndex(index)}
+                    onClick={() => {
+                      if (heroItems.length <= 1) return;
+                      setIsTransitioning(true);
+                      setInternalIndex(index + 1);
+                    }}
                     aria-label={`View slide ${index + 1}`}
                     className={`h-2 rounded-full transition-all duration-500 ease-out ${index === activeHeroIndex
                       ? 'w-8 bg-[var(--app-accent)] shadow-[0_0_12px_var(--app-accent-muted)]'
@@ -802,6 +1142,44 @@ const AnimeHome: React.FC = () => {
 
             </div>
           )}
+        </section>
+
+        {/* === QUICK FILTER === */}
+        <section className="qf-section">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal size={14} style={{ color: 'var(--aw-accent)' }} />
+            <h2 style={{
+              fontFamily: 'var(--aw-font-display)',
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--aw-text)',
+              letterSpacing: '0.01em',
+              margin: 0,
+            }}>Quick Filters</h2>
+          </div>
+
+          <div className="qf-grid">
+            <QFSelect id="genre" label="Genre" value={qfGenre} options={QF_GENRE_OPTIONS} onChange={setQfGenre} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="theme" label="Theme" value={qfTheme} options={QF_THEME_OPTIONS} onChange={setQfTheme} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="country" label="Country" value={qfCountry} options={QF_COUNTRY_OPTIONS} onChange={setQfCountry} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="season" label="Season" value={qfSeason} options={QF_SEASON_OPTIONS} onChange={setQfSeason} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="year" label="Year" value={qfYear} options={QF_YEAR_OPTIONS} onChange={setQfYear} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="type" label="Type" value={qfType} options={QF_TYPE_OPTIONS} onChange={setQfType} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="status" label="Status" value={qfStatus} options={QF_STATUS_OPTIONS} onChange={setQfStatus} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <QFSelect id="language" label="Language" value={qfLanguage} options={QF_LANGUAGE_OPTIONS} onChange={setQfLanguage} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <QFSelect id="sort" label="Sort" value={qfSort} options={QF_SORT_OPTIONS} onChange={setQfSort} activeId={activeDropdown} setActiveId={setActiveDropdown} />
+            <div className="flex flex-col gap-1">
+              <span style={{ fontSize: 9, opacity: 0 }}>‎</span>
+              <button className="qf-filter-btn group" onClick={handleQuickFilter}>
+                <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
+                <SlidersHorizontal size={14} className="relative z-10" />
+                <span className="relative z-10">Filter</span>
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* === TRENDING NOW === */}
