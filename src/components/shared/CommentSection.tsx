@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   MessageSquare, Send, Trash2, Loader2, LogIn, Paperclip, 
-  ThumbsUp, ThumbsDown, CornerDownRight, Bold, Italic, Strikethrough, Pencil 
+  ThumbsUp, ThumbsDown, CornerDownRight, Bold, Italic, Strikethrough, Pencil, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { supabaseUrl, supabaseAnonKey } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
@@ -665,23 +665,30 @@ const renderBadges = (commentProfile: any, likes: number) => {
           )}
         </div>
 
-        {childReplies.length > 0 && (
+{childReplies.length > 0 && (
           <div className="mt-1 flex flex-col">
             {!isExpanded ? (
               <button
                 onClick={() => toggleReplies(comment.id)}
-                className="flex items-center gap-2 text-[11px] font-bold text-[var(--app-accent)] transition-all duration-200 hover:brightness-125 w-max pl-2 py-2"
+                className="group flex items-center gap-1.5 text-[11px] font-bold text-[var(--app-accent)] transition-all duration-300 hover:brightness-125 w-max ml-[44px] py-1.5"
               >
-                <CornerDownRight size={13} />
-                View {childReplies.length} {childReplies.length === 1 ? 'reply' : 'replies'}
+                <ChevronDown size={14} className="transition-transform duration-300 ease-out group-hover:translate-y-[2px]" />
+                <span className="relative">
+                  View {childReplies.length} {childReplies.length === 1 ? 'reply' : 'replies'}
+                  <span className="absolute -bottom-0.5 left-0 h-[1px] w-0 bg-[var(--app-accent)] transition-all duration-300 ease-out group-hover:w-full opacity-70"></span>
+                </span>
               </button>
             ) : (
               <div className="flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
                 <button
                   onClick={() => toggleReplies(comment.id)}
-                  className="flex items-center gap-2 text-[11px] font-bold text-zinc-500 transition-all duration-200 hover:text-zinc-300 w-max pl-2 py-2"
+                  className="group flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 transition-all duration-300 hover:text-zinc-300 w-max ml-[44px] py-1.5 mb-1"
                 >
-                  Hide replies
+                  <ChevronUp size={14} className="transition-transform duration-300 ease-out group-hover:-translate-y-[2px]" />
+                  <span className="relative">
+                    Hide replies
+                    <span className="absolute -bottom-0.5 left-0 h-[1px] w-0 bg-zinc-400 transition-all duration-300 ease-out group-hover:w-full opacity-70"></span>
+                  </span>
                 </button>
                 {childReplies.map(reply => (
                   <React.Fragment key={reply.id}>
