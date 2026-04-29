@@ -37,11 +37,11 @@ const ThemePicker: React.FC<{
           whileHover={{ scale: 1.04, y: -2 }}
           whileTap={{ scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-          className="relative rounded-[14px] p-2"
-          style={{
-            background: active ? `${option.color}14` : 'rgba(255,255,255,0.02)',
-            border: `1px solid ${active ? `${option.color}55` : 'rgba(255,255,255,0.05)'}`,
-            boxShadow: active ? `0 0 18px ${option.color}22` : 'none',
+          className="relative rounded-[14px] p-2 border"
+          animate={{
+            backgroundColor: active ? `${option.color}14` : 'rgba(255,255,255,0.02)',
+            borderColor: active ? `${option.color}55` : 'rgba(255,255,255,0.05)',
+            boxShadow: active ? `0 0 18px ${option.color}22` : '0 0 0px transparent',
           }}
         >
           <div
@@ -114,7 +114,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked,
     whileTap={{ scale: 0.93 }}
     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
     className="relative inline-flex h-[22px] w-10 items-center rounded-full focus:outline-none"
-    style={{ background: checked ? 'var(--app-accent)' : 'rgba(255,255,255,0.1)' }}
+    animate={{ background: checked ? 'var(--app-accent)' : 'rgba(255,255,255,0.1)' }}
   >
     <motion.span
       layout
@@ -143,15 +143,14 @@ const Select: React.FC<{ value: string; options: string[]; onChange: (v: string)
     <div className="relative min-w-[155px]" ref={containerRef}>
       <motion.button
         onClick={() => setIsOpen(o => !o)}
+        animate={{
+          backgroundColor: isOpen ? 'var(--app-accent-muted)' : 'rgba(255,255,255,0.04)',
+          borderColor: isOpen ? 'var(--app-accent-soft)' : 'rgba(255,255,255,0.08)',
+          color: isOpen ? 'var(--app-accent)' : 'rgba(255,255,255,0.8)'
+        }}
         whileHover={!isOpen ? { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.18)' } : {}}
         whileTap={{ scale: 0.97 }}
-        className="w-full flex items-center justify-between gap-2 text-[12.5px] font-medium px-3 py-2 rounded-[9px] outline-none"
-        style={{
-          background: isOpen ? 'var(--app-accent-muted)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${isOpen ? 'var(--app-accent-soft)' : 'rgba(255,255,255,0.08)'}`,
-          color: isOpen ? 'var(--app-accent)' : 'rgba(255,255,255,0.8)',
-          transition: 'background 0.15s, border-color 0.15s, color 0.15s',
-        }}
+        className="w-full flex items-center justify-between gap-2 text-[12.5px] font-medium px-3 py-2 rounded-[9px] outline-none border"
       >
         <span className="truncate pr-1">{value}</span>
         <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.18, ease: 'easeOut' }}>
@@ -331,14 +330,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                       <motion.button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
+                        animate={{
+                          backgroundColor: active ? 'var(--app-accent-muted)' : 'transparent',
+                          color: active ? '#ffffff' : 'rgb(113,113,122)'
+                        }}
                         whileHover={!active ? { backgroundColor: 'rgba(255,255,255,0.04)', x: 2 } : {}}
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.12 }}
                         className="relative flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-[13px] font-medium text-left"
-                        style={{
-                          background: active ? 'var(--app-accent-muted)' : 'transparent',
-                          color: active ? 'white' : 'rgb(113,113,122)',
-                        }}
                       >
                         {/* Indicator: top-2/bottom-2 avoids transform conflict with layoutId */}
                         {active && (
