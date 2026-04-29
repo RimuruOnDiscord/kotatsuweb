@@ -571,15 +571,7 @@ const generateTabLabel = (_title: string, _baseTitle: string, index: number) => 
 // Safe slug extractor that perfectly preserves our custom prefixes
 const extractSlug = (id: string | undefined): string => {
   if (!id) return '1';
-  
-  if (/^(animepahe|animekai|animedunya|anikoto)-\d+$/i.test(id)) {
-    return id.toLowerCase();
-  }
-
-  const parts = id.split('/');
-  const last = parts.pop() || '1';
-  const match = last.match(/(\d+)$/);
-  return match ? match[1] : last;
+  return id.split('/').pop() || id;
 };
 
 const getEpisodeHref = (animeSlug: string, provider: string, category: 'sub' | 'dub', episodeId: string) =>
@@ -884,6 +876,7 @@ const AnimeWatch: React.FC = () => {
   const speedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const seekIndicatorTimeout = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const [videoDuration, setVideoDuration] = useState(0);
 
   const wtUserName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ('Anonymous ' + Math.floor(Math.random() * 9999));
   const watchTogether = useWatchTogether(
@@ -1197,7 +1190,7 @@ const AnimeWatch: React.FC = () => {
   useEffect(() => {
     if (!currentEpData?.id || !resolvedId || !currentProvider || !episodeId) return;
     let mounted = true;
-    const load = async () => {
+const load = async () => {
       if (playerRef.current) {
         playerRef.current.pause();
       }
@@ -1209,7 +1202,8 @@ const AnimeWatch: React.FC = () => {
         if (!data.streams?.length) throw new Error('Server is not responding.');
         if (mounted) setStreamData(data as any);
 
-        if (!data.intro && !data.outro && mounted) {
+        // --- START OF SKIP TIMES FALLBACK ---
+if (!data.intro && !data.outro && mounted) {
           const skipProviders = ['arc', 'kiwi', 'animepahe', 'animekai', 'animedunya', 'anikoto'];
           for (const sp of skipProviders) {
             if (sp === currentProvider.toLowerCase()) continue;
@@ -1221,18 +1215,18 @@ const AnimeWatch: React.FC = () => {
               if (matchEp) {
                 const spPure = extractSlug(matchEp.id);
                 const spData = await fetchAnimeStreams(sp, resolvedId, currentCategory as 'sub' | 'dub', spPure);
-                 if (spData.intro || spData.outro) {
-                   if (mounted) {
-                     setStreamData((prev: StreamData | null) => ({ ...prev!, intro: spData.intro || prev?.intro, outro: spData.outro || prev?.outro }));
-                   }
-                   break;
-                 }
+                if (spData.intro || spData.outro) {
+                  if (mounted) {
+                    setStreamData((prev: any) => ({ ...prev, intro: spData.intro || prev?.intro, outro: spData.outro || prev?.outro }));
+                  }
+                  break;
+                }
               }
-             } catch (e) {
-               console.warn('Failed to fetch skip intro/outro from alternative provider:', sp, e);
-             }
+            } catch (e) { }
           }
         }
+        // --- END OF SKIP TIMES FALLBACK ---
+
       } catch (err: any) {
         if (mounted) {
           setStreamError(err.message || 'Failed to load media.');
@@ -1323,8 +1317,9 @@ const AnimeWatch: React.FC = () => {
   const lastSavedTime = useRef<number>(-1);
   const [isVideoReady, setIsVideoReady] = useState(false);
 
-  useEffect(() => {
+useEffect(() => {
     setIsVideoReady(false);
+    setVideoDuration(0); // <--- ADD THIS LINE
     videoStateRef.current = { episodeId: '', currentTime: 0, duration: 0 };
     lastSavedTime.current = -1;
     if (streamData && episodeId) { playingEpisodeRef.current = episodeId; }
@@ -1533,7 +1528,7 @@ const AnimeWatch: React.FC = () => {
     return () => { window.removeEventListener('pointerup', handleVideoPointerLeave); window.removeEventListener('blur', handleVideoPointerLeave); };
   }, [handleVideoPointerLeave]);
 
-  const chapterTrackUrl = useMemo(() => {
+const chapterTrackUrl = useMemo(() => {
     if (!streamData) return null;
     const { intro, outro } = streamData;
     if (!intro && !outro) return null;
@@ -1842,6 +1837,11 @@ const AnimeWatch: React.FC = () => {
                  onTimeUpdate={(e: number | { detail?: { currentTime?: number }; currentTime?: number }) => {
                    const time = typeof e === 'number' ? e : e?.detail?.currentTime || e?.currentTime || 0;
                    const duration = playerRef.current?.state?.duration || videoStateRef.current.duration || 0;
+
+                  if (duration > 0 && videoDuration === 0) {
+                    setVideoDuration(duration);
+                  }
+
                    handleTimeUpdate({ currentTime: time, duration });
                    watchTogether.broadcastEvent('timeupdate', time);
                  }}
@@ -1882,12 +1882,29 @@ const AnimeWatch: React.FC = () => {
                  }}
                 style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', outline: 'none', position: 'relative', zIndex: 10 }}
               >
-                <MediaProvider>
-                  {chapterTrackUrl && <Track src={chapterTrackUrl} kind="chapters" label="Chapters" language="en" default />}
-                  {streamData?.subtitles?.map((sub, i) => (
-                    <Track key={String(i)} src={sub.file} kind="subtitles" label={sub.label} language={sub.label.substring(0, 2).toLowerCase()} default={sub.label.toLowerCase().includes('english')} />
-                  ))}
-                </MediaProvider>
+<MediaProvider>
+  {chapterTrackUrl && (
+    <Track 
+      key={chapterTrackUrl} 
+      src={chapterTrackUrl} 
+      kind="chapters" 
+      label="Chapters" 
+      type="vtt" 
+      srcLang="en-US" 
+      default 
+    />
+  )}
+  {streamData?.subtitles?.map((sub, i) => (
+    <Track 
+      key={sub.file || String(i)} 
+      src={sub.file} 
+      kind="subtitles" 
+      label={sub.label} 
+      srcLang={sub.label.substring(0, 2).toLowerCase()} 
+      default={sub.label.toLowerCase().includes('english')} 
+    />
+  ))}
+</MediaProvider>
                 <DefaultVideoLayout icons={defaultLayoutIcons} />
 
                 {isSpeeding && (
