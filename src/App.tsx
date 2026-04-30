@@ -100,7 +100,12 @@ function AppContent() {
       )}
 
       {/* ─── FADING PAGE CONTENT ─── */}
-      <AnimatePresence mode="wait">
+      {/* 
+        By adding onExitComplete={() => window.scrollTo(0, 0)}, 
+        the scroll resets *exactly* when the old page finishes fading out, 
+        giving you a flawless, professional transition. 
+      */}
+      <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<PageWrapper><AnimeHome /></PageWrapper>} />

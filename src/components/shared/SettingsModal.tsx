@@ -54,7 +54,6 @@ const ThemePicker: React.FC<{ theme: ThemeKey; onThemeChange: (theme: ThemeKey) 
           style={{
             backgroundColor: active ? `${option.color}15` : 'rgba(255,255,255,0.03)',
             borderColor: active ? `${option.color}60` : 'rgba(255,255,255,0.08)',
-            boxShadow: active ? `0 8px 24px -4px ${option.color}30, inset 0 1px 1px rgba(255,255,255,0.1)` : 'inset 0 1px 1px rgba(255,255,255,0.02)',
           }}
         >
           <div

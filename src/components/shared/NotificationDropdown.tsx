@@ -1,13 +1,30 @@
 
+
 import React, { useEffect, useState, useMemo } from 'react';
-import { Bell, CheckCheck, UserPlus, Check, X, User, Loader2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import {
+  Bell, CheckCheck, UserPlus, Check, X, User, Loader2, Sparkles, Megaphone, Inbox, Users
+} from 'lucide-react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
 
 const APP_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
 
+// ─── Animation Variants ────────────────────────────────────────────────────────
+const staggerContainer: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
+  exit: { opacity: 0, transition: { duration: 0.15 } }
+};
+
+const fadeUpItem: Variants = {
+  hidden: { opacity: 0, y: 12, scale: 0.98 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 400, damping: 25 } }
+};
+
+// ─── Constants & Types ────────────────────────────────────────────────────────
 export interface AppNotification {
   id: number | string;
   title: string;
@@ -17,45 +34,112 @@ export interface AppNotification {
   icon: React.ElementType;
   color: string;
   coverImage?: string;
-  type?: 'default' | 'friend_request';
-  actionId?: string; // Stores user_id for friend requests
+  type?: 'default' | 'friend_request' | 'news';
+  actionId?: string;
 }
 
-export const INITIAL_NOTIFICATIONS: AppNotification[] = [];
+export const INITIAL_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: 'news_v2_launch',
+    title: 'Welcome to the new Library!',
+    message: 'We just rolled out a massive UI upgrade for your bookmarks with premium drag-and-drop. Try it out!',
+    time: '2h ago',
+    unread: true,
+    icon: Sparkles,
+    color: 'var(--app-accent, #8b5cf6)',
+    type: 'news'
+  },
+  {
+    id: 'sys_maintenance',
+    title: 'Scheduled Maintenance',
+    message: 'Brief server maintenance planned for Sunday at 2 AM EST. Expect ~15 mins of downtime.',
+    time: '1d ago',
+    unread: false,
+    icon: Megaphone,
+    color: '#f59e0b',
+    type: 'news'
+  }
+];
 
-// Helper to format time
+const TABS = [
+  { id: 'all', label: 'All Notifications', icon: Inbox, desc: 'Everything in one place' },
+  { id: 'unread', label: 'Unread', icon: Bell, desc: 'Needs your attention' },
+  { id: 'requests', label: 'Friend Requests', icon: Users, desc: 'Pending connections' },
+] as const;
+
+type TabId = typeof TABS[number]['id'];
+
+// ─── Helpers & UI Primitives ──────────────────────────────────────────────────
 const timeAgo = (dateStr: string) => {
   const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'just now'; if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return `${Math.floor(days / 30)}mo ago`;
+  if (days < 30) return `${days}d ago`; return `${Math.floor(days / 30)}mo ago`;
 };
 
-const NotificationDropdown = ({
+const SectionCard: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <motion.div
+    variants={fadeUpItem}
+    className={`rounded-[16px] shadow-lg ${className}`}
+    style={{ 
+      background: 'rgba(255,255,255,0.02)', 
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)'
+    }}
+  >
+    {children}
+  </motion.div>
+);
+
+const SectionLabel: React.FC<{ children: React.ReactNode; rightAction?: React.ReactNode }> = ({ children, rightAction }) => (
+  <motion.div variants={fadeUpItem} className="flex items-center justify-between mb-2.5 px-1">
+    <p className="text-[10.5px] font-bold tracking-[0.15em] uppercase text-zinc-500">{children}</p>
+    {rightAction && <div>{rightAction}</div>}
+  </motion.div>
+);
+
+const AvatarImg = ({ src, alt, className }: { src?: string; alt?: string; className?: string }) => {
+  const [error, setError] = useState(false);
+  if (!src || error) {
+    return (
+      <div className={`flex items-center justify-center bg-[#1a1a1c] ${className}`}>
+        <User className="text-zinc-500 w-1/2 h-1/2" strokeWidth={1.5} />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+};
+
+// ─── Main Modal Component ─────────────────────────────────────────────────────
+export default function NotificationDropdown({
+  open = false, // Added to convert to modal pattern
+  onClose = () => {}, // Added to convert to modal pattern
   notifications: propNotifications,
   setNotifications: setPropNotifications,
 }: {
+  open?: boolean;
+  onClose?: () => void;
   notifications: AppNotification[];
   setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>;
-}) => {
+}) {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<TabId>('all');
   const [friendRequests, setFriendRequests] = useState<AppNotification[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
-  
-  // Loading state for a smooth transition
-  const [isLoadingRequests, setIsLoadingRequests] = useState(true);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
 
-  // 1. Fetch Friend Requests
+  // Esc key to close
   useEffect(() => {
-    if (!user?.id) {
-      setIsLoadingRequests(false);
-      return;
-    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape' && open) onClose(); };
+    window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);
+  }, [open, onClose]);
+
+  // Fetch Friend Requests
+  useEffect(() => {
+    if (!user?.id || !open) return;
 
     const fetchFriendRequests = async () => {
       setIsLoadingRequests(true);
@@ -102,20 +186,32 @@ const NotificationDropdown = ({
     };
 
     fetchFriendRequests();
-  }, [user?.id]);
+  }, [user?.id, open]);
 
+  // Derived State
   const allNotifications = useMemo(() => {
-    return [...friendRequests, ...propNotifications];
+    return [...friendRequests, ...propNotifications].sort((a, b) => {
+      // Basic sorting: unread first
+      if (a.unread && !b.unread) return -1;
+      if (!a.unread && b.unread) return 1;
+      return 0;
+    });
   }, [friendRequests, propNotifications]);
 
   const unreadCount = allNotifications.filter((n) => n.unread).length;
 
+  const filteredNotifications = useMemo(() => {
+    if (activeTab === 'unread') return allNotifications.filter(n => n.unread);
+    if (activeTab === 'requests') return friendRequests;
+    return allNotifications;
+  }, [activeTab, allNotifications, friendRequests]);
+
+  // Actions
   const markAllAsRead = () => {
     setPropNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
     setFriendRequests((prev) => prev.map((n) => ({ ...n, unread: false })));
   };
 
-  // 2. Handle Friend Request Actions
   const handleFriendAction = async (requesterId: string, action: 'accept' | 'decline', notifId: string | number) => {
     if (!user?.id || processingId) return;
     setProcessingId(requesterId);
@@ -134,213 +230,273 @@ const NotificationDropdown = ({
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, x: '-50%', scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, x: '-50%', scale: 1 }}
-      exit={{ opacity: 0, y: 8, x: '-50%', scale: 0.96, filter: 'blur(4px)' }}
-      transition={{ 
-        type: 'spring', 
-        damping: 25, 
-        stiffness: 350,
-        opacity: { duration: 0.15 } // Slightly faster fade on exit
-      }}
-      className="absolute left-1/2 top-[calc(100%+14px)] w-[360px] flex flex-col overflow-hidden z-[100] cursor-default rounded-[24px] shadow-2xl"
-      style={{
-        background: 'var(--app-surface-1, rgba(9, 9, 11, 0.95))',
-        backdropFilter: 'blur(16px)',
-        fontFamily: APP_FONT,
-        border: '1px solid var(--app-border, rgba(255,255,255,0.08))',
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* ── Header ── */}
-      <div className="relative z-10 flex items-center justify-between px-5 py-4 border-b border-white/[0.06] bg-white/[0.015]">
-        <div className="flex items-center gap-3">
-          <div>
-            <h2 className="text-[16px] font-bold text-white tracking-tight leading-none mb-1" style={{ fontFamily: DISPLAY_FONT }}>
-              Notifications
-            </h2>
-            <p className="text-[12px] text-zinc-400 leading-none">
-              {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
-            </p>
-          </div>
-        </div>
+  const activeTabMeta = TABS.find(t => t.id === activeTab)!;
 
-        {unreadCount > 0 && (
-          <button
-            onClick={markAllAsRead}
-            title="Mark all as read"
-            className="flex items-center justify-center w-8 h-8 rounded-[10px] text-zinc-400 bg-white/[0.02] border border-transparent hover:border-white/[0.1] hover:bg-white/[0.06] hover:text-white transition-all duration-200"
-          >
-            <CheckCheck size={15} />
-          </button>
-        )}
-      </div>
+  const modalStyles = {
+    fontFamily: APP_FONT,
+    background: 'var(--app-bg, #09090b)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05), 0 32px 80px rgba(0,0,0,0.8)',
+  } as React.CSSProperties;
 
-      {/* ── List ── */}
-      <div className="relative z-10 max-h-[380px] overflow-y-auto p-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
-        <div className="flex flex-col gap-1">
-          {/* Removed mode="popLayout" as it causes items to jump unexpectedly during variable-height exits */}
-          <AnimatePresence initial={false}>
-            
-            {/* SKELETON LOADER */}
-            {isLoadingRequests && (
-              <motion.div
-                key="skeleton-loader"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-                transition={{ duration: 0.2 }}
-                className="flex w-full items-start gap-3.5 rounded-[16px] p-3 border border-transparent opacity-60"
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-md"
+            onClick={onClose}
+          />
+
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="relative flex w-full max-w-[800px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
+              style={modalStyles}
+              onClick={e => e.stopPropagation()}
+            >
+
+              {/* ── Sidebar ── */}
+              <aside
+                className="relative flex flex-col w-[240px] flex-shrink-0 py-6"
+                style={{ background: 'rgba(255,255,255,0.015)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
               >
-                <div className="h-[40px] w-[40px] rounded-[12px] bg-white/[0.05] animate-pulse shrink-0" />
-                <div className="flex-1 pt-1.5 flex flex-col gap-2.5">
-                  <div className="h-3 w-1/3 bg-white/[0.05] rounded-full animate-pulse" />
-                  <div className="h-2.5 w-2/3 bg-white/[0.05] rounded-full animate-pulse" />
-                </div>
-              </motion.div>
-            )}
-
-            {/* EMPTY STATE */}
-            {!isLoadingRequests && allNotifications.length === 0 && (
-              <motion.div
-                key="empty-state"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center justify-center py-10 text-center px-4"
-              >
-                <div className="flex items-center justify-center w-14 h-14 rounded-full bg-white/[0.02] border border-white/[0.05] mb-4 shadow-inner">
-                  <Bell size={24} className="text-zinc-600" />
-                </div>
-                <p className="text-[15px] font-bold text-white tracking-tight" style={{ fontFamily: DISPLAY_FONT }}>
-                  You're all caught up!
-                </p>
-                <p className="mt-1 text-[13px] text-zinc-500">
-                  No new notifications at this time.
-                </p>
-              </motion.div>
-            )}
-
-            {/* NOTIFICATIONS MAP */}
-            {!isLoadingRequests && allNotifications.map((notification) => {
-              const Icon = notification.icon;
-              const isFriendRequest = notification.type === 'friend_request';
-
-              return (
-                <motion.div
-                  key={notification.id}
-                  layout
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  // Crucial: Clear padding and margin on exit to fully collapse height smoothly
-                  exit={{ 
-                    opacity: 0, 
-                    scale: 0.95, 
-                    height: 0, 
-                    paddingTop: 0, 
-                    paddingBottom: 0, 
-                    marginTop: 0, 
-                    marginBottom: 0, 
-                    overflow: 'hidden' 
-                  }}
-                  transition={{ 
-                    type: 'spring', 
-                    damping: 25, 
-                    stiffness: 350,
-                  }}
-                  onClick={() => {
-                    if (isFriendRequest) return;
-                    setPropNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, unread: false } : n));
-                  }}
-                  className={`group relative flex w-full items-start gap-3.5 rounded-[16px] p-3 text-left border transition-colors duration-150 ease-out ${
-                    notification.unread 
-                      ? 'bg-white/[0.03] border-transparent hover:bg-white/[0.06] hover:border-white/[0.08]' 
-                      : 'opacity-60 bg-transparent border-transparent hover:opacity-100 hover:bg-white/[0.02] hover:border-white/[0.04]'
-                  } ${!isFriendRequest ? 'cursor-pointer' : ''}`}
-                >
-
-                  {/* Thumbnail or icon */}
-                  <div className="relative shrink-0 mt-0.5">
-                    {notification.coverImage ? (
-                      <div className="h-[46px] w-[46px] overflow-hidden rounded-[12px] border border-white/[0.1] bg-zinc-900 shadow-lg">
-                        <img src={notification.coverImage} alt="" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" draggable={false} />
-                      </div>
-                    ) : (
-                      <div 
-                        className="flex h-[40px] w-[40px] items-center justify-center rounded-[12px] shadow-sm transition-transform duration-300 group-hover:scale-110"
-                        style={{ background: `color-mix(in srgb, ${notification.color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${notification.color} 30%, transparent)`, color: notification.color }}
-                      >
-                        {isFriendRequest && !notification.coverImage ? <User size={18} strokeWidth={2} /> : <Icon size={18} strokeWidth={2} />}
-                      </div>
-                    )}
-                    
-                    {/* Sub-icon for friend requests with avatars */}
-                    {isFriendRequest && notification.coverImage && (
-                       <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center text-white shadow-md"
-                            style={{ background: 'var(--app-accent, #8b5cf6)', borderColor: 'var(--app-surface-1, #09090b)' }}>
-                         <UserPlus size={10} strokeWidth={3} />
-                       </div>
-                    )}
+                {/* Header Block */}
+                <div className="px-6 mb-8 flex flex-col gap-3">
+                  <div className="w-[48px] h-[48px] rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'var(--app-accent-muted)', border: '1px solid var(--app-accent-soft)' }}>
+                    <Bell size={22} style={{ color: 'var(--app-accent)' }} strokeWidth={2} />
                   </div>
-
-                  {/* Text Content */}
-                  <div className="flex-1 min-w-0 pt-0.5">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <h4 className={`truncate text-[13.5px] font-medium transition-colors duration-150 ${notification.unread ? 'text-white' : 'text-zinc-300 group-hover:text-zinc-100'}`}>
-                        {notification.title}
-                      </h4>
-                      <span className="shrink-0 text-[10px] font-regular text-zinc-500 uppercase tracking-wider">
-                        {notification.time}
-                      </span>
-                    </div>
-                    <p className="text-[13px] text-zinc-400 line-clamp-2 leading-relaxed transition-colors duration-150 group-hover:text-zinc-300">
-                      {notification.message}
+                  <div>
+                    <h2 className="text-[19px] text-white leading-tight font-bold" style={{ fontFamily: DISPLAY_FONT, letterSpacing: '-0.02em' }}>
+                      Notifications
+                    </h2>
+                    <p className="text-[12.5px] text-zinc-400 font-medium mt-0.5">
+                      {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
                     </p>
-
-                    {/* Friend Request Actions */}
-                    {isFriendRequest && notification.actionId && (
-                      <div className="flex items-center gap-2 mt-3">
-                        <motion.button 
-                          disabled={processingId === notification.actionId}
-                          onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'accept', notification.id); }}
-                          whileTap={{ scale: 0.96 }}
-                          className="group/btn relative overflow-hidden flex-1 h-8 rounded-[8px] text-[12px] font-bold flex items-center justify-center disabled:opacity-50 border border-solid"
-                          style={{ 
-                            backgroundColor: 'color-mix(in srgb, var(--app-accent) 12%, transparent)',
-                            borderColor: 'color-mix(in srgb, var(--app-accent) 25%, transparent)',
-                            color: 'var(--app-accent)'
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-white/[0.08] opacity-0 group-hover/btn:opacity-100 transition-opacity duration-150 ease-out z-0" />
-                          <span className="relative z-10 flex items-center gap-1.5 transition-colors duration-150 group-hover/btn:text-white">
-                            {processingId === notification.actionId ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={2.5} />} Accept
-                          </span>
-                        </motion.button>
-                        
-                        <motion.button 
-                          disabled={processingId === notification.actionId}
-                          onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'decline', notification.id); }}
-                          whileTap={{ scale: 0.96 }}
-                          className="group/decline relative overflow-hidden flex-1 h-8 rounded-[8px] bg-white/[0.03] border border-white/[0.08] text-zinc-400 text-[12px] font-bold flex items-center justify-center disabled:opacity-50"
-                        >
-                          <div className="absolute inset-0 bg-white/[0.05] opacity-0 group-hover/decline:opacity-100 transition-opacity duration-150 ease-out z-0" />
-                          <span className="relative z-10 flex items-center gap-1.5 transition-colors duration-150 group-hover/decline:text-white">
-                            <X size={14} strokeWidth={2.5} /> Decline
-                          </span>
-                        </motion.button>
-                      </div>
-                    )}
                   </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+                </div>
 
-export default NotificationDropdown;
+                {/* Navigation */}
+                <nav className="relative z-10 flex-1 flex flex-col gap-1.5 px-3">
+                  {TABS.map(tab => {
+                    const active = activeTab === tab.id;
+                    let count = 0;
+                    if (tab.id === 'all') count = allNotifications.length;
+                    if (tab.id === 'unread') count = unreadCount;
+                    if (tab.id === 'requests') count = friendRequests.length;
+
+                    return (
+                      <motion.button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        initial={false}
+                        animate={{
+                          backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255, 255, 255, 0)',
+                          color: active ? '#ffffff' : 'rgb(161, 161, 170)'
+                        }}
+                        whileHover={{
+                          backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255, 255, 255, 0.06)',
+                          color: '#ffffff'
+                        }}
+                        transition={{ duration: 0.2 }}
+                        className="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-[12px] text-[13.5px] font-medium text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : '' }}>
+                            <tab.icon size={16} strokeWidth={active ? 2.5 : 2} style={{ flexShrink: 0 }} />
+                          </motion.div>
+                          <span className="leading-none">{tab.label}</span>
+                        </div>
+                        {count > 0 && (
+                          <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${active ? 'bg-[var(--app-accent)] text-black' : 'bg-white/10 text-white'}`}>
+                            {count}
+                          </span>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+                </nav>
+
+                {/* Footer Actions */}
+                {unreadCount > 0 && (
+                  <div className="relative z-10 px-3 pt-5 mt-2 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <motion.button
+                      onClick={markAllAsRead}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                    >
+                      <CheckCheck size={15} /> Mark all as read
+                    </motion.button>
+                  </div>
+                )}
+              </aside>
+
+              {/* ── Content ── */}
+              <div className="flex flex-col flex-1 min-w-0 bg-white/[0.01]">
+                <div
+                  className="flex items-center justify-between px-8 py-6 flex-shrink-0"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <motion.div
+                    key={activeTabMeta.id}
+                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}
+                  >
+                    <h3 className="text-[17px] font-bold text-white tracking-wide" style={{ fontFamily: DISPLAY_FONT }}>
+                      {activeTabMeta.label}
+                    </h3>
+                    <p className="text-[12.5px] text-zinc-400 mt-1">{activeTabMeta.desc}</p>
+                  </motion.div>
+                  <motion.button
+                    onClick={onClose}
+                    whileHover={{ scale: 1.1, rotate: 90, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    whileTap={{ scale: 0.9 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                  </motion.button>
+                </div>
+
+                <main className="flex-1 overflow-y-auto overflow-x-hidden py-6 px-8" style={{ scrollbarGutter: 'stable' }}>
+                  <AnimatePresence mode="wait">
+
+                    {isLoadingRequests ? (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="flex flex-col items-center justify-center h-48 gap-3"
+                      >
+                        <Loader2 size={22} className="animate-spin text-zinc-500" />
+                        <p className="text-[13px] text-zinc-500 font-medium">Loading notifications...</p>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key={activeTab}
+                        variants={staggerContainer} initial="hidden" animate="show" exit="exit"
+                        className="flex flex-col gap-6"
+                      >
+                        {filteredNotifications.length === 0 ? (
+                          <motion.div variants={fadeUpItem} className="flex flex-col items-center justify-center py-16 text-center">
+                            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.08] mb-5 shadow-inner">
+                              <activeTabMeta.icon size={28} className="text-zinc-600" />
+                            </div>
+                            <p className="text-[16px] font-bold text-white tracking-tight" style={{ fontFamily: DISPLAY_FONT }}>
+                              You're all caught up!
+                            </p>
+                            <p className="mt-1.5 text-[13px] text-zinc-500">
+                              No {activeTab === 'all' ? 'new' : activeTab} notifications at this time.
+                            </p>
+                          </motion.div>
+                        ) : (
+                          <div>
+                            <SectionLabel>Inbox</SectionLabel>
+                            <SectionCard>
+                              {filteredNotifications.map((notification, i) => {
+                                const Icon = notification.icon;
+                                const isFriendRequest = notification.type === 'friend_request';
+
+                                return (
+                                  <div
+                                    key={notification.id}
+                                    onClick={() => {
+                                      if (isFriendRequest) return;
+                                      setPropNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, unread: false } : n));
+                                    }}
+                                    className={`relative flex items-start gap-4 px-4 py-4 transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px] ${
+                                      notification.unread 
+                                        ? 'bg-white/[0.03] hover:bg-white/[0.06]' 
+                                        : 'hover:bg-white/[0.02]'
+                                    } ${!isFriendRequest ? 'cursor-pointer' : ''}`}
+                                    style={i < filteredNotifications.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
+                                  >
+
+                                    {/* Thumbnail or Icon */}
+                                    <div className="relative shrink-0 ml-1 mt-0.5">
+                                      {notification.coverImage ? (
+                                        <div className="h-[42px] w-[42px] overflow-hidden rounded-[10px] border border-white/[0.1] bg-[#1a1a1c] shadow-sm">
+                                          <img src={notification.coverImage} alt="" className="h-full w-full object-cover" draggable={false} />
+                                        </div>
+                                      ) : (
+                                        <div 
+                                          className="flex h-[40px] w-[40px] items-center justify-center rounded-[12px] shadow-sm"
+                                          style={{ background: `color-mix(in srgb, ${notification.color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${notification.color} 30%, transparent)`, color: notification.color }}
+                                        >
+                                          {isFriendRequest && !notification.coverImage ? <User size={18} strokeWidth={2} /> : <Icon size={18} strokeWidth={2} />}
+                                        </div>
+                                      )}
+                                      
+                                      {isFriendRequest && notification.coverImage && (
+                                         <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-black shadow-sm"
+                                              style={{ background: 'var(--app-accent)', border: '2px solid var(--app-bg)' }}>
+                                           <UserPlus size={10} strokeWidth={3} />
+                                         </div>
+                                      )}
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                                        <h4 className={`truncate text-[13.5px] font-semibold ${notification.unread ? 'text-white' : 'text-zinc-300'}`}>
+                                          {notification.title}
+                                        </h4>
+                                        <span className="shrink-0 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                          {notification.time}
+                                        </span>
+                                      </div>
+                                      <p className="text-[13px] text-zinc-400 line-clamp-2 leading-relaxed">
+                                        {notification.message}
+                                      </p>
+
+                                      {/* Friend Request Action Buttons */}
+                                      {isFriendRequest && notification.actionId && (
+                                        <div className="flex items-center gap-2 mt-3.5">
+                                          <motion.button 
+                                            disabled={processingId === notification.actionId}
+                                            onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'decline', notification.id); }}
+                                            whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                                            whileTap={{ scale: 0.96 }}
+                                            className="flex-1 h-[34px] rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-zinc-400 text-[12.5px] font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                                          >
+                                            <X size={14} strokeWidth={2.5} /> Decline
+                                          </motion.button>
+                                          
+                                          <motion.button 
+                                            disabled={processingId === notification.actionId}
+                                            onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'accept', notification.id); }}
+                                            whileHover={{ filter: 'brightness(1.1)' }}
+                                            whileTap={{ scale: 0.96 }}
+                                            className="flex-1 h-[34px] rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-1.5 text-black disabled:opacity-50"
+                                            style={{ background: 'var(--app-accent)' }}
+                                          >
+                                            {processingId === notification.actionId ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />} Accept
+                                          </motion.button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </SectionCard>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </main>
+              </div>
+
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
+  );
+}
