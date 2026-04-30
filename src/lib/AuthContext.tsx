@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase, supabaseUrl, supabaseAnonKey } from './supabase';
+import { supabase } from './supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
 export interface Profile {
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
-  signOut: async () => { },
+  signOut: async () => {},
   updateProfile: async () => ({ error: null }),
 });
 
@@ -38,52 +38,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // ── Profile helpers ──────────────────────────────────────────────────────
   const fetchProfile = useCallback(async (userId: string) => {
-    try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=id,display_name,avatar_url`, {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data[0]) setProfile(data[0]);
-      }
-    } catch {
-      // Profile might not exist yet if trigger hasn't fired
-    }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .eq('id', userId)
+      .single();
+
+    if (!error && data) setProfile(data as Profile);
   }, []);
 
+  // ── Session bootstrap ────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return;
       if (error) console.warn('Auth session error:', error);
-      
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: Session | null) => {
-        if (!mounted) return;
-
-        if (event === 'SIGNED_OUT') {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-        } else if (session) {
-          setSession(session);
-          setUser(session.user);
-          fetchProfile(session.user.id);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } else if (session) {
+        setSession(session);
+        setUser(session.user);
+        fetchProfile(session.user.id);
       }
-    );
+    });
 
     return () => {
       mounted = false;
@@ -91,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchProfile]);
 
+  // ── Auth actions ─────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
@@ -103,11 +94,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: { data: { display_name: displayName } },
     });
 
-    if (error) {
-      return { error: error.message };
-    }
+    if (error) return { error: error.message };
 
-    // If session is returned, user was created and logged in instantly
     if (data.session) {
       setSession(data.session);
       setUser(data.user);
@@ -115,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     }
 
-    // No session on signup - try auto-login immediately
+    // Auto-login fallback (email confirmation disabled in Supabase)
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInData.session) {
       setSession(signInData.session);
@@ -124,81 +112,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: null };
     }
 
-    return { error: signInError?.message || 'Account created. Please sign in.' };
+    return { error: signInError?.message ?? 'Account created. Please sign in.' };
   }, [fetchProfile]);
 
-  const signOutFn = useCallback(async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
     setProfile(null);
   }, []);
 
+  /**
+   * Update the user's profile row using the supabase-js client (upsert handles
+   * both insert-on-first-login and update cases) instead of raw REST calls.
+   */
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!user) return { error: 'Not logged in' };
-    
+
     try {
-      const token = session?.access_token || supabaseAnonKey;
-      
-      const response = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(updates)
-      });
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, ...updates }, { onConflict: 'id' })
+        .select('id, display_name, avatar_url')
+        .single();
 
-      if (!response.ok) {
-        const upsertResponse = await fetch(`${supabaseUrl}/rest/v1/profiles`, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseAnonKey,
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation,resolution=merge-duplicates'
-          },
-          body: JSON.stringify({ id: user.id, ...updates })
-        });
-        
-        if (!upsertResponse.ok) {
-          throw new Error(await upsertResponse.text());
-        }
-      }
+      if (error) throw error;
+      if (data) setProfile(data as Profile);
 
-      const refetchResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}&select=id,display_name,avatar_url`, {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (refetchResponse.ok) {
-        const data = await refetchResponse.json();
-        if (data && data[0]) {
-          setProfile(data[0]);
-        }
-      }
-
+      // Keep Supabase auth metadata in sync (best-effort)
       supabase.auth.updateUser({
         data: {
           avatar_url: updates.avatar_url ?? profile?.avatar_url,
-          display_name: updates.display_name ?? profile?.display_name
-        }
+          display_name: updates.display_name ?? profile?.display_name,
+        },
       }).catch(() => {});
 
       return { error: null };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Error updating profile:', err);
-      return { error: err.message || 'An unknown error occurred' };
+      return { error: message };
     }
-  }, [user, session, profile]);
+  }, [user, profile]);
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut: signOutFn, updateProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

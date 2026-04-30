@@ -133,8 +133,6 @@ const DESIGN_STYLES = `
     left: -150%;
     width: 60%;
     height: 100%;
-    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.06), transparent);
-    transform: skewX(-25deg) translateZ(0);
     transition: left 0.7s cubic-bezier(0.25, 1, 0.5, 1);
     z-index: 20;
     pointer-events: none;
@@ -452,7 +450,7 @@ const AnimeListCard: React.FC<{ anime: AnimeResult; navigate: ReturnType<typeof 
 
         <div className="relative w-[115px] sm:w-[125px] flex-shrink-0 overflow-hidden rounded-xl bg-white/[0.02]">
           {coverUrl ? (
-            <img src={coverUrl} alt={titleStr} className="h-full w-full object-cover transition-transform duration-[600ms] ease-out opacity-95 group-hover:opacity-100 group-hover:scale-[1.15] group-hover:rotate-2 pointer-events-none" />
+            <img src={coverUrl} alt={titleStr} className="h-full w-full object-cover transition-transform duration-[600ms] ease-out opacity-95 group-hover:opacity-100 pointer-events-none" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-wider text-zinc-600 pointer-events-none">No Cover</div>
           )}

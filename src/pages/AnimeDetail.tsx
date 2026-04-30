@@ -1047,26 +1047,22 @@ const AnimeDetail: React.FC = () => {
   const statsUrl = data?.id ? `https://anilist.co/anime/${data.id}/stats` : undefined;
   const displayTitle = data?.title?.english || data?.title?.romaji || data?.title?.native || '?';
 
-  if (loading) {
-    return (
-      <div className="aw-root min-h-screen flex flex-col p-8 anim-fade-in-up">
-        {/* Loading Screen Back Button */}
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-6 text-sm font-medium w-fit relative z-50"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="relative">
-            <div className="w-12 h-12 border-[3px] border-t-transparent rounded-full spin-smooth" style={{ borderColor: 'var(--aw-accent)', borderTopColor: 'transparent' }} />
-            <div className="absolute inset-0 rounded-full pulse-ring" />
-          </div>
+if (loading) {
+  return (
+    <div className="aw-root min-h-screen flex flex-col p-8 anim-fade-in-up">
+      <div className="flex-1 flex items-center justify-center">
+        <div className="relative">
+          <div 
+            className="w-12 h-12 border-[3px] border-t-transparent rounded-full spin-smooth" 
+            style={{ borderColor: 'var(--aw-accent)', borderTopColor: 'transparent' }} 
+          />
+          <div className="absolute inset-0 rounded-full pulse-ring" />
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   if (!data || loadFailed) {
     return (

@@ -1,15 +1,11 @@
-
-
 /* ─── START OF FILE AnimeWatchPage.tsx ────────────────────────────── */
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import CommentSection from '../components/shared/CommentSection';
-import WatchTogetherModal from '../components/shared/WatchTogetherModal';
-import { useWatchTogether } from '../hooks/useWatchTogether';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ChevronsLeft, ChevronsRight, Loader2, AlertCircle, FastForward,
   Server, MonitorPlay, Layers, ArrowDownUp, Link2, Play,
-  Bookmark, BookmarkCheck, Users, Share2, Clapperboard,
+  Bookmark, BookmarkCheck, Share2, Clapperboard,
   X, Copy, Check, ExternalLink, Clock
 } from 'lucide-react';
 
@@ -108,26 +104,58 @@ const DESIGN_STYLES = `
   .ep-thumb { transition: transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.3s; }
 
   .aw-action-btn { 
-    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
     position: relative;
     overflow: hidden;
+    will-change: transform, box-shadow;
+  }
+  .aw-action-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.12) 50%, transparent 60%);
+    transform: translateX(-100%);
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    pointer-events: none;
+    border-radius: inherit;
   }
   .aw-action-btn:hover:not(:disabled) { 
-    background: color-mix(in srgb, var(--aw-accent) 12%, transparent) !important; 
-    border-color: color-mix(in srgb, var(--aw-accent) 60%, transparent) !important; 
-    color: var(--aw-text) !important; 
-    transform: translateY(-2px); 
-    box-shadow: 0 6px 16px -8px rgba(0,0,0,0.8); 
+    background: color-mix(in srgb, var(--aw-accent) 30%, transparent) !important; 
+    border-color: color-mix(in srgb, var(--aw-accent) 70%, transparent) !important; 
+    color: white !important; 
+    transform: translateY(-2px) scale(1.02); 
+    box-shadow: 0 0 24px -6px color-mix(in srgb, var(--aw-accent) 50%, transparent), 0 8px 20px -8px rgba(0,0,0,0.8); 
+  }
+  .aw-action-btn:hover:not(:disabled)::after {
+    transform: translateX(100%);
   }
   .aw-action-btn:active:not(:disabled) { 
-    transform: translateY(0) scale(0.96); 
-    box-shadow: none; 
+    transform: translateY(0) scale(0.94); 
+    box-shadow: 0 0 8px -4px color-mix(in srgb, var(--aw-accent) 30%, transparent); 
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .aw-action-btn.aw-primary-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--aw-accent) 45%, transparent) !important;
+    border-color: var(--aw-accent) !important;
+    box-shadow: 0 0 28px -4px color-mix(in srgb, var(--aw-accent) 60%, transparent), 0 8px 20px -8px rgba(0,0,0,0.8);
+    filter: brightness(1.15);
   }
 
   .aw-segment-btn { transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, filter 0.2s; }
   .aw-segment-btn:hover:not(:disabled) { transform: translateY(-1px); }
   .aw-segment-btn[data-active='false']:hover { background: rgba(255,255,255,0.08) !important; color: var(--aw-text) !important; }
-  .aw-segment-btn[data-active='true']:hover { background: var(--aw-s2) !important; color: var(--aw-accent) !important; box-shadow: 0 8px 22px -18px var(--aw-accent-glow); filter: brightness(1.08); }
+  .aw-segment-btn[data-active='true'] { 
+    background: color-mix(in srgb, var(--aw-accent) 18%, transparent) !important; 
+    color: var(--aw-accent) !important; 
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-accent) 50%, transparent), 0 4px 20px -8px color-mix(in srgb, var(--aw-accent) 30%, transparent); 
+  }
+  .aw-segment-btn[data-active='true']:hover { 
+    background: color-mix(in srgb, var(--aw-accent) 25%, transparent) !important; 
+    color: var(--aw-text) !important; 
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--aw-accent) 60%, transparent), 0 8px 22px -8px color-mix(in srgb, var(--aw-accent) 40%, transparent); 
+    filter: brightness(1.08); 
+  }
+  .aw-segment-btn:active { transform: scale(0.95); }
 
   .skip-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   .skip-btn:hover { background: rgba(255, 255, 255, 0.2) !important; transform: scale(1.05) translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.1) !important; }
@@ -913,7 +941,7 @@ const AnimeWatch: React.FC = () => {
   const [likeState, setLikeState] = useState<'like' | 'dislike' | null>(null);
 
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showWatchTogetherModal, setShowWatchTogetherModal] = useState(false);
+  const [playerMode, setPlayerMode] = useState<'internal' | 'external'>('internal');
 
   const [showSkipIntro, setShowSkipIntro] = useState(false);
   const [showSkipOutro, setShowSkipOutro] = useState(false);
@@ -935,36 +963,6 @@ const AnimeWatch: React.FC = () => {
   const seekIndicatorTimeout = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const [videoDuration, setVideoDuration] = useState(0);
-
-  const wtUserName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || ('Anonymous ' + Math.floor(Math.random() * 9999));
-  const watchTogether = useWatchTogether(
-    user?.id,
-    wtUserName,
-    useCallback((event) => {
-      if (event.type === 'episode_change' && event.payload) {
-        if (window.location.pathname !== event.payload) {
-          navigate(event.payload, { replace: false });
-        }
-        return;
-      }
-      if (!playerRef.current) return;
-      const diff = Math.abs(playerRef.current.currentTime - (event.time || 0));
-      switch (event.type) {
-        case 'play':
-          playerRef.current.play();
-          break;
-        case 'pause':
-          playerRef.current.pause();
-          break;
-        case 'seek':
-          if (diff > 2) playerRef.current.currentTime = event.time || 0;
-          break;
-        case 'timeupdate':
-          if (diff > 5) playerRef.current.currentTime = event.time || 0;
-          break;
-      }
-    }, [navigate])
-  );
 
   const [seekIndicator, setSeekIndicator] = useState<'rewind' | 'forward' | null>(null);
   const pointerStateRef = useRef({
@@ -1301,14 +1299,40 @@ if (!data.intro && !data.outro && mounted) {
   const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(-1);
 
   useEffect(() => {
-    if (streamData?.streams && streamData.streams.length > 0 && selectedStreamIndex === -1) {
-      const internalIndex = streamData.streams.findIndex((s: StreamSource) =>
-        s.type === 'hls' || (!s.url.includes('iframe') && !s.url.includes('/embed/') && s.url.includes('.m3u8'))
-      );
-      if (internalIndex !== -1) setSelectedStreamIndex(internalIndex);
-      else setSelectedStreamIndex(0);
+    if (!streamData?.streams || streamData.streams.length === 0) return;
+
+    const hlsStreams = streamData.streams.filter(s => s.type === 'hls' || s.url.includes('.m3u8'));
+    const embedStreams = streamData.streams.filter(s => s.type === 'embed' || (!s.url.includes('.m3u8') && (s.url.includes('iframe') || s.url.includes('/embed/'))));
+
+    const getQualityScore = (q: string) => {
+      const lq = (q || '').toLowerCase();
+      if (lq.includes('1080')) return 1080;
+      if (lq.includes('720')) return 720;
+      if (lq.includes('480')) return 480;
+      if (lq.includes('360')) return 360;
+      if (lq.includes('auto')) return 9999;
+      if (lq.includes('default')) return 9000;
+      return parseInt(lq) || 0;
+    };
+
+    const getBestStream = (list: StreamSource[]) => {
+      return [...list].sort((a, b) => getQualityScore(b.quality) - getQualityScore(a.quality))[0];
+    };
+
+    if (playerMode === 'internal' && hlsStreams.length > 0) {
+      const best = getBestStream(hlsStreams);
+      setSelectedStreamIndex(streamData.streams.indexOf(best));
+    } else if (playerMode === 'external' && embedStreams.length > 0) {
+      const best = getBestStream(embedStreams);
+      setSelectedStreamIndex(streamData.streams.indexOf(best));
+    } else {
+      if (hlsStreams.length > 0) {
+        setSelectedStreamIndex(streamData.streams.indexOf(getBestStream(hlsStreams)));
+      } else if (embedStreams.length > 0) {
+        setSelectedStreamIndex(streamData.streams.indexOf(getBestStream(embedStreams)));
+      }
     }
-  }, [streamData, selectedStreamIndex]);
+  }, [streamData, playerMode]);
 
   const activeStream = useMemo<StreamSource | null>(() => {
     if (!streamData?.streams) return null;
@@ -1643,7 +1667,6 @@ const chapterTrackUrl = useMemo(() => {
   const skipTo = (t: number) => {
     if (playerRef.current) {
       playerRef.current.currentTime = t;
-      watchTogether.broadcastEvent('seek', t);
     }
   };
 
@@ -1683,11 +1706,8 @@ const chapterTrackUrl = useMemo(() => {
     }
 
     const href = getEpisodeHref(urlSlug, currentProvider, currentCategory, finalTargetId);
-    if (watchTogether.isInRoom) {
-      watchTogether.broadcastEvent('episode_change', 0, href);
-    }
     navigate(href);
-  }, [urlSlug, currentProvider, currentCategory, navigate, forceSaveProgress, episodeId, providerEpisodes, watchTogether.isInRoom, watchTogether.broadcastEvent]);
+  }, [urlSlug, currentProvider, currentCategory, navigate, forceSaveProgress, episodeId, providerEpisodes]);
 
   const handleCategorySwitch = useCallback((newCat: 'sub' | 'dub') => {
     forceSaveProgress();
@@ -1705,11 +1725,8 @@ const chapterTrackUrl = useMemo(() => {
     }
     
     const href = getEpisodeHref(urlSlug, currentProvider, newCat, finalTargetId);
-    if (watchTogether.isInRoom) {
-      watchTogether.broadcastEvent('episode_change', 0, href);
-    }
     navigate(href);
-  }, [urlSlug, currentProvider, currentCategory, episodesData, currentEpData, navigate, showToast, forceSaveProgress, episodeId, watchTogether.isInRoom, watchTogether.broadcastEvent]);
+  }, [urlSlug, currentProvider, currentCategory, episodesData, currentEpData, navigate, showToast, forceSaveProgress, episodeId]);
 
   const handleProviderSwitch = useCallback((newProv: string) => {
     forceSaveProgress();
@@ -1718,11 +1735,8 @@ const chapterTrackUrl = useMemo(() => {
     if (!eps.length) return showToast(`Server [${newProv}] has no episodes.`);
     const match = eps.find(ep => ep.number === currentEpData?.number) || eps[0];
     const href = getEpisodeHref(urlSlug, newProv, currentCategory, match?.id || extractSlug(episodeId));
-    if (watchTogether.isInRoom) {
-      watchTogether.broadcastEvent('episode_change', 0, href);
-    }
     navigate(href);
-  }, [urlSlug, currentProvider, currentCategory, episodesData, currentEpData, navigate, showToast, forceSaveProgress, episodeId, watchTogether.isInRoom, watchTogether.broadcastEvent]);
+  }, [urlSlug, currentProvider, currentCategory, episodesData, currentEpData, navigate, showToast, forceSaveProgress, episodeId]);
 
   const handleVideoEnd = useCallback(() => {
     if (autoPlay && hasNext && providerEpisodes[currentIndex + 1]) {
@@ -1813,20 +1827,6 @@ const chapterTrackUrl = useMemo(() => {
         studioName={studioName}
       />
 
-      <WatchTogetherModal
-        open={showWatchTogetherModal}
-        onClose={() => setShowWatchTogetherModal(false)}
-        isInRoom={watchTogether.isInRoom}
-        roomCode={watchTogether.roomCode}
-        participants={watchTogether.participants}
-        isHost={watchTogether.isHost}
-        connectionStatus={watchTogether.connectionStatus}
-        error={watchTogether.error}
-        onCreateRoom={watchTogether.createRoom}
-        onJoinRoom={watchTogether.joinRoom}
-        onLeaveRoom={watchTogether.leaveRoom}
-      />
-
       <div style={{ height: 24 }} />
 
       <div className="aw-layout">
@@ -1850,16 +1850,7 @@ const chapterTrackUrl = useMemo(() => {
             onContextMenu={(e) => { if (isSpeeding) e.preventDefault(); }}
           >
             {/* 1. Loading Overlay */}
-            {(streamLoading || loadingEpisodes || isProxifying) && (
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7,7,13,0.9)', backdropFilter: 'blur(4px)', zIndex: 50 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-                  <Loader2 style={{ width: 40, height: 40, color: 'var(--aw-accent)', animation: 'spin 1s linear infinite' }} />
-                  <span style={{ fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--aw-muted)' }}>
-                    {isProxifying ? 'Redirecting Stream' : 'Loading Stream'}
-                  </span>
-                </div>
-              </div>
-            )}
+
 
             {/* 2. Error Overlay */}
             {streamError && (
@@ -1890,8 +1881,6 @@ const chapterTrackUrl = useMemo(() => {
                     };
                   }
                 }}
-                onPlay={() => watchTogether.broadcastEvent('play', playerRef.current?.currentTime || 0)}
-                onPause={() => watchTogether.broadcastEvent('pause', playerRef.current?.currentTime || 0)}
                  onTimeUpdate={(e: number | { detail?: { currentTime?: number }; currentTime?: number }) => {
                    const time = typeof e === 'number' ? e : e?.detail?.currentTime || e?.currentTime || 0;
                    const duration = playerRef.current?.state?.duration || videoStateRef.current.duration || 0;
@@ -1901,7 +1890,6 @@ const chapterTrackUrl = useMemo(() => {
                   }
 
                    handleTimeUpdate({ currentTime: time, duration });
-                   watchTogether.broadcastEvent('timeupdate', time);
                  }}
                 onEnded={handleVideoEnd}
                  onCanPlay={() => {
@@ -1929,13 +1917,6 @@ const chapterTrackUrl = useMemo(() => {
                          showToast(`Resumed playback at ${Math.floor(parsedTime)}s`);
                        }
                      }
-                   }
-                   if (watchTogether.isInRoom) {
-                     setTimeout(() => {
-                       if (playerRef.current) {
-                         watchTogether.broadcastEvent('play', playerRef.current.currentTime);
-                       }
-                     }, 2000);
                    }
                  }}
                 style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', outline: 'none', position: 'relative', zIndex: 10 }}
@@ -2024,30 +2005,45 @@ const chapterTrackUrl = useMemo(() => {
               <Toggle checked={autoSkip} onChange={setAutoSkip} label="Auto Skip" />
               <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.07)', margin: '0 4px' }} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="aw-action-btn anim-fade-in-up anim-delay-1" onClick={() => hasPrev && handleEpisodeClick(providerEpisodes[currentIndex - 1].id)} disabled={!hasPrev || streamLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', borderRadius: 100, background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', color: (!hasPrev || streamLoading) ? 'rgba(255,255,255,0.25)' : 'var(--aw-muted)', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: (!hasPrev || streamLoading) ? 'not-allowed' : 'pointer' }}>
+                <button className="aw-action-btn anim-fade-in-up anim-delay-1" onClick={() => hasPrev && handleEpisodeClick(providerEpisodes[currentIndex - 1].id)} disabled={!hasPrev || streamLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', borderRadius: 100, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: (!hasPrev || streamLoading) ? 'rgba(255,255,255,0.25)' : 'var(--aw-muted)', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: (!hasPrev || streamLoading) ? 'not-allowed' : 'pointer' }}>
                   <ChevronsLeft size={14} /> PREV
                 </button>
-                <button className="aw-action-btn anim-fade-in-up anim-delay-2" onClick={() => hasNext && handleEpisodeClick(providerEpisodes[currentIndex + 1].id)} disabled={!hasNext || streamLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', borderRadius: 100, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: (!hasNext || streamLoading) ? 'rgba(255,255,255,0.25)' : 'white', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: (!hasNext || streamLoading) ? 'not-allowed' : 'pointer' }}>
+                <button className="aw-action-btn anim-fade-in-up anim-delay-1" onClick={() => hasNext && handleEpisodeClick(providerEpisodes[currentIndex + 1].id)} disabled={!hasNext || streamLoading} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', borderRadius: 100, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: (!hasNext || streamLoading) ? 'rgba(255,255,255,0.25)' : 'white', fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: (!hasNext || streamLoading) ? 'not-allowed' : 'pointer' }}>
                   NEXT <ChevronsRight size={14} />
                 </button>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                className={`aw-action-btn anim-fade-in-up anim-delay-3 ${watchTogether.isInRoom ? 'room-glow' : ''}`}
-                onClick={() => setShowWatchTogetherModal(true)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 100,
-                  background: watchTogether.isInRoom ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.05)',
-                  border: watchTogether.isInRoom ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.08)',
-                  color: watchTogether.isInRoom ? 'var(--aw-accent)' : 'var(--aw-text)',
-                  fontSize: 11, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer'
-                }}
-              >
-                <Users size={14} />
-                {watchTogether.isInRoom ? `ROOM: ${watchTogether.roomCode}` : 'WATCH TOGETHER'}
-              </button>
+              {/* Internal / External Toggle */}
+              <div className="anim-fade-in-up anim-delay-3" style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 100, padding: 4, gap: 2 }}>
+                <button
+                  className="aw-segment-btn"
+                  data-active={playerMode === 'internal'}
+                  onClick={() => setPlayerMode('internal')}
+                  style={{
+                    padding: '6px 18px', borderRadius: 100, border: 'none',
+                    fontSize: 11, fontFamily: 'var(--aw-font-display)',
+                    fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  <MonitorPlay size={14} style={{ color: 'inherit' }} /> INTERNAL
+                </button>
+                <button
+                  className="aw-segment-btn"
+                  data-active={playerMode === 'external'}
+                  onClick={() => setPlayerMode('external')}
+                  style={{
+                    padding: '6px 18px', borderRadius: 100, border: 'none',
+                    fontSize: 11, fontFamily: 'var(--aw-font-display)',
+                    fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  <ExternalLink size={14} style={{ color: 'inherit' }} /> EXTERNAL
+                </button>
+              </div>
 
               <button
                 className="aw-action-btn anim-fade-in-up anim-delay-4"
@@ -2076,169 +2072,6 @@ const chapterTrackUrl = useMemo(() => {
               <p className="anim-fade-in-up anim-delay-1" style={{ margin: 0, fontSize: 13, fontWeight: 300, color: 'var(--aw-muted)', lineHeight: 1.6, maxWidth: 800 }}>
                 {currentEpData.description}
               </p>
-            )}
-
-            <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
-
-            <div style={{ position: 'relative', display: 'flex', gap: 0, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              {[
-                { key: 'servers', label: 'Video Servers', icon: Server },
-                { key: 'providers', label: 'Stream Providers', icon: Link2 },
-                { key: 'player', label: 'Video Player', icon: Play },
-              ].map((tab, idx) => {
-                const Icon = tab.icon;
-                const isActive = sourcesTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    ref={el => { tabRefs.current[tab.key] = el; }}
-                    type="button"
-                    onClick={() => setSourcesTab(tab.key as any)}
-                    className={`anim-fade-in-down anim-delay-${idx + 1}`}
-                    style={{
-                      padding: '10px 20px',
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: '2px solid transparent',
-                      color: isActive ? 'var(--aw-accent)' : 'var(--aw-muted)',
-                      fontSize: 11,
-                      fontFamily: 'var(--aw-font-display)',
-                      fontWeight: 600,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      cursor: 'pointer',
-                      transition: 'color 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      position: 'relative',
-                    }}
-                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = 'var(--aw-text)'; }}
-                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = 'var(--aw-muted)'; }}
-                  >
-                    <Icon size={14} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: -1,
-                  height: 2,
-                  background: 'var(--aw-accent)',
-                  borderRadius: 2,
-                  left: indicatorStyle.left,
-                  width: indicatorStyle.width,
-                  transition: 'left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), width 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                  pointerEvents: 'none',
-                }}
-              />
-            </div>
-
-            {sourcesTab === 'servers' && (
-              <div className="tab-content-enter stagger-children" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 20 }}>
-                {rankedProviders.map((p) => {
-                  const isActive = currentProvider === p;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => handleProviderSwitch(p)}
-                      className="server-tab aw-action-hover"
-                      data-active={isActive}
-                      style={{
-                        position: 'relative',
-                        padding: '8px 16px', borderRadius: 10,
-                        border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                        background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                        color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                        fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700,
-                        cursor: 'pointer', textTransform: 'lowercase',
-                        display: 'flex', alignItems: 'center', gap: 6
-                      }}
-                    >
-                      {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {sourcesTab === 'providers' && (
-              <div className="tab-content-enter stagger-children" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingLeft: 20 }}>
-                {['animepahe', 'animekai', 'animedunya', 'anikoto'].map((prefix) => {
-                  const isActive = episodeId?.toLowerCase().startsWith(prefix);
-                  return (
-                    <button
-                      key={prefix}
-                      type="button"
-                      onClick={() => {
-                        const epNumMatch = episodeId?.match(/\d+$/);
-                        const epNum = epNumMatch ? epNumMatch[0] : (currentEpData?.number || '1');
-                        const newEpisodeId = `${prefix}-${epNum}`;
-                        if (urlSlug) navigate(getEpisodeHref(urlSlug, currentProvider, currentCategory, newEpisodeId));
-                      }}
-                      className="source-badge aw-action-hover"
-                      data-active={isActive}
-                      style={{
-                        position: 'relative', padding: '8px 16px', borderRadius: 10,
-                        border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)',
-                        background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)',
-                        color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)',
-                        fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700,
-                        cursor: 'pointer', textTransform: 'lowercase',
-                        display: 'flex', alignItems: 'center', gap: 6
-                      }}
-                    >
-                      {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                      {prefix}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {sourcesTab === 'player' && streamData && (
-              <div className="tab-content-enter" style={{ display: 'flex', flexWrap: 'wrap', gap: 32, paddingLeft: 20 }}>
-                {streamData.streams.some(s => s.type === 'hls' && s.url) && (
-                  <div className="anim-fade-in-up anim-delay-1">
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}><MonitorPlay size={10} /> Internal</p>
-                    <div className="stagger-children" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {streamData.streams.map((s, idx) => {
-                        if (s.type !== 'hls' || !s.url) return null;
-                        const isActive = selectedStreamIndex === idx;
-                        return (
-                          <button key={idx} type="button" onClick={() => setSelectedStreamIndex(idx)} className="source-badge aw-action-hover" data-active={isActive} style={{ padding: '8px 16px', borderRadius: 10, border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700, textTransform: 'lowercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-                            {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                            {s.quality || 'auto'}
-                            <span style={{ fontSize: 8, letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase' }}>HLS</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {streamData.streams.some(s => s.type === 'embed' && s.url) && (
-                  <div className="anim-fade-in-up anim-delay-2">
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 7, fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6, marginBottom: 12 }}><MonitorPlay size={10} /> External</p>
-                    <div className="stagger-children" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {streamData.streams.map((s, idx) => {
-                        if (s.type !== 'embed' || !s.url) return null;
-                        const isActive = selectedStreamIndex === idx;
-                        return (
-                          <button key={idx} type="button" onClick={() => setSelectedStreamIndex(idx)} className="source-badge aw-action-hover" data-active={isActive} style={{ padding: '8px 16px', borderRadius: 10, border: isActive ? '1px solid var(--aw-accent)' : '1px solid rgba(255,255,255,0.1)', background: isActive ? 'var(--aw-accent-dim)' : 'rgba(255,255,255,0.03)', color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'var(--aw-font-display)', fontWeight: 700, textTransform: 'lowercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-                            {isActive && <div className="aw-shimmer-wrapper"><div className="aw-btn-shimmer" /></div>}
-                            {s.quality || 'auto'}
-                            <span style={{ fontSize: 8, letterSpacing: '0.1em', opacity: 0.6, textTransform: 'uppercase' }}>EMBED</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
           </div>
 
@@ -2314,7 +2147,7 @@ const chapterTrackUrl = useMemo(() => {
               </h3>
               <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 100, padding: 4, gap: 2 }}>
                 {(['sub', 'dub'] as const).map(cat => (
-                  <button key={cat} className="aw-segment-btn" data-active={currentCategory === cat} onClick={() => handleCategorySwitch(cat)} style={{ padding: '4px 14px', borderRadius: 100, border: 'none', background: currentCategory === cat ? 'rgba(255,255,255,0.1)' : 'transparent', color: currentCategory === cat ? 'var(--aw-accent)' : 'var(--aw-muted)', fontSize: 10, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s', boxShadow: currentCategory === cat ? '0 2px 12px rgba(0,0,0,0.3)' : 'none' }}>{cat}</button>
+                  <button key={cat} className="aw-segment-btn" data-active={currentCategory === cat} onClick={() => handleCategorySwitch(cat)} style={{ padding: '4px 14px', borderRadius: 100, border: 'none', background: 'transparent', color: 'var(--aw-muted)', fontSize: 10, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer' }}>{cat}</button>
                 ))}
               </div>
             </div>

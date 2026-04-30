@@ -1,6 +1,5 @@
-
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, X, Loader2, Settings, Bell, User, Calendar, ArrowRight, Ghost, Play } from 'lucide-react';
+import { Search, X, Loader2, Settings, Bell, User, Calendar, ArrowRight, Ghost } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BrandLogo, topbarNavItems } from '../shared/topbarShared';
@@ -12,41 +11,10 @@ import AuthModal from '../shared/AuthModal';
 import NotificationDropdown, { INITIAL_NOTIFICATIONS, AppNotification } from '../shared/NotificationDropdown';
 import { checkBookmarksForUpdates } from '../../utils/bookmarkUpdateChecker';
 import { fetchAnimeSuggestions } from '../../utils/animeApi';
+import { supabase } from '../../lib/supabase';
 
 const TOPBAR_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
-
-const DESIGN_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Onest:wght@300;400;500&display=swap');
-  
-  :root {
-    --aw-bg:          var(--app-bg);
-    --aw-s1:          var(--app-bg-2);
-    --aw-s2:          var(--app-bg-3);
-    --aw-card:        var(--app-card);
-    --aw-border:      var(--app-border);
-    --aw-border-hi:   var(--app-border-hover);
-    --aw-accent:      var(--app-accent);
-    --aw-accent-dim:  var(--app-accent-muted);
-    
-    --aw-text:        var(--app-text, #ffffff);
-    --aw-muted:       color-mix(in srgb, var(--aw-text) 60%, transparent);
-    
-    --aw-font-display: 'Syne', sans-serif; 
-    --aw-font-body:    'Onest', sans-serif;
-  }
-  
-  .aw-topbar-input::placeholder { color: var(--aw-muted); opacity: 0.6; }
-
-  /* OVERLAY GLASS: 96% Opaque to completely block images behind it, but theme-aware */
-  .aw-ultra-frosted {
-    background: color-mix(in srgb, var(--aw-bg) 96%, transparent);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--aw-border);
-    box-shadow: 0 40px 100px -20px rgba(0,0,0,0.9);
-  }
-`;
 
 const dropdownVariants = {
   hidden: { opacity: 0, y: 16, scale: 0.96, filter: 'blur(12px)' },
@@ -63,6 +31,19 @@ const dropdownVariants = {
 const itemVariants = {
   hidden: { opacity: 0, x: -12 },
   visible: { opacity: 1, x: 0, transition: { type: 'spring', damping: 25, stiffness: 400 } }
+};
+
+// Sub-component for snappy bottom tooltips
+const ActionTooltip = ({ label, hidden }: { label: string, hidden?: boolean }) => {
+  if (hidden) return null;
+  return (
+    <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 -translate-y-1 group-hover:translate-y-0 pointer-events-none transition-all duration-150 ease-out z-[200] flex flex-col items-center">
+      <div className="w-0 h-0 border-l-[4.5px] border-l-transparent border-r-[4.5px] border-r-transparent border-b-[5px]" style={{ borderBottomColor: 'color-mix(in srgb, var(--app-surface-1, #18181b) 95%, transparent)' }} />
+      <div className="text-white text-[11px] font-bold px-2.5 py-1 rounded-[6px] whitespace-nowrap shadow-xl border border-white/[0.08]" style={{ fontFamily: TOPBAR_FONT, background: 'color-mix(in srgb, var(--app-surface-1, #18181b) 95%, transparent)', backdropFilter: 'blur(12px)' }}>
+        {label}
+      </div>
+    </div>
+  );
 };
 
 interface DesktopTopbarProps {
@@ -84,17 +65,21 @@ const DesktopNavLink: React.FC<{ icon: React.ElementType; label: string; to: str
         {isActive && (
           <motion.div
             layoutId="desktopActiveNavPill"
-            className="absolute inset-0 rounded-[10px] bg-[color-mix(in_srgb,var(--aw-accent),transparent_85%)] border border-[color-mix(in_srgb,var(--aw-accent),transparent_80%)] z-0"
+            className="absolute inset-0 rounded-[10px] z-0"
+            style={{
+              background: 'color-mix(in srgb, var(--app-accent, #8b5cf6) 15%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--app-accent, #8b5cf6) 30%, transparent)'
+            }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
           />
         )}
         
         {!isActive && (
-          <div className="absolute inset-0 rounded-[10px] bg-[rgba(255,255,255,0.04)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-0" />
+          <div className="absolute inset-0 rounded-[10px] bg-white/[0.04] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-0" />
         )}
 
-        <Icon className={`relative z-10 h-4 w-4 transition-transform duration-150 group-hover:scale-110 ${isActive ? 'text-[var(--aw-accent)]' : 'text-[var(--aw-muted)] group-hover:text-[var(--aw-text)]'}`} />
-        <span className={`relative z-10 tracking-wide ${isActive ? 'text-[var(--aw-accent)]' : 'text-[var(--aw-muted)] group-hover:text-[var(--aw-text)]'}`}>
+        <Icon className={`relative z-10 h-4 w-4 transition-transform duration-150 group-hover:scale-110 ${isActive ? 'text-[var(--app-accent,#8b5cf6)]' : 'text-[color:var(--app-text-muted,#a1a1aa)] group-hover:text-white'}`} />
+        <span className={`relative z-10 tracking-wide ${isActive ? 'text-[var(--app-accent,#8b5cf6)]' : 'text-[color:var(--app-text-muted,#a1a1aa)] group-hover:text-white'}`}>
           {label}
         </span>
       </motion.div>
@@ -119,23 +104,18 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
   const notifRef = useRef<HTMLDivElement>(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>(INITIAL_NOTIFICATIONS);
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const [pendingFrCount, setPendingFrCount] = useState(0);
 
+  const [searchMode, setSearchMode] = useState<'anime' | 'users'>('anime');
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [userSuggestions, setUserSuggestions] = useState<any[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
   const { brandName } = useContentMode();
   const { user, profile } = useAuth();
 
-  useEffect(() => {
-    const id = 'aw-design-styles-desktop-topbar';
-    if (!document.getElementById(id)) {
-      const tag = document.createElement('style');
-      tag.id = id;
-      tag.textContent = DESIGN_STYLES;
-      document.head.appendChild(tag);
-    }
-  }, []);
+  // Combine local standard unread + real-time friend requests
+  const totalUnreadCount = notifications.filter(n => n.unread).length + pendingFrCount;
 
   const normalizeRoute = (p: string) => {
     if (p === '/' || p === '/anihome') return '/home';
@@ -158,41 +138,97 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [setShowSearch]);
 
+  // Fetch standard bookmarks updates
   useEffect(() => {
     checkBookmarksForUpdates(setNotifications);
     const intervalId = window.setInterval(() => checkBookmarksForUpdates(setNotifications), 1_800_000);
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // Fetch pending friend requests count for the badge
+  useEffect(() => {
+    if (!user?.id) {
+      setPendingFrCount(0);
+      return;
+    }
+
+    const fetchFrCount = async () => {
+      const { count } = await supabase
+        .from('friendships')
+        .select('*', { count: 'exact', head: true })
+        .eq('friend_id', user.id)
+        .eq('status', 'pending');
+      setPendingFrCount(count || 0);
+    };
+
+    fetchFrCount();
+
+    // Subscribe to realtime changes so the red dot updates instantly
+    const channel = supabase.channel('public:friendships_count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `friend_id=eq.${user.id}` }, () => {
+         fetchFrCount();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id]);
+
   useEffect(() => {
     if (!searchQuery || searchQuery.trim().length < 2) {
       setSuggestions([]);
+      setUserSuggestions([]);
       return;
     }
 
     const timer = setTimeout(async () => {
       setIsLoadingSuggestions(true);
       try {
-        const res = await fetchAnimeSuggestions(searchQuery.trim());
-        let parsedResults: any[] = [];
-        if (Array.isArray(res)) parsedResults = res;
-        else if (res && Array.isArray((res as any).results)) parsedResults = (res as any).results;
-        else if (res && Array.isArray((res as any).data)) parsedResults = (res as any).data;
-        else if (res && Array.isArray((res as any).suggestions)) parsedResults = (res as any).suggestions;
-        
-        setSuggestions(parsedResults);
+        if (searchMode === 'anime') {
+          const res = await fetchAnimeSuggestions(searchQuery.trim());
+          let parsedResults: any[] = [];
+          if (Array.isArray(res)) parsedResults = res;
+          else if (res && Array.isArray((res as any).results)) parsedResults = (res as any).results;
+          else if (res && Array.isArray((res as any).data)) parsedResults = (res as any).data;
+          else if (res && Array.isArray((res as any).suggestions)) parsedResults = (res as any).suggestions;
+          
+          // Ensure theme safety & block adult content from results natively
+          parsedResults = parsedResults.filter((anime: any) => {
+            if (anime.isAdult === true) return false;
+            if (typeof anime.format === 'string' && anime.format.toUpperCase() === 'HENTAI') return false;
+            if (Array.isArray(anime.genres) && anime.genres.some((g: string) => g.toLowerCase() === 'hentai' || g.toLowerCase() === 'erotica')) return false;
+            return true;
+          });
+
+          setSuggestions(parsedResults);
+          setUserSuggestions([]);
+        } else {
+          // Search Users via Supabase
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, display_name, avatar_url')
+            .ilike('display_name', `%${searchQuery.trim()}%`)
+            .limit(5);
+            
+          if (!error && data) {
+            setUserSuggestions(data);
+          } else {
+            setUserSuggestions([]);
+          }
+          setSuggestions([]);
+        }
       } catch (error) {
         setSuggestions([]);
+        setUserSuggestions([]);
       } finally {
         setIsLoadingSuggestions(false);
       }
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, searchMode]);
 
   const handleSearchSubmit = () => {
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && searchMode === 'anime') {
       navigate(`/browse?q=${encodeURIComponent(searchQuery.trim())}`);
       setIsExpanded(false);
     }
@@ -205,15 +241,21 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
     setSuggestions([]);
   };
 
-  const H = 40;
+  const handleUserResultClick = (id: string) => {
+    window.dispatchEvent(new CustomEvent('openProfile', { detail: { userId: id } }));
+    setIsExpanded(false);
+    clearSearch();
+    setUserSuggestions([]);
+  };
+
   const MAX_DISPLAY = 5; 
   const displayResults = suggestions.slice(0, MAX_DISPLAY);
 
   const pillStyle = {
-    height: H, 
+    height: 40, 
     borderRadius: '12px', 
     background: 'rgba(10, 10, 15, 0.25)', 
-    border: '1px solid rgba(255, 255, 255, 0.08)'
+    border: '1px solid var(--app-border, rgba(255,255,255,0.08))'
   };
 
   return (
@@ -229,12 +271,12 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
             className="flex items-center gap-3 transition-opacity group"
           >
             <BrandLogo />
-            <span className="text-xl font-bold tracking-tight text-[var(--aw-text)] transition-colors group-hover:text-[var(--aw-accent)]" style={{ fontFamily: DISPLAY_FONT }}>
+            <span className="text-xl font-bold tracking-tight text-white transition-colors group-hover:text-[var(--app-accent,#8b5cf6)]" style={{ fontFamily: DISPLAY_FONT }}>
               {brandName}
             </span>
           </motion.button>
 
-          <div className="h-5 w-px shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          <div className="h-5 w-px shrink-0" style={{ background: 'var(--app-border, rgba(255,255,255,0.08))' }} />
 
           <nav className="flex items-center gap-1 relative">
             {topbarNavItems
@@ -258,7 +300,7 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
         <div className="flex shrink-0 items-center gap-3">
 
           {/* Search Container */}
-          <div ref={searchRef} className="relative flex items-center">
+          <div ref={searchRef} className="relative flex items-center group">
             <motion.div
               layout
               className={`relative flex items-center overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${isExpanded ? 'w-[420px]' : 'w-[40px]'}`}
@@ -266,8 +308,9 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
             >
               <button
                 onClick={() => { setIsExpanded(true); setTimeout(() => inputRef.current?.focus(), 80); }}
-                className="flex shrink-0 items-center justify-center h-full w-[40px] border-none outline-none ring-0 bg-transparent transition-colors duration-150"
-                style={{ color: isExpanded ? 'var(--aw-accent)' : 'var(--aw-muted)' }}
+                className={`flex shrink-0 items-center justify-center h-full w-[38px] border-none outline-none ring-0 bg-transparent transition-colors duration-150 ${
+                  isExpanded ? 'text-[color:var(--app-accent,#8b5cf6)]' : 'text-[color:var(--app-text-muted,#a1a1aa)]'
+                }`}
               >
                 <Search size={16} />
               </button>
@@ -278,20 +321,23 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
                 value={searchQuery}
                 onChange={(e) => onSearchQueryChange(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearchSubmit(); }}
-                placeholder="Search anime..."
-                className={`flex-1 bg-transparent text-[14px] font-medium text-[var(--aw-text)] border-none outline-none ring-0 focus:ring-0 focus:outline-none transition-opacity duration-300 ${isExpanded ? 'opacity-100 mr-2' : 'opacity-0 pointer-events-none'}`}
+                placeholder="Search..."
+                className={`flex-1 bg-transparent text-[14px] font-medium text-white border-none outline-none ring-0 focus:ring-0 focus:outline-none transition-opacity duration-300 ${isExpanded ? 'opacity-100 mr-2' : 'opacity-0 pointer-events-none'}`}
                 style={{ fontFamily: TOPBAR_FONT }}
               />
 
               {isExpanded && searchQuery && (
                 <button
-                  onClick={() => { clearSearch(); setSuggestions([]); }}
-                  className="flex shrink-0 items-center justify-center h-full w-[40px] text-[var(--aw-muted)] hover:text-[var(--aw-text)] hover:bg-[rgba(255,255,255,0.06)] transition-all duration-150"
+                  onClick={() => { clearSearch(); setSuggestions([]); setUserSuggestions([]); }}
+                  className="flex shrink-0 items-center justify-center h-full w-[38px] text-[color:var(--app-text-muted,#a1a1aa)] hover:text-white hover:bg-white/[0.06] transition-all duration-150"
                 >
-                  {isLoadingSuggestions ? <Loader2 size={14} className="animate-spin text-[var(--aw-accent)]" /> : <X size={14} />}
+                  {isLoadingSuggestions ? <Loader2 size={14} className="animate-spin text-[var(--app-accent,#8b5cf6)]" /> : <X size={14} />}
                 </button>
               )}
             </motion.div>
+
+            {/* Placed outside the overflow-hidden mask so it can bleed down */}
+            <ActionTooltip label="Search" hidden={isExpanded} />
 
             {/* DROPDOWN UI */}
             <AnimatePresence>
@@ -301,100 +347,194 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="aw-ultra-frosted absolute right-0 top-[calc(100%+14px)] w-[420px] rounded-[24px] overflow-hidden flex flex-col z-[100]"
+                  className="absolute right-0 top-[calc(100%+14px)] w-[420px] rounded-[24px] overflow-hidden flex flex-col z-[100] shadow-2xl"
+                  style={{
+                    background: 'color-mix(in srgb, var(--app-surface-1, #09090b) 75%, transparent)',
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid var(--app-border, rgba(255,255,255,0.08))',
+                  }}
                 >
                   <div className="p-3 flex flex-col gap-1.5">
                     
-                    {isLoadingSuggestions && suggestions.length === 0 ? (
+                    {/* Search Mode Toggles */}
+                    <div className="flex bg-white/[0.02] p-1 rounded-[12px] mb-2 border border-[var(--app-border,rgba(255,255,255,0.04))] relative z-10">
+                      {['anime', 'users'].map((mode) => {
+                        const isActive = searchMode === mode;
+                        return (
+                          <button
+                            key={mode}
+                            onClick={() => setSearchMode(mode as 'anime' | 'users')}
+                            className="relative flex-1 py-1.5 text-[13px] font-bold rounded-[8px] outline-none capitalize group"
+                            style={{ fontFamily: TOPBAR_FONT }}
+                          >
+                            {isActive && (
+                              <motion.div
+                                layoutId="searchToggleActive"
+                                className="absolute inset-0 rounded-[8px] z-0"
+                                style={{
+                                  background: 'color-mix(in srgb, var(--app-accent, #8b5cf6) 15%, transparent)',
+                                  border: '1px solid color-mix(in srgb, var(--app-accent, #8b5cf6) 30%, transparent)'
+                                }}
+                                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                              />
+                            )}
+                            
+                            {!isActive && (
+                              <div className="absolute inset-0 rounded-[8px] bg-white/[0.04] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 z-0" />
+                            )}
+
+                            <span className={`relative z-10 transition-colors duration-200 ${isActive ? 'text-[var(--app-accent,#8b5cf6)]' : 'text-white/50 group-hover:text-white'}`}>
+                              {mode}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {isLoadingSuggestions && suggestions.length === 0 && userSuggestions.length === 0 ? (
                       // Skeleton Loaders
                       [1, 2, 3].map((i) => (
                         <div key={i} className="flex w-full items-center gap-4 rounded-[16px] p-2">
-                          <div className="h-[68px] w-[48px] shrink-0 rounded-[10px] bg-[rgba(255,255,255,0.04)] animate-pulse border border-[rgba(255,255,255,0.04)]" />
+                          <div className={`h-[68px] w-[48px] shrink-0 bg-white/[0.04] animate-pulse border border-[var(--app-border,rgba(255,255,255,0.08))] ${searchMode === 'users' ? 'rounded-full h-[48px]' : 'rounded-[10px]'}`} />
                           <div className="flex flex-col gap-2.5 flex-1 justify-center">
-                            <div className="h-4 w-2/3 rounded-md bg-[rgba(255,255,255,0.04)] animate-pulse" />
+                            <div className="h-4 w-2/3 rounded-md bg-white/[0.04] animate-pulse" />
                             <div className="flex gap-2">
-                              <div className="h-3 w-8 rounded bg-[rgba(255,255,255,0.04)] animate-pulse" />
-                              <div className="h-3 w-12 rounded bg-[rgba(255,255,255,0.04)] animate-pulse" />
+                              <div className="h-3 w-8 rounded bg-white/[0.04] animate-pulse" />
+                              <div className="h-3 w-12 rounded bg-white/[0.04] animate-pulse" />
                             </div>
                           </div>
                         </div>
                       ))
-                    ) : displayResults.length > 0 ? (
-                      // Search Results
-                      displayResults.map((result) => {
-                        let displayTitle = 'Unknown';
-                        if (typeof result.title === 'string') displayTitle = result.title_romaji || result.title;
-                        else if (result.title) displayTitle = result.title.english || result.title.romaji || result.title.native || 'Unknown';
-                        else if (result.title_romaji) displayTitle = result.title_romaji;
+                    ) : searchMode === 'anime' ? (
+                      displayResults.length > 0 ? (
+                        // Anime Search Results
+                        displayResults.map((result) => {
+                          let displayTitle = 'Unknown';
+                          if (typeof result.title === 'string') displayTitle = result.title_romaji || result.title;
+                          else if (result.title) displayTitle = result.title.english || result.title.romaji || result.title.native || 'Unknown';
+                          else if (result.title_romaji) displayTitle = result.title_romaji;
 
-                        const cover = result.poster || result.coverImage?.extraLarge || result.coverImage?.large || '';
-                        const format = result.format || 'TV';
-                        const year = result.year || result.seasonYear || result.startDate?.year || '';
+                          const cover = result.poster || result.coverImage?.extraLarge || result.coverImage?.large || '';
+                          const format = result.format || 'TV';
+                          const year = result.year || result.seasonYear || result.startDate?.year || '';
 
-                        return (
+                          return (
+                            <motion.button
+                              variants={itemVariants}
+                              whileHover={{ scale: 1.015 }}
+                              whileTap={{ scale: 0.98 }}
+                              key={result.id}
+                              onClick={() => handleResultClick(result.id)}
+                              className="group/item relative flex w-full items-center gap-4 rounded-[16px] p-2 text-left outline-none transition-all duration-150 overflow-hidden border border-transparent hover:bg-white/[0.06] hover:border-[var(--app-border,rgba(255,255,255,0.08))]"
+                            >
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[50%] w-1 rounded-r-full bg-[var(--app-accent,#8b5cf6)] opacity-0 transition-all duration-150 transform -translate-x-full group-hover/item:translate-x-0 group-hover/item:opacity-100" />
+
+                              <div className="relative h-[68px] w-[48px] shrink-0 overflow-hidden rounded-[10px] bg-black/40 shadow-md ml-1 border border-[var(--app-border,rgba(255,255,255,0.08))]">
+                                <img src={cover} alt={displayTitle} className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/item:scale-110" loading="lazy" />
+                              </div>
+
+                              <div className="flex flex-col min-w-0 flex-1 justify-center pr-2">
+                                <span className="truncate text-[15px] font-bold text-white transition-colors tracking-tight line-clamp-1" style={{ fontFamily: 'var(--aw-font-display)' }}>
+                                  {displayTitle}
+                                </span>
+                                
+                                <div className="flex items-center gap-2 mt-1.5" style={{ fontFamily: 'var(--aw-font-body)' }}>
+                                  {format && (
+                                    <span className="px-1.5 py-[2px] rounded-[4px] bg-white/[0.04] border border-[var(--app-border,rgba(255,255,255,0.08))] text-[10px] font-bold text-[color:var(--app-text-muted,#a1a1aa)] uppercase tracking-wider">
+                                      {format}
+                                    </span>
+                                  )}
+                                  {year && <span className="text-[12px] font-medium text-[color:var(--app-text-muted,#a1a1aa)]">{year}</span>}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/[0.04] border border-[var(--app-border,rgba(255,255,255,0.08))] text-[color:var(--app-text-muted,#a1a1aa)] opacity-0 -translate-x-4 transition-all duration-150 group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:text-white group-hover/item:border-white/[0.15] mr-1">
+                                <ArrowRight size={14} />
+                              </div>
+                            </motion.button>
+                          );
+                        })
+                      ) : (
+                        // Empty State Anime
+                        <motion.div variants={itemVariants} className="flex flex-col items-center justify-center py-14 px-6 text-center">
+                          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.04] text-[color:var(--app-text-muted,#a1a1aa)] mb-5 border border-[var(--app-border,rgba(255,255,255,0.08))] shadow-inner">
+                            <Ghost size={28} className="relative z-10" />
+                          </div>
+                          <h3 className="text-[18px] font-bold text-white tracking-tight" style={{ fontFamily: DISPLAY_FONT }}>
+                            No anime found
+                          </h3>
+                          <p className="text-[14px] text-[color:var(--app-text-muted,#a1a1aa)] mt-2 max-w-[90%] mx-auto" style={{ fontFamily: TOPBAR_FONT }}>
+                            Try adjusting your search for <span className="text-white font-semibold">"{searchQuery}"</span>
+                          </p>
+                        </motion.div>
+                      )
+                    ) : (
+                      userSuggestions.length > 0 ? (
+                        // User Search Results
+                        userSuggestions.map((resultUser) => (
                           <motion.button
                             variants={itemVariants}
                             whileHover={{ scale: 1.015 }}
                             whileTap={{ scale: 0.98 }}
-                            key={result.id}
-                            onClick={() => handleResultClick(result.id)}
-                            className="group relative flex w-full items-center gap-4 rounded-[16px] p-2 text-left outline-none transition-all duration-150 overflow-hidden border border-transparent hover:bg-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.08)]"
+                            key={resultUser.id}
+                            onClick={() => handleUserResultClick(resultUser.id)}
+                            className="group/item relative flex w-full items-center gap-4 rounded-[16px] p-2 text-left outline-none transition-all duration-150 overflow-hidden border border-transparent hover:bg-white/[0.06] hover:border-[var(--app-border,rgba(255,255,255,0.08))]"
                           >
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[50%] w-1 rounded-r-full bg-[var(--aw-accent)] opacity-0 transition-all duration-150 transform -translate-x-full group-hover:translate-x-0 group-hover:opacity-100" />
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-[50%] w-1 rounded-r-full bg-[var(--app-accent,#8b5cf6)] opacity-0 transition-all duration-150 transform -translate-x-full group-hover/item:translate-x-0 group-hover/item:opacity-100" />
 
-                            <div className="relative h-[68px] w-[48px] shrink-0 overflow-hidden rounded-[10px] bg-[rgba(0,0,0,0.4)] shadow-md ml-1 border border-[rgba(255,255,255,0.08)]">
-                              <img src={cover} alt={displayTitle} className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110" loading="lazy" />
+                            <div className="relative h-[48px] w-[48px] shrink-0 overflow-hidden rounded-full bg-black/40 shadow-md ml-1 border border-[var(--app-border,rgba(255,255,255,0.08))]">
+                              {resultUser.avatar_url ? (
+                                <img src={resultUser.avatar_url} alt={resultUser.display_name} className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover/item:scale-110" loading="lazy" />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-white/[0.04]">
+                                  <User size={20} className="text-[color:var(--app-text-muted,#a1a1aa)]" />
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex flex-col min-w-0 flex-1 justify-center pr-2">
-                              <span className="truncate text-[15px] font-bold text-[var(--aw-text)] transition-colors tracking-tight line-clamp-1" style={{ fontFamily: 'var(--aw-font-display)' }}>
-                                {displayTitle}
+                              <span className="truncate text-[15px] font-bold text-white transition-colors tracking-tight line-clamp-1" style={{ fontFamily: 'var(--aw-font-display)' }}>
+                                {resultUser.display_name}
                               </span>
-                              
-                              <div className="flex items-center gap-2 mt-1.5" style={{ fontFamily: 'var(--aw-font-body)' }}>
-                                {format && (
-                                  <span className="px-1.5 py-[2px] rounded-[4px] bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[10px] font-bold text-[var(--aw-muted)] uppercase tracking-wider">
-                                    {format}
-                                  </span>
-                                )}
-                                {year && <span className="text-[12px] font-medium text-[var(--aw-muted)]">{year}</span>}
+                              <div className="flex items-center gap-2 mt-0.5" style={{ fontFamily: 'var(--aw-font-body)' }}>
+                                <span className="text-[12px] font-medium text-[color:var(--app-text-muted,#a1a1aa)]">User Profile</span>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-[var(--aw-muted)] opacity-0 -translate-x-4 transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0 group-hover:text-[var(--aw-text)] group-hover:border-[rgba(255,255,255,0.15)] mr-1">
+                            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/[0.04] border border-[var(--app-border,rgba(255,255,255,0.08))] text-[color:var(--app-text-muted,#a1a1aa)] opacity-0 -translate-x-4 transition-all duration-150 group-hover/item:opacity-100 group-hover/item:translate-x-0 group-hover/item:text-white group-hover/item:border-white/[0.15] mr-1">
                               <ArrowRight size={14} />
                             </div>
                           </motion.button>
-                        );
-                      })
-                    ) : (
-                      // Empty State
-                      <motion.div variants={itemVariants} className="flex flex-col items-center justify-center py-14 px-6 text-center">
-                        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.04)] text-[var(--aw-muted)] mb-5 border border-[rgba(255,255,255,0.08)] shadow-inner">
-                          <Ghost size={28} className="relative z-10" />
-                        </div>
-                        <h3 className="text-[18px] font-bold text-[var(--aw-text)] tracking-tight" style={{ fontFamily: 'var(--aw-font-display)' }}>
-                          No results found
-                        </h3>
-                        <p className="text-[14px] text-[var(--aw-muted)] mt-2 max-w-[90%] mx-auto" style={{ fontFamily: 'var(--aw-font-body)' }}>
-                          Try adjusting your search for <span className="text-[var(--aw-text)] font-semibold">"{searchQuery}"</span>
-                        </p>
-                      </motion.div>
+                        ))
+                      ) : (
+                        // Empty State Users
+                        <motion.div variants={itemVariants} className="flex flex-col items-center justify-center py-14 px-6 text-center">
+                          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.04] text-[color:var(--app-text-muted,#a1a1aa)] mb-5 border border-[var(--app-border,rgba(255,255,255,0.08))] shadow-inner">
+                            <Ghost size={28} className="relative z-10" />
+                          </div>
+                          <h3 className="text-[18px] font-bold text-white tracking-tight" style={{ fontFamily: DISPLAY_FONT }}>
+                            No users found
+                          </h3>
+                          <p className="text-[14px] text-[color:var(--app-text-muted,#a1a1aa)] mt-2 max-w-[90%] mx-auto" style={{ fontFamily: TOPBAR_FONT }}>
+                            Try adjusting your search for <span className="text-white font-semibold">"{searchQuery}"</span>
+                          </p>
+                        </motion.div>
+                      )
                     )}
                   </div>
 
-                  {/* Redesigned Footer */}
-                  {displayResults.length > 0 && (
-                    <motion.div variants={itemVariants} className="w-full border-t border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.2)] mt-1 p-2">
+                  {/* Redesigned Footer (Only show for anime browse) */}
+                  {displayResults.length > 0 && searchMode === 'anime' && (
+                    <motion.div variants={itemVariants} className="w-full border-t border-[var(--app-border,rgba(255,255,255,0.08))] bg-black/20 mt-1 p-2">
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleSearchSubmit}
-                        className="flex w-full items-center justify-between px-4 py-2.5 rounded-[12px] text-[13px] font-bold text-[var(--aw-muted)] transition-all duration-150 hover:text-[var(--aw-text)] hover:bg-[rgba(255,255,255,0.06)] outline-none group border border-transparent hover:border-[rgba(255,255,255,0.08)]"
-                        style={{ fontFamily: 'var(--aw-font-body)' }}
+                        className="flex w-full items-center justify-between px-4 py-2.5 rounded-[12px] text-[13px] font-bold text-[color:var(--app-text-muted,#a1a1aa)] transition-all duration-150 hover:text-white hover:bg-white/[0.06] outline-none group border border-transparent hover:border-[var(--app-border,rgba(255,255,255,0.08))]"
+                        style={{ fontFamily: TOPBAR_FONT }}
                       >
                         <span>See all results</span>
-                        <div className="flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] group-hover:border-[rgba(255,255,255,0.15)] transition-colors duration-150">
+                        <div className="flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-md bg-white/[0.04] border border-[var(--app-border,rgba(255,255,255,0.08))] group-hover:border-white/[0.15] transition-colors duration-150">
                           <span className="text-[14px] leading-none">↵</span> Enter
                         </div>
                       </motion.button>
@@ -408,62 +548,64 @@ const DesktopTopbar: React.FC<DesktopTopbarProps> = ({
           {/* ────────────── ACTION PILL ────────────── */}
           <div className="flex items-center gap-1.5 px-1.5" style={pillStyle}>
             
+            {/* Notification Button */}
             <div className="relative flex items-center h-full" ref={notifRef}>
               <motion.button
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--aw-text)' }}
                 whileTap={{ scale: 0.92 }}
                 onClick={() => setIsNotifOpen(!isNotifOpen)}
-                className="relative flex items-center justify-center rounded-[10px] transition-colors duration-150"
-                style={{ 
-                  width: 32, height: 32, 
-                  color: isNotifOpen ? 'var(--aw-text)' : 'var(--aw-muted)', 
-                  background: isNotifOpen ? 'rgba(255,255,255,0.08)' : 'transparent' 
-                }}
+                className={`group relative flex items-center justify-center rounded-[10px] transition-all duration-150 ease-out hover:bg-white/[0.08] hover:text-white ${
+                  isNotifOpen ? 'bg-white/[0.08] text-white' : 'text-[color:var(--app-text-muted,#a1a1aa)]'
+                }`}
+                style={{ width: 32, height: 32 }}
               >
                 <Bell size={16} strokeWidth={1.5} />
-                {unreadCount > 0 && (
-                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-[1.5px] border-[rgba(20,20,25,1)] bg-[var(--aw-accent)]" />
+                {totalUnreadCount > 0 && (
+                  <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-[1.5px] border-[var(--app-surface-1,#18181b)] bg-[var(--app-accent,#8b5cf6)]" />
                 )}
+                <ActionTooltip label="Notifications" hidden={isNotifOpen} />
               </motion.button>
               {isNotifOpen && <NotificationDropdown notifications={notifications} setNotifications={setNotifications} />}
             </div>
 
-            <div className="h-4 w-px mx-0.5 bg-[rgba(255,255,255,0.08)]" />
+            <div className="h-4 w-px mx-0.5 bg-[var(--app-border,rgba(255,255,255,0.08))]" />
 
+            {/* Settings Button */}
             <motion.button 
-              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--aw-text)' }}
               whileTap={{ scale: 0.92 }}
               onClick={() => setIsSettingsOpen(true)} 
-              className="flex items-center justify-center rounded-[10px] transition-colors duration-150" 
-              style={{ width: 32, height: 32, color: 'var(--aw-muted)' }}
+              className="group relative flex items-center justify-center rounded-[10px] transition-all duration-150 ease-out text-[color:var(--app-text-muted,#a1a1aa)] hover:bg-white/[0.08] hover:text-white" 
+              style={{ width: 32, height: 32 }}
             >
               <Settings size={16} strokeWidth={1.5} />
+              <ActionTooltip label="Settings" />
             </motion.button>
 
-            <div className="h-4 w-px mx-0.5 bg-[rgba(255,255,255,0.08)]" />
+            <div className="h-4 w-px mx-0.5 bg-[var(--app-border,rgba(255,255,255,0.08))]" />
 
+            {/* Profile / Auth Button */}
             {user ? (
               <motion.button 
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.06)' }}
                 whileTap={{ scale: 0.92 }}
                 onClick={() => {
-                  // Explicitly dispatch the open event for the logged in user
                   window.dispatchEvent(new CustomEvent('openProfile', { detail: { userId: user.id } }));
                 }} 
-                className="group flex items-center justify-center rounded-[10px] overflow-hidden transition-colors duration-150 border border-transparent hover:border-[rgba(255,255,255,0.08)]" 
-                style={{ width: 32, height: 32, color: 'var(--aw-muted)' }}
+                className="group relative flex items-center justify-center rounded-[10px] overflow-visible transition-all duration-150 ease-out text-[color:var(--app-text-muted,#a1a1aa)] hover:bg-white/[0.08] hover:text-white" 
+                style={{ width: 32, height: 32 }}
               >
-                {profile?.avatar_url ? <img src={profile.avatar_url} className="h-full w-full object-cover" alt="Profile" /> : <User size={16} strokeWidth={1.5} />}
+                <div className="w-full h-full rounded-[10px] overflow-hidden border border-transparent group-hover:border-white/[0.1] transition-colors">
+                  {profile?.avatar_url ? <img src={profile.avatar_url} className="h-full w-full object-cover" alt="Profile" /> : <User size={16} strokeWidth={1.5} />}
+                </div>
+                <ActionTooltip label="Profile" />
               </motion.button>
             ) : (
               <motion.button 
-                whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.06)', color: 'var(--aw-text)' }}
                 whileTap={{ scale: 0.92 }}
                 onClick={() => setIsAuthModalOpen(true)} 
-                className="group flex items-center justify-center rounded-[10px] transition-colors duration-150" 
-                style={{ width: 32, height: 32, color: 'var(--aw-muted)' }}
+                className="group relative flex items-center justify-center rounded-[10px] transition-all duration-150 ease-out text-[color:var(--app-text-muted,#a1a1aa)] hover:bg-white/[0.08] hover:text-white" 
+                style={{ width: 32, height: 32 }}
               >
                 <User size={16} strokeWidth={1.5} />
+                <ActionTooltip label="Sign In" />
               </motion.button>
             )}
           </div>

@@ -174,7 +174,7 @@ const DESIGN_STYLES = `
     background: color-mix(in srgb, var(--aw-accent), transparent 94%);
     color: white;
   }
-  .qf-filter-btn {
+.qf-filter-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -182,25 +182,25 @@ const DESIGN_STYLES = `
     width: 100%;
     height: 40px;
     border-radius: 10px;
-    border: none;
-    background: var(--aw-accent);
-    color: #04110d;
+    border: 1px solid var(--aw-accent-dim);
+    background: color-mix(in srgb, var(--aw-accent), transparent 94%);
+    color: white;
     font-family: var(--aw-font-display);
     font-size: 11px;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
   }
   .qf-filter-btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    filter: brightness(1.1);
+    background: color-mix(in srgb, var(--aw-accent), transparent 88%);
+    transform: translateY(-1px);
   }
   .qf-filter-btn:active {
-    transform: translateY(0) scale(0.96);
+    transform: translateY(0) scale(0.98);
   }
 
   .qf-dropdown-glass {
@@ -881,11 +881,10 @@ const AnimeHome: React.FC = () => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <QFSelect id="sort" label="Sort" value={qfSort} options={QF_SORT_OPTIONS} onChange={setQfSort} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <div className="flex flex-col gap-1">
+<div className="flex flex-col gap-1">
               <span style={{ fontSize: 9, opacity: 0 }}>‎</span>
               <button className="qf-filter-btn group" onClick={handleQuickFilter}>
-                <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
-                <SlidersHorizontal size={14} className="relative z-10" />
+                <SlidersHorizontal size={14} className="relative z-10 text-[var(--aw-accent)]" />
                 <span className="relative z-10">Filter</span>
               </button>
             </div>

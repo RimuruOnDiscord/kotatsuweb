@@ -1,0 +1,126 @@
+/*
+ * design-tokens.css
+ *
+ * Shared CSS tokens + utility classes that were previously copy-pasted as the
+ * `DESIGN_STYLES` string constant inside AnimeHome, AnimeDetail, AnimeWatchPage, etc.
+ *
+ * Import once in src/index.css (or main.tsx) instead of injecting a <style> tag
+ * in every component.
+ *
+ * Usage:
+ *   In src/index.css add:  @import './styles/design-tokens.css';
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Onest:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --aw-bg:           var(--app-bg);
+  --aw-s1:           var(--app-bg-2);
+  --aw-s2:           var(--app-bg-3);
+  --aw-card:         var(--app-card);
+  --aw-border:       var(--app-border);
+  --aw-border-hi:    var(--app-border-hover);
+  --aw-accent:       var(--app-accent);
+  --aw-accent-2:     var(--app-accent);
+  --aw-accent-dim:   var(--app-accent-muted);
+  --aw-accent-glow:  var(--app-accent);
+  --aw-muted:        #ffffffb7;
+  --aw-text:         #ffffff;
+  --aw-font-display: 'Syne', sans-serif;
+  --aw-font-body:    'Onest', sans-serif;
+}
+
+/* ── Root ──────────────────────────────────────── */
+.aw-root {
+  font-family: var(--aw-font-body);
+  background: transparent;
+  color: var(--aw-text);
+}
+
+/* ── Labels ─────────────────────────────────────── */
+.aw-label {
+  font-family: var(--aw-font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--aw-accent);
+}
+
+/* ── Scrollbar ───────────────────────────────────── */
+.aw-scroll::-webkit-scrollbar        { width: 4px; height: 4px; }
+.aw-scroll::-webkit-scrollbar-track  { background: transparent; }
+.aw-scroll::-webkit-scrollbar-thumb  { background: var(--aw-accent-dim); border-radius: 2px; }
+.aw-scroll::-webkit-scrollbar-thumb:hover { background: var(--aw-accent); }
+
+/* ── Entrance animations ─────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.8) translateY(20px); }
+  70%  { transform: scale(1.03) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Layout helpers ──────────────────────────────── */
+.aw-layout {
+  max-width: 1460px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 32px 16px;
+  gap: 32px;
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.aw-main {
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  z-index: 50;
+}
+
+.aw-sidebar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 15, 0.1) !important;
+  backdrop-filter: blur(12px) saturate(120%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.8);
+  height: fit-content;
+}
+
+@media (min-width: 1280px) {
+  .aw-layout { grid-template-columns: 1fr 380px; align-items: start; }
+  .aw-sidebar {
+    position: sticky;
+    top: 100px;
+    max-height: calc(100vh - 140px);
+  }
+}
