@@ -1,13 +1,23 @@
 /* ─── START OF FILE AnimeWatchPage.tsx ────────────────────────────── */
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import CommentSection from '../components/shared/CommentSection';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
-  ChevronsLeft, ChevronsRight, Loader2, AlertCircle, FastForward,
-  Server, MonitorPlay, Layers, ArrowDownUp, Link2, Play,
-  Bookmark, BookmarkCheck, Share2, Clapperboard,
-  X, Copy, Check, ExternalLink, Clock, ChevronDown
+  ChevronsLeft,
+  ChevronsRight,
+  Loader2,
+  AlertCircle,
+  FastForward,
+  MonitorPlay,
+  ArrowDownUp,
+  ExternalLink,
+  Clock,
+  Share2,
+  X,
+  Copy,
+  Check
 } from 'lucide-react';
 
 import {
@@ -15,16 +25,16 @@ import {
   fetchAnimeEpisodes,
   fetchAnimeSearch,
   getProviderEpisodes,
-  AnimeWatchProviderPayload,
   fetchAnimeStreams
 } from '../utils/animeApi';
-import { readBookmarks, toggleBookmark } from '../utils/bookmarks';
+import type { AnimeWatchProviderPayload } from '../utils/animeApi';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
 
 import '@vidstack/react/player/styles/default/theme.css';
 import '@vidstack/react/player/styles/default/layouts/video.css';
-import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance, isHLSProvider } from '@vidstack/react';
+import { MediaPlayer, MediaProvider, Track, isHLSProvider } from '@vidstack/react';
+import type { MediaPlayerInstance } from '@vidstack/react';
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 /* ─── Proxy Configuration ───────────────────────────────────────── */
@@ -136,7 +146,6 @@ const DESIGN_STYLES = `
 
   .aw-noise::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E"); background-repeat: repeat; background-size: 180px; }
 
-  /* ═══ RESTORED OLD SIDEBAR CSS ═══ */
   .aw-segment-btn { transition: background 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s, filter 0.2s; }
   .aw-segment-btn:hover:not(:disabled) { transform: translateY(-1px); }
   .aw-segment-btn[data-active='false']:hover { background: rgba(255,255,255,0.08) !important; color: var(--aw-text) !important; }
@@ -244,20 +253,32 @@ interface ProgressData {
   episodeId: string;
   animeTitle: string;
   animeCover?: string | null;
-  episodeImage?: string | null;
   episodeTitle: string;
   episodeNumber: number;
   href: string;
 }
 
-interface StreamSource { url: string; type: string; quality: string; referer?: string; }
-interface StreamSubtitle { file: string; label: string; }
-interface StreamThumbnail { url?: string; file?: string; } // Depends on your API
+interface StreamSource {
+  url: string;
+  type: string;
+  quality: string;
+  referer?: string;
+}
+
+interface StreamSubtitle {
+  file: string;
+  label: string;
+}
+
+interface StreamThumbnail {
+  url?: string;
+  file?: string;
+}
 
 interface StreamData {
   streams: StreamSource[];
   subtitles?: StreamSubtitle[];
-  thumbnails?: string | StreamThumbnail[]; // <-- ADD THIS
+  thumbnails?: string | StreamThumbnail[];
   intro?: { start: number; end: number };
   outro?: { start: number; end: number };
 }
@@ -292,11 +313,13 @@ interface AnimeInfo {
 const NextAiringTimer: React.FC<{ data: any; compact?: boolean }> = ({ data, compact }) => {
   const { airingAt, airingTime, timeUntilAiring, episode } = data;
 
-  const targetTime =
-    timeUntilAiring ? Date.now() + timeUntilAiring * 1000
-      : airingAt ? airingAt * 1000
-        : airingTime ? airingTime * 1000
-          : 0;
+  const targetTime = timeUntilAiring
+    ? Date.now() + timeUntilAiring * 1000
+    : airingAt
+      ? airingAt * 1000
+      : airingTime
+        ? airingTime * 1000
+        : 0;
 
   const [timeLeft, setTimeLeft] = useState(targetTime - Date.now());
 
@@ -331,27 +354,6 @@ const NextAiringTimer: React.FC<{ data: any; compact?: boolean }> = ({ data, com
 export const createSlug = (title: string) => {
   if (!title) return '';
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-};
-
-const normalizeTitle = (title: string): string => {
-  if (!title) return '';
-  return createSlug(title);
-};
-
-const getBaseTitle = (title: string) => {
-  if (!title) return '';
-  let t = title;
-  const seasonMatch = t.match(/\b(?:Season|Part|Arc|Chapter|Cour|Act)\s*\d+\b/i);
-  if (seasonMatch && seasonMatch.index !== undefined) t = t.substring(0, seasonMatch.index);
-  const nthSeasonMatch = t.match(/\b\d+(?:st|nd|rd|th)\s+Season\b/i);
-  if (nthSeasonMatch && nthSeasonMatch.index !== undefined) t = t.substring(0, nthSeasonMatch.index);
-  const separatorMatch = t.match(/:|\s+-\s+/);
-  if (separatorMatch && separatorMatch.index !== undefined) {
-    const candidate = t.substring(0, separatorMatch.index).trim();
-    if (candidate.length > 2 || !t.includes(' - ')) t = candidate;
-    else t = t.split(' - ')[0];
-  }
-  return t.replace(/\s+(I{1,3}|IV|V|VI{0,3}|IX|X|\d+)$/i, '').trim();
 };
 
 const extractSlug = (id: string | undefined): string => {
@@ -442,7 +444,7 @@ const ShareModal: React.FC<{
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
+    } catch (e: any) {
       const ta = document.createElement('textarea');
       ta.value = shareUrl;
       document.body.appendChild(ta);
@@ -458,7 +460,7 @@ const ShareModal: React.FC<{
     if (navigator.share) {
       try {
         await navigator.share({ title: `${title} - ${episodeInfo}`, url: shareUrl });
-      } catch (e) { /* cancelled */ }
+      } catch (e: any) { /* cancelled */ }
     }
   };
 
@@ -589,13 +591,16 @@ const AnimeWatch: React.FC = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const original = MediaSource.prototype.addSourceBuffer;
-    MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
-      const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
-      if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
-      return original.call(this, fixed);
-    };
-    return () => { MediaSource.prototype.addSourceBuffer = original; };
+    if (typeof window !== 'undefined' && (window as any).MediaSource) {
+      const MS = (window as any).MediaSource;
+      const original = MS.prototype.addSourceBuffer;
+      MS.prototype.addSourceBuffer = function (this: MediaSource, mimeType: string) {
+        const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
+        if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
+        return original.call(this, fixed);
+      };
+      return () => { MS.prototype.addSourceBuffer = original; };
+    }
   }, []);
 
   const { animeId: urlSlug, provider, category, episodeId } = useParams<{
@@ -636,9 +641,7 @@ const AnimeWatch: React.FC = () => {
   const [showSkipOutro, setShowSkipOutro] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [proxifiedSources, setProxifiedSources] = useState<Record<string, string>>({});
   const [proxifiedStreamUrl, setProxifiedStreamUrl] = useState<string | null>(null);
-  const [isProxifying, setIsProxifying] = useState(false);
   const prevProxifiedUrlRef = useRef<string | null>(null);
 
   const [isSpeeding, setIsSpeeding] = useState(false);
@@ -646,14 +649,14 @@ const AnimeWatch: React.FC = () => {
   const normalSpeedRef = useRef(1);
   const wasPausedRef = useRef(false);
   const preventClickRef = useRef(false);
-  const speedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const seekIndicatorTimeout = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef(true);
+
+  const speedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekIndicatorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [videoDuration, setVideoDuration] = useState(0);
 
   const [seekIndicator, setSeekIndicator] = useState<'rewind' | 'forward' | null>(null);
   const pointerStateRef = useRef({
-    downTime: 0, downX: 0, downY: 0, lastTapTime: 0, lastTapX: 0, lastTapY: 0, clickTimeout: null as any
+    downTime: 0, downX: 0, downY: 0, lastTapTime: 0, lastTapX: 0, lastTapY: 0, clickTimeout: null as ReturnType<typeof setTimeout> | null
   });
 
   useEffect(() => { localStorage.setItem('watchAutoPlay', String(autoPlay)); }, [autoPlay]);
@@ -675,7 +678,7 @@ const AnimeWatch: React.FC = () => {
         if (data && data.episode_id === episodeId && data.progress_time > 3) {
           localStorage.setItem(`progress-${urlSlug}-${episodeId}`, data.progress_time.toString());
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn('Sync Remote Progress error:', e);
       }
     };
@@ -755,7 +758,7 @@ const AnimeWatch: React.FC = () => {
         document.title = `Watching ${titleText}${epText}`;
         setEpisodesData(epsPayload?.providers || {});
 
-      } catch (err) {
+      } catch (err: any) {
         console.error("Watch Page Load Error:", err);
         if (mounted) setEpisodesData({});
       } finally {
@@ -765,7 +768,7 @@ const AnimeWatch: React.FC = () => {
 
     loadAnimeData();
     return () => { mounted = false; };
-  }, [urlSlug]);
+  }, [urlSlug, episodeId]);
 
   useEffect(() => {
     if (loadingEpisodes || availableProviders.length === 0 || !urlSlug || provider) return;
@@ -854,7 +857,7 @@ const AnimeWatch: React.FC = () => {
                   break;
                 }
               }
-            } catch (e) { }
+            } catch (e: any) { /* silent fail for fallback search */ }
           }
         }
       } catch (err: any) {
@@ -868,7 +871,7 @@ const AnimeWatch: React.FC = () => {
     };
     load();
     return () => { mounted = false; };
-  }, [currentEpData?.id, resolvedId, currentProvider, currentCategory, episodeId]);
+  }, [currentEpData?.id, resolvedId, currentProvider, currentCategory, episodeId, episodesData]);
 
   const [selectedStreamIndex, setSelectedStreamIndex] = useState<number>(-1);
 
@@ -926,30 +929,25 @@ const AnimeWatch: React.FC = () => {
         URL.revokeObjectURL(prevProxifiedUrlRef.current);
         prevProxifiedUrlRef.current = null;
       }
-      setIsProxifying(false);
       setProxifiedStreamUrl(null);
       return;
     }
 
-    setIsProxifying(true);
     try {
       const b64 = btoa(activeStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-      const url = `https://proxypipe-production.up.railway.app/proxy/${b64}`;
+      const url = `${WORKER_PROXY_URL}proxy/${b64}`;
       if (mounted) {
         if (prevProxifiedUrlRef.current) {
           URL.revokeObjectURL(prevProxifiedUrlRef.current);
         }
         prevProxifiedUrlRef.current = url;
-        setProxifiedSources({ proxypipe: url });
         setProxifiedStreamUrl(url);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Failed to encode stream URL for proxy:', e);
       if (mounted) {
         setProxifiedStreamUrl(null);
       }
-    } finally {
-      if (mounted) setIsProxifying(false);
     }
     return () => {
       mounted = false;
@@ -966,6 +964,7 @@ const AnimeWatch: React.FC = () => {
   const displayTitle = derivedTitle || (!/^\d+$/.test(String(urlSlug)) ? String(urlSlug).replace(/-/g, ' ') : 'Anime Details');
   const displayTitleWithEpisode = currentEpData?.number ? `${displayTitle}` : displayTitle;
 
+  // Track progress specific refs EXACTLY like the working old version
   const progressDataRef = useRef<ProgressData | null>(null);
   const playingEpisodeRef = useRef<string>('');
   const videoStateRef = useRef({ episodeId: '', currentTime: 0, duration: 0 });
@@ -975,8 +974,7 @@ const AnimeWatch: React.FC = () => {
   useEffect(() => {
     setIsVideoReady(false);
     setVideoDuration(0);
-    // ✅ Fix: Properly assign the current episodeId
-    videoStateRef.current = { episodeId: episodeId || '', currentTime: 0, duration: 0 };
+    videoStateRef.current = { episodeId: '', currentTime: 0, duration: 0 };
     lastSavedTime.current = -1;
     if (streamData && episodeId) { playingEpisodeRef.current = episodeId; }
   }, [episodeId, streamData]);
@@ -984,7 +982,6 @@ const AnimeWatch: React.FC = () => {
   progressDataRef.current = {
     animeId: String(resolvedId || urlSlug), episodeId: episodeId || '', animeTitle: displayTitle,
     animeCover: animeInfo?.image || animeInfo?.coverImage?.large || animeInfo?.images?.jpg?.large_image_url || undefined,
-    episodeImage: currentEpData?.image || null,
     episodeTitle: currentEpData?.title || `Episode ${currentEpData?.number || '?'}`,
     episodeNumber: currentEpData?.number || 0,
     href: (episodeId && urlSlug) ? getEpisodeHref(urlSlug, currentProvider, currentCategory, episodeId) : ''
@@ -1009,6 +1006,7 @@ const AnimeWatch: React.FC = () => {
     const safeDuration = (Number.isFinite(duration) && duration > 0) ? duration : 0;
     const safeTime = (Number.isFinite(currentTime) && currentTime > 0) ? currentTime : 0;
 
+    // DO NOT SAVE IF TOO CLOSE TO THE END (100% completed videos drop out of continue watching)
     if (safeDuration > 0 && (safeTime > safeDuration - 15 || safeTime > safeDuration * 0.95)) {
       return;
     }
@@ -1019,7 +1017,7 @@ const AnimeWatch: React.FC = () => {
       if (user) {
         const { error } = await supabase.from('anime_watch_history').upsert({
           user_id: user.id, anime_id: String(payload.animeId), episode_id: String(payload.episodeId),
-          anime_title: payload.animeTitle, anime_cover: payload.animeCover, episode_image: payload.episodeImage || null, episode_title: payload.episodeTitle,
+          anime_title: payload.animeTitle, anime_cover: payload.animeCover, episode_title: payload.episodeTitle,
           episode_number: payload.episodeNumber, href: payload.href, duration: safeDuration,
           progress_time: safeTime, updated_at: new Date().toISOString()
         }, { onConflict: 'user_id, anime_id' });
@@ -1036,7 +1034,7 @@ const AnimeWatch: React.FC = () => {
       filtered.unshift({ kind: 'anime', ...payload, duration: safeDuration, currentTime: safeTime, updatedAt: Date.now() });
       localStorage.setItem('anime-continue-watching', JSON.stringify(filtered.slice(0, 40)));
       window.dispatchEvent(new Event('storage'));
-    } catch (e) { console.warn('Failed to save progress', e); }
+    } catch (e: any) { console.warn('Failed to save progress', e); }
   }, [user]);
 
   useEffect(() => {
@@ -1054,9 +1052,7 @@ const AnimeWatch: React.FC = () => {
   }, [forceSaveProgress]);
 
   useEffect(() => {
-    isMountedRef.current = true;
     return () => {
-      isMountedRef.current = false;
       if (speedTimeoutRef.current) { clearTimeout(speedTimeoutRef.current); speedTimeoutRef.current = null; }
       if (seekIndicatorTimeout.current) { clearTimeout(seekIndicatorTimeout.current); seekIndicatorTimeout.current = null; }
       if (prevProxifiedUrlRef.current) {
@@ -1223,11 +1219,6 @@ const AnimeWatch: React.FC = () => {
   }, [activeStream, forceSaveProgress]);
 
   const handleTimeUpdate = useCallback(({ currentTime, duration }: { currentTime: number, duration: number }) => {
-    // ✅ Fix: Ensure the episodeId matches inside the reference on each tick
-    if (episodeId && videoStateRef.current.episodeId !== episodeId) {
-      videoStateRef.current.episodeId = episodeId;
-    }
-
     videoStateRef.current.currentTime = currentTime;
     if (duration > 0) videoStateRef.current.duration = duration;
 
@@ -1242,7 +1233,7 @@ const AnimeWatch: React.FC = () => {
       const isWithinOutro = currentTime >= start && currentTime < end;
       if (isWithinOutro) { if (autoSkip) skipTo(end); else setShowSkipOutro(true); } else setShowSkipOutro(false);
     }
-  }, [streamData, autoSkip, episodeId]); // <-- episodeId added to deps
+  }, [streamData, autoSkip]);
 
   const skipTo = (t: number) => {
     if (playerRef.current) {
@@ -1415,7 +1406,11 @@ const AnimeWatch: React.FC = () => {
                 onTimeUpdate={(e: number | { detail?: { currentTime?: number }; currentTime?: number }) => {
                   const time = typeof e === 'number' ? e : e?.detail?.currentTime || e?.currentTime || 0;
                   const duration = playerRef.current?.state?.duration || videoStateRef.current.duration || 0;
-                  if (duration > 0 && videoDuration === 0) setVideoDuration(duration);
+            
+                  if (duration > 0 && videoDuration === 0) {
+                    setVideoDuration(duration);
+                  }
+            
                   handleTimeUpdate({ currentTime: time, duration });
                 }}
                 onEnded={handleVideoEnd}
@@ -1424,7 +1419,7 @@ const AnimeWatch: React.FC = () => {
                   if (!playerRef.current) return;
                   const epId = progressDataRef.current?.episodeId || episodeId;
                   const aId = progressDataRef.current?.animeId || urlSlug;
-                  if (autoPlay && playerRef.current.paused) playerRef.current.play().catch(() => { });
+                  if (autoPlay && playerRef.current.state?.paused) playerRef.current.play().catch(() => { });
 
                   if (!epId || !aId) return;
                   const savedTimeRaw = localStorage.getItem(`progress-${aId}-${epId}`);
@@ -1449,9 +1444,9 @@ const AnimeWatch: React.FC = () => {
 
                   {/* 2. Seek Bar Thumbnails */}
                   {/* We look for a subtitle track labeled 'thumbnails' */}
-                  {streamData?.subtitles?.find(s => s.label?.toLowerCase() === 'thumbnails' || (s as any).kind === 'thumbnails') && (
+                  {streamData?.subtitles?.find((s: any) => s.label?.toLowerCase() === 'thumbnails' || s.kind === 'thumbnails') && (
                     <Track
-                      src={streamData.subtitles.find(s => s.label?.toLowerCase() === 'thumbnails' || (s as any).kind === 'thumbnails')!.file}
+                      src={streamData.subtitles.find((s: any) => s.label?.toLowerCase() === 'thumbnails' || s.kind === 'thumbnails')!.file}
                       kind="thumbnails"
                       label="Thumbnails"
                       default
@@ -1460,8 +1455,8 @@ const AnimeWatch: React.FC = () => {
 
                   {/* 3. Actual Subtitles (Filtering OUT the thumbnail track) */}
                   {streamData?.subtitles
-                    ?.filter(sub => sub.label?.toLowerCase() !== 'thumbnails' && (sub as any).kind !== 'thumbnails')
-                    .map((sub, i) => (
+                    ?.filter((sub: any) => sub.label?.toLowerCase() !== 'thumbnails' && sub.kind !== 'thumbnails')
+                    .map((sub: any, i: number) => (
                       <Track
                         key={sub.file || String(i)}
                         src={sub.file}
@@ -1752,7 +1747,7 @@ const AnimeWatch: React.FC = () => {
                     {isActive && <div className="ep-active-marker" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, height: '100%', background: 'linear-gradient(180deg, var(--aw-accent), var(--aw-accent-2))', borderRadius: '0 2px 2px 0' }} />}
                     <div className={`ep-number ${isActive ? '' : ''}`} style={{ width: 28, height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontFamily: 'var(--aw-font-display)', fontWeight: isActive ? 700 : 500, color: isActive ? 'var(--aw-accent)' : 'rgba(255,255,255,0.25)', transition: 'color 0.2s' }}>{ep.number || '–'}</div>
                     <div style={{ width: 110, height: 64, flexShrink: 0, borderRadius: 8, overflow: 'hidden', background: 'var(--aw-card)', boxShadow: isActive ? '0 0 0 1.5px var(--aw-accent)' : '0 0 0 1px rgba(255,255,255,0.06)', position: 'relative' }}>
-                      <img src={ep.image || 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'} alt="" className="ep-thumb" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isActive ? 1 : 0.75 }} onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'; }} />
+                      <img src={ep.image || 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'} alt="" className="ep-thumb" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: isActive ? 1 : 0.75 }} onError={(e: any) => { e.currentTarget.src = 'https://via.placeholder.com/128x72/0d0d1a/3f3f56?text=–'; }} />
                       {ep.filler && <div style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.8)', fontSize: 9, fontFamily: 'var(--aw-font-display)', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.7)', padding: '2px 5px', borderRadius: 3, textTransform: 'uppercase' }}>Filler</div>}
                     </div>
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: 64 }}>
@@ -1779,4 +1774,5 @@ const AnimeWatch: React.FC = () => {
 };
 
 export default AnimeWatch;
+
 /* ─── END OF FILE AnimeWatchPage.tsx ────────────────────────────── */
