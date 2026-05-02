@@ -63,12 +63,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     if (user && internalOpen) handleClose();
   }, [user, internalOpen]);
 
-  // Handle ESC key
+  // Handle ESC key and Title
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape' && internalOpen) handleClose(); };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [internalOpen]);
+    if (internalOpen) {
+      const prevTitle = document.title;
+      document.title = mode === 'login' ? 'Sign In' : 'Sign Up';
+      const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape' && internalOpen) handleClose(); };
+      window.addEventListener('keydown', handleEsc);
+      return () => {
+        window.removeEventListener('keydown', handleEsc);
+        document.title = prevTitle;
+      };
+    }
+  }, [internalOpen, mode]);
 
   const handleClose = () => {
     setInternalOpen(false);

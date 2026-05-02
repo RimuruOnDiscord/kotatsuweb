@@ -2,19 +2,24 @@
 
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Star, MonitorPlay, Search, X, BookOpen, BadgeCheck, Flame, StepForward, ChevronRight, ChevronDown, SlidersHorizontal, Bookmark, BookmarkCheck } from 'lucide-react';
-import { motion } from 'framer-motion';
-import AppTopbar from '../components/AppTopbar';
+import { Play, Star, MonitorPlay, ChevronRight, ChevronLeft, Bookmark, BookmarkCheck, MoreVertical, Trash2, RotateCcw, User, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AnimeResult,
   fetchAnimePopular,
   fetchAnimeSpotlight,
   fetchAnimeInfo,
+  fetchAnimeEpisodes,
+  fetchAnimeStreams,
+  getEpisodeSlug,
   getAnimeCover,
   getAnimeDisplayTitle,
   getAnimeScore,
   getAnimeTypeLabel,
 } from '../utils/animeApi';
+import { MediaPlayer, MediaProvider, isHLSProvider, type MediaPlayerInstance } from '@vidstack/react';
+import '@vidstack/react/player/styles/default/theme.css';
+import '@vidstack/react/player/styles/default/layouts/video.css';
 import { handleRippleMouseDown } from '../utils/ripple';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -73,148 +78,32 @@ const DESIGN_STYLES = `
   .aw-scroll::-webkit-scrollbar-thumb { background: var(--aw-accent-dim); border-radius: 2px; }
   .aw-scroll::-webkit-scrollbar-thumb:hover { background: var(--aw-accent); }
 
-  /* Info section label */
-  .aw-label {
-    font-family: var(--aw-font-display);
-    font-size: 10px;
-    letter-spacing: 0.18em;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--aw-accent);
-  }
-
   /* Premium Horizontal Card Styles */
   .aw-media-card {
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transform-origin: center;
-    will-change: transform, box-shadow, border-color;
+    will-change: transform;
   }
   
   .aw-media-card:hover {
-    transform: translateY(-6px) scale(1.02);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6);
-    background: color-mix(in srgb, var(--aw-accent), transparent 92%);
+    transform: translateY(-4px);
+    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .aw-media-card:active {
-    transform: scale(0.96);
-    filter: brightness(0.8);
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: scale(0.97);
+    transition: all 0.12s ease;
   }
 
-  /* Noise overlay */
-  .aw-noise::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-    opacity: 0.025;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
-    background-repeat: repeat;
-    background-size: 180px;
-  }
-
-  /* Quick Filter Styles */
-  .qf-section {
-    padding: 20px 24px;
-    background: var(--aw-s1);
-    border-radius: 16px;
-    border: 1px solid var(--aw-border);
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .qf-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 10px;
-  }
-  @media (min-width: 640px) {
-    .qf-grid {
-      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-    }
-  }
-  .qf-select-wrap {
-    position: relative;
-  }
-  .qf-select-wrap .qf-chevron {
-    position: absolute;
-    right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--aw-muted);
-    opacity: 0.5;
-    transition: opacity 0.2s;
-  }
-  .qf-select-wrap:hover .qf-chevron {
-    opacity: 0.8;
-  }
-  .qf-select {
-    width: 100%;
-    height: 40px;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid var(--aw-border);
-    background: var(--aw-s2);
-    color: var(--aw-muted);
-    font-family: var(--aw-font-display);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    cursor: pointer;
-    outline: none;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .qf-select:hover {
-    border-color: var(--aw-accent-dim);
-    background: color-mix(in srgb, var(--aw-accent), transparent 94%);
-    color: white;
-  }
-.qf-filter-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    height: 40px;
-    border-radius: 10px;
-    border: 1px solid var(--aw-accent-dim);
-    background: color-mix(in srgb, var(--aw-accent), transparent 94%);
-    color: white;
-    font-family: var(--aw-font-display);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-  }
-  .qf-filter-btn:hover {
-    background: color-mix(in srgb, var(--aw-accent), transparent 88%);
-    transform: translateY(-1px);
-  }
-  .qf-filter-btn:active {
-    transform: translateY(0) scale(0.98);
-  }
-
-  .qf-dropdown-glass {
-    background-color: color-mix(in srgb, var(--aw-accent), #09090e 92%);
-    background-image: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 100%);
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 24px 60px -10px rgba(0,0,0,0.95);
-  }
-
-  @keyframes qf-pop {
-    0% { opacity: 0; transform: translateY(10px) scale(0.95); }
+  /* Context Menu */
+  @keyframes ctx-menu-in {
+    0% { opacity: 0; transform: translateY(6px) scale(0.96); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
-  .qf-animate-pop {
-    animation: qf-pop 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  .ctx-menu {
+    animation: ctx-menu-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    transform-origin: bottom right;
   }
 `;
 
@@ -226,6 +115,19 @@ const formatTime = (secs: number) => {
   const s = Math.floor(secs % 60);
   if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
+// Time Ago Helper
+const timeAgo = (dateStr: string) => {
+  const diff = Math.max(0, Date.now() - new Date(dateStr).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 };
 
 // Safe helper to extract nested object data without rendering [object Object]
@@ -265,6 +167,21 @@ export interface ContinueWatchingEntry {
   updatedAt: number;
 }
 
+export interface FriendActivityData {
+  id: string;
+  display_name: string;
+  avatar_url: string;
+  isOnline: boolean;
+  statusType: string;
+  statusText: string;
+  lastActivity?: {
+    animeTitle: string;
+    episodeNumber: number;
+    timestamp: string;
+    image?: string;
+  };
+}
+
 // ─────────────────────────────────────────
 // FRAMER MOTION VARIANTS
 // ─────────────────────────────────────────
@@ -285,7 +202,7 @@ const itemVariants = {
 };
 
 // ─────────────────────────────────────────
-// PREMIUM SECTION HEADER
+// SECTION HEADER
 // ─────────────────────────────────────────
 interface SectionHeaderProps {
   title: string;
@@ -294,194 +211,476 @@ interface SectionHeaderProps {
 }
 
 const SectionHeader: React.FC<SectionHeaderProps> = ({ title, subtitle, onViewMore }) => (
-  <div className="flex w-full items-end justify-between" style={{ marginBottom: 4 }}>
-    <div>
+  <div className="flex w-full items-baseline justify-between mb-2 mt-2">
+    <div className="flex items-baseline gap-3">
+      <h2 className="text-[20px] sm:text-[24px] font-bold tracking-tight text-white" style={{ fontFamily: 'var(--aw-font-display)' }}>
+        {title}
+      </h2>
       {subtitle && (
-        <p className="aw-label" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <p className="hidden sm:block text-[11px] font-medium text-zinc-500" style={{ fontFamily: 'var(--aw-font-body)' }}>
           {subtitle}
         </p>
       )}
-      <h2 style={{
-        fontFamily: 'var(--aw-font-display)',
-        fontSize: 'clamp(20px, 3vw, 24px)',
-        fontWeight: 700,
-        color: 'var(--aw-text)',
-        letterSpacing: '-0.01em',
-        lineHeight: 1.4,
-        margin: 1,
-        paddingBottom: 4,
-      }}>
-        {title}
-      </h2>
     </div>
     {onViewMore && (
       <button
         onClick={onViewMore}
-        className="group flex items-center gap-1 pb-1 text-[11px] sm:text-[12px] font-bold uppercase tracking-wider text-zinc-400 hover:text-[var(--aw-accent)] transition-colors"
-        style={{ fontFamily: 'var(--aw-font-display)' }}
+        className="group flex items-center gap-1 text-[12px] font-medium text-zinc-500 hover:text-white transition-colors"
+        style={{ fontFamily: 'var(--aw-font-body)' }}
       >
-        <span>View More</span>
-        <ChevronRight size={14} className="transition-transform duration-300 group-hover:translate-x-1" />
+        <span>See all</span>
+        <ChevronRight size={14} className="transition-transform duration-200 group-hover:translate-x-0.5" />
       </button>
     )}
   </div>
 );
 
 // ─────────────────────────────────────────
-// PREMIUM HORIZONTAL MEDIA CARD
+// VERTICAL CINEMATIC POSTER CARD
 // ─────────────────────────────────────────
 interface MediaCardProps {
   title: string;
   image: string;
   subtitle?: string;
   badge?: string;
-  score?: number | null;
-  progress?: number;
-  timestamp?: string;
   onClick: () => void;
-  onClear?: () => void;
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({
-  title,
-  image,
-  subtitle,
-  badge,
-  score,
-  progress,
-  timestamp,
-  onClick,
-  onClear,
-}) => {
-  const clampedProgress = progress !== undefined ? Math.max(2, Math.min(100, progress)) : undefined;
-
+const MediaCard: React.FC<MediaCardProps> = ({ title, image, subtitle, onClick }) => {
   return (
     <div
-      className="aw-media-card group relative flex h-[135px] w-full cursor-pointer gap-4 overflow-hidden rounded-[20px] border border-white/5 bg-[color-mix(in_srgb,var(--aw-accent),transparent_97%)] p-3 select-none"
+      className="aw-media-card group relative flex flex-col w-[160px] sm:w-[175px] md:w-[190px] lg:w-[200px] flex-shrink-0 cursor-pointer select-none snap-start rounded-[16px] p-2 bg-transparent border border-transparent"
       onClick={onClick}
     >
-      {/* Image Container (Left) */}
-      <div className="relative aspect-[3/4] w-[80px] sm:w-[90px] flex-shrink-0 overflow-hidden rounded-xl bg-white/[0.02]">
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[12px] bg-[var(--aw-s2)] border border-white/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
         <img
           src={image}
           alt={title}
-          className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] opacity-95 group-hover:opacity-100 group-hover:scale-110 pointer-events-none"
+          className="h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.05] pointer-events-none"
         />
-
-        {/* Play Button Overlay */}
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-all duration-300 pointer-events-none group-hover:opacity-100">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--aw-accent)] text-[#04110d] shadow-[0_0_20px_rgba(var(--aw-accent-glow),0.5)] transform scale-75 group-hover:scale-100 transition-transform duration-500 ease-out">
-            <Play size={20} className="ml-1" fill="currentColor" />
-          </div>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--aw-accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_0_8px_var(--aw-accent-glow)]" />
       </div>
 
-      {/* Content Container (Right) - Using justify-center removes massive gaps and stacks elements tightly */}
-      <div className="relative flex min-w-0 flex-1 flex-col justify-center py-1.5 pr-5">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          {badge && (
-            <span className="rounded-md bg-white/[0.06] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-widest text-[var(--aw-accent)] border border-white/5 shadow-sm" style={{ fontFamily: 'var(--aw-font-display)' }}>
-              {badge}
-            </span>
-          )}
-        </div>
-
-        <h3 className="line-clamp-2 text-[14px] sm:text-[15px] font-bold leading-tight text-white/95 group-hover:text-white transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
+      <div className="pt-2.5 px-0.5 h-[48px] flex flex-col justify-start gap-0.5">
+        <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-white/85 group-hover:text-white transition-colors" style={{ fontFamily: 'var(--aw-font-body)' }}>
           {title}
         </h3>
-        
-        {(subtitle || timestamp) && (
-          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            {subtitle && (
-              <p className="flex items-center gap-2 text-[12px] font-medium text-zinc-400 line-clamp-1" style={{ fontFamily: 'var(--aw-font-body)' }}>
-                {subtitle}
-              </p>
-            )}
-            {timestamp && (
-              <span className="text-[10px] font-bold text-zinc-500 whitespace-nowrap ml-auto" style={{ fontFamily: 'var(--aw-font-body)' }}>
-                {timestamp}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Progress Rail tightly packed below */}
-        {clampedProgress !== undefined && (
-          <div className="mt-2 w-full">
-            <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden border border-white/5">
-              <div
-                className="h-full rounded-full bg-[var(--aw-accent)] shadow-[0_0_10px_var(--aw-accent-glow)] transition-all duration-500"
-                style={{ width: `${clampedProgress}%` }}
-              />
-            </div>
-          </div>
+        {subtitle && (
+          <p className="text-[10.5px] font-medium text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors" style={{ fontFamily: 'var(--aw-font-body)' }}>
+            {subtitle}
+          </p>
         )}
       </div>
+    </div>
+  );
+};
 
-      {/* Clear Button - Fixed relative to the entire card */}
-      {onClear && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onClear(); }}
-          className="absolute top-3 right-3 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white/50 opacity-0 transition-all duration-300 hover:bg-red-500 hover:text-white group-hover:opacity-100 border border-white/10 backdrop-blur-sm pointer-events-auto"
-        >
-          <X size={14} strokeWidth={2.5} />
-        </button>
+// ─────────────────────────────────────────
+// TRUE STATUS: FRIENDS ACTIVITY CARD
+// ─────────────────────────────────────────
+const FriendCard: React.FC<{ friend: FriendActivityData; onClick: () => void }> = ({ friend, onClick }) => {
+  const { display_name, avatar_url, isOnline, statusType, statusText, lastActivity } = friend;
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div
+      onClick={onClick}
+      className="group relative flex w-[250px] sm:w-[270px] flex-shrink-0 cursor-pointer items-center gap-3.5 rounded-[16px] border border-transparent bg-white/[0.02] p-3.5 transition-all duration-300 hover:-translate-y-1 hover:bg-[color-mix(in_srgb,var(--app-accent)_5%,transparent)] hover:border-[var(--app-accent)] hover:shadow-[0_12px_30px_rgba(0,0,0,0.4),0_8px_20px_color-mix(in_srgb,var(--app-accent)_15%,transparent)] active:scale-[0.97] snap-start"
+    >
+      {/* Background image if active (faded heavily) */}
+      {lastActivity?.image && (
+        <div className="absolute inset-0 z-0 opacity-[0.02] group-hover:opacity-[0.06] transition-opacity duration-300 pointer-events-none rounded-[inherit] overflow-hidden">
+          <img src={lastActivity.image} className="w-full h-full object-cover blur-sm" alt="" />
+        </div>
       )}
+
+      {/* Avatar Container */}
+      <div className="relative z-10 w-[46px] h-[46px] flex-shrink-0">
+        <div className="w-full h-full rounded-full border border-white/10 group-hover:border-[var(--app-accent)] transition-colors duration-300 bg-[#1a1a1c] overflow-hidden shadow-sm">
+          {(!avatar_url || imgError) ? (
+            <div className="w-full h-full flex items-center justify-center text-zinc-500 bg-[#111]">
+              <User size={18} strokeWidth={2} />
+            </div>
+          ) : (
+            <img src={avatar_url} className="w-full h-full object-cover" alt={display_name} onError={() => setImgError(true)} />
+          )}
+        </div>
+        {/* Status Dot positioned just outside the overflow-hidden avatar */}
+        <div
+          className={`absolute bottom-0 right-0 translate-x-[15%] translate-y-[15%] h-3.5 w-3.5 rounded-full border-[2.5px] border-[#0e0e11] group-hover:border-[#13151a] transition-colors duration-300 z-20 ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-zinc-600'}`}
+        />
+      </div>
+
+      {/* True Status Info Container */}
+      <div className="relative z-10 flex flex-col min-w-0 flex-1 justify-center leading-tight">
+        <span className="text-[14px] font-bold text-white truncate group-hover:text-[var(--app-accent)] transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
+          {display_name}
+        </span>
+
+        {isOnline ? (
+          <div className="flex flex-col mt-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+              {statusType === 'watching' ? 'Watching' : 'Online'}
+            </span>
+            <span className="text-[12px] text-zinc-300 truncate font-medium mt-0.5">
+              {statusText || 'Browsing Kotatsu'}
+            </span>
+          </div>
+        ) : lastActivity ? (
+          <div className="flex flex-col mt-0.5">
+            <span className="text-[11px] text-zinc-400 truncate group-hover:text-zinc-300 transition-colors">Watched {lastActivity.animeTitle}</span>
+            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-wide mt-0.5 group-hover:text-zinc-500 transition-colors">{timeAgo(lastActivity.timestamp)}</span>
+          </div>
+        ) : (
+          <span className="text-[12px] text-zinc-500 mt-0.5 font-medium">Offline</span>
+        )}
+      </div>
     </div>
   );
 };
 
 
 // ─────────────────────────────────────────
-// QUICK FILTER OPTIONS
+// NETFLIX-STYLE CONTINUE WATCHING CARD
 // ─────────────────────────────────────────
-const QF_GENRE_OPTIONS = [
-  { value: '', label: 'All' }, { value: 'Action', label: 'Action' }, { value: 'Adventure', label: 'Adventure' }, { value: 'Comedy', label: 'Comedy' },
-  { value: 'Drama', label: 'Drama' }, { value: 'Fantasy', label: 'Fantasy' }, { value: 'Horror', label: 'Horror' }, { value: 'Mecha', label: 'Mecha' },
-  { value: 'Music', label: 'Music' }, { value: 'Mystery', label: 'Mystery' }, { value: 'Psychological', label: 'Psychological' }, { value: 'Romance', label: 'Romance' },
-  { value: 'Sci-Fi', label: 'Sci-Fi' }, { value: 'Slice of Life', label: 'Slice of Life' }, { value: 'Sports', label: 'Sports' }, { value: 'Supernatural', label: 'Supernatural' },
-  { value: 'Thriller', label: 'Thriller' },
-];
-const QF_THEME_OPTIONS = [
-  { value: '', label: 'All' }, { value: 'Isekai', label: 'Isekai' }, { value: 'Reincarnation', label: 'Reincarnation' }, { value: 'School', label: 'School' },
-  { value: 'Military', label: 'Military' }, { value: 'Martial Arts', label: 'Martial Arts' }, { value: 'Super Power', label: 'Super Power' }, { value: 'Vampire', label: 'Vampire' },
-  { value: 'Demons', label: 'Demons' }, { value: 'Historical', label: 'Historical' }, { value: 'Space', label: 'Space' }, { value: 'Survival', label: 'Survival' },
-];
-const QF_COUNTRY_OPTIONS = [ { value: '', label: 'All' }, { value: 'JP', label: 'Japan' }, { value: 'KR', label: 'South Korea' }, { value: 'CN', label: 'China' } ];
-const QF_SEASON_OPTIONS = [ { value: '', label: 'All' }, { value: 'WINTER', label: 'Winter' }, { value: 'SPRING', label: 'Spring' }, { value: 'SUMMER', label: 'Summer' }, { value: 'FALL', label: 'Fall' } ];
-const QF_YEAR_OPTIONS = (() => { const opts = [{ value: '', label: 'All' }]; for (let y = new Date().getFullYear(); y >= 1990; y--) opts.push({ value: String(y), label: String(y) }); return opts; })();
-const QF_TYPE_OPTIONS = [ { value: '', label: 'All' }, { value: 'TV', label: 'TV' }, { value: 'MOVIE', label: 'Movie' }, { value: 'OVA', label: 'OVA' }, { value: 'ONA', label: 'ONA' }, { value: 'SPECIAL', label: 'Special' }, { value: 'MUSIC', label: 'Music' } ];
-const QF_STATUS_OPTIONS = [ { value: '', label: 'All' }, { value: 'RELEASING', label: 'Releasing' }, { value: 'FINISHED', label: 'Finished' }, { value: 'HIATUS', label: 'Hiatus' }, { value: 'CANCELLED', label: 'Cancelled' }, { value: 'NOT_YET_RELEASED', label: 'Upcoming' } ];
-const QF_LANGUAGE_OPTIONS = [ { value: '', label: 'All' }, { value: 'sub', label: 'Sub' }, { value: 'dub', label: 'Dub' } ];
-const QF_SORT_OPTIONS = [ { value: '', label: 'Default' }, { value: 'POPULARITY_DESC', label: 'Popular' }, { value: 'START_DATE_DESC', label: 'Newest' }, { value: 'START_DATE', label: 'Oldest' } ];
+const ContinueWatchingCard: React.FC<{ entry: any; onClick: () => void; onClear: () => void }> = ({ entry, onClick, onClear }) => {
+  const progressNum = entry.currentTime && entry.duration ? (entry.currentTime / entry.duration) * 100 : Math.floor(Math.random() * 60) + 20;
 
-interface QFSelectProps { id: string; label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void; activeId: string | null; setActiveId: (id: string | null) => void; }
-const QFSelect: React.FC<QFSelectProps> = ({ id, label, value, options, onChange, activeId, setActiveId }) => {
-  const isOpen = activeId === id;
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [directUrl, setDirectUrl] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<MediaPlayerInstance>(null);
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => { if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) { if (isOpen) setActiveId(null); } };
+    if (!menuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, setActiveId]);
-  const displayLabel = options.find(o => o.value === value)?.label || 'All';
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!isHovered) setIsVideoReady(false);
+  }, [isHovered]);
+
+  useEffect(() => {
+    let mounted = true;
+    let timer: NodeJS.Timeout;
+
+    if (isHovered && !streamUrl) {
+      timer = setTimeout(async () => {
+        try {
+          const epsRes = await fetchAnimeEpisodes(Number(entry.animeId));
+          if (!mounted) return;
+
+          let foundProvider = null;
+          let foundCategory = null;
+          let slug = '';
+
+          if (epsRes?.providers) {
+            const PREFERRED_SERVERS = ['kiwi', 'animepahe', 'hd-1', 'vidstreaming', 'megacloud', 'hd-2', 'zoro', 'gogoanime', 'kai'];
+            const sortedProviders = Object.keys(epsRes.providers).sort((a, b) => {
+              const aIdx = PREFERRED_SERVERS.findIndex(p => a.toLowerCase().includes(p));
+              const bIdx = PREFERRED_SERVERS.findIndex(p => b.toLowerCase().includes(p));
+              if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+              if (aIdx !== -1) return -1;
+              if (bIdx !== -1) return 1;
+              return 0;
+            });
+
+            for (const pName of sortedProviders) {
+              const pData = epsRes.providers[pName];
+              for (const cat of ['sub', 'dub'] as const) {
+                const eps = (pData as any).episodes?.[cat] || [];
+                const match = eps.find((e: any) => e.number === entry.episodeNumber || String(e.id) === String(entry.episodeId));
+                if (match) {
+                  foundProvider = pName;
+                  foundCategory = cat;
+                  slug = getEpisodeSlug(match.id);
+                  break;
+                }
+              }
+              if (foundProvider) break;
+            }
+          }
+
+          if (foundProvider && foundCategory && slug) {
+            const streamsRes = await fetchAnimeStreams(foundProvider.toLowerCase(), entry.animeId, foundCategory, slug);
+            if (mounted && streamsRes?.streams?.length > 0) {
+              const hlsStreams = streamsRes.streams.filter((s: any) => s.type === 'hls' || s.url?.includes('.m3u8'));
+
+              if (hlsStreams.length > 0) {
+                const getQualityScore = (q: string) => {
+                  const lq = (q || '').toLowerCase();
+                  if (lq.includes('auto')) return 9999;
+                  if (lq.includes('default')) return 9000;
+                  if (lq.includes('1080')) return 1080;
+                  if (lq.includes('720')) return 720;
+                  if (lq.includes('480')) return 480;
+                  if (lq.includes('360')) return 360;
+                  return parseInt(lq) || 0;
+                };
+
+                const bestStream = [...hlsStreams].sort((a, b) => getQualityScore(b.quality) - getQualityScore(a.quality))[0];
+
+                const b64 = btoa(bestStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+                const proxied = `https://proxypipe-production.up.railway.app/proxy/${b64}`;
+                setDirectUrl(bestStream.url);
+                setStreamUrl(proxied);
+              }
+            }
+          }
+        } catch (e) { console.error("Failed to fetch preview stream", e); }
+      }, 600);
+    }
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [isHovered, entry.animeId, entry.episodeId, entry.episodeNumber, streamUrl]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchThumbnail = async () => {
+      try {
+        const epsRes = await fetchAnimeEpisodes(Number(entry.animeId));
+        if (!mounted) return;
+
+        let foundImage = null;
+        if (epsRes?.providers) {
+          for (const p of Object.values(epsRes.providers)) {
+            const eps = (p as any).episodes?.sub || [];
+            const match = eps.find((e: any) => e.number === entry.episodeNumber || String(e.id) === String(entry.episodeId));
+            if (match?.image && !match.image.includes('default')) {
+              foundImage = match.image;
+              break;
+            }
+          }
+        }
+
+        if (foundImage) {
+          setThumbnail(foundImage);
+          return;
+        }
+
+        const info = await fetchAnimeInfo(Number(entry.animeId));
+        if (mounted && info?.bannerImage) {
+          setThumbnail(info.bannerImage);
+        }
+      } catch (e) { }
+    };
+    fetchThumbnail();
+    return () => { mounted = false; };
+  }, [entry.animeId, entry.episodeNumber, entry.episodeId]);
+
+  const imageSrc = thumbnail || entry.episodeImage || entry.animeBanner || entry.animeCover;
+  const timestampStr = entry.currentTime && entry.duration ? `${formatTime(entry.currentTime)} / ${formatTime(entry.duration)}` : '';
+
   return (
-    <div className="flex flex-col gap-1 relative" ref={dropdownRef}>
-      <span style={{ fontFamily: 'var(--aw-font-display)', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--aw-muted)', opacity: 0.6 }}>{label}</span>
-      <div className="qf-select-wrap">
-        <button type="button" onClick={() => setActiveId(isOpen ? null : id)} className={`qf-select flex items-center justify-between text-left transition-all duration-300 ${isOpen ? 'border-[var(--aw-accent-dim)] bg-white/5' : ''}`}>
-          <span className="truncate">{displayLabel}</span>
-          <ChevronDown size={12} className={`transition-transform duration-300 ${isOpen ? 'rotate-180 text-[var(--aw-accent)]' : 'opacity-50'}`} />
-        </button>
-        {isOpen && (
-          <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[100] max-h-[220px] overflow-y-auto rounded-xl border border-white/10 p-1.5 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full qf-animate-pop qf-dropdown-glass">
-            {options.map(o => (
-              <button key={o.value} onClick={() => { onChange(o.value); setActiveId(null); }} className={`w-full px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all ${value === o.value ? 'bg-[var(--aw-accent)] text-[#04110d]' : 'text-zinc-400 hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_85%)] hover:text-white'}`}>
-                {o.label}
-              </button>
-            ))}
+    <div
+      className="group relative flex flex-col w-[260px] sm:w-[280px] md:w-[320px] lg:w-[340px] xl:w-[360px] flex-shrink-0 cursor-pointer gap-0 rounded-[20px] p-2.5 bg-transparent border border-transparent transition-all duration-300 hover:bg-white/[0.03] hover:border-white/[0.05] hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] snap-start"
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="relative w-full aspect-[16/9] overflow-hidden rounded-[14px] border border-white/10 bg-[var(--aw-s2)] shadow-md transition-transform duration-300 group-hover:scale-[1.02]">
+
+        <img
+          src={imageSrc}
+          className="absolute inset-0 w-full h-full object-cover object-center opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 pointer-events-none"
+          alt={entry.animeTitle}
+        />
+
+        <AnimatePresence>
+          {streamUrl && isHovered && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: isVideoReady ? 1 : 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.3 } }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+              className="absolute inset-0 z-10 w-full h-full pointer-events-none"
+            >
+              <MediaPlayer
+                ref={playerRef}
+                src={{ src: streamUrl, type: 'application/vnd.apple.mpegurl' }}
+                muted
+                autoPlay
+                loop
+                playsInline
+                onProviderChange={(provider) => {
+                  if (isHLSProvider(provider)) {
+                    provider.config = {
+                      enableWorker: true, backBufferLength: 0, maxBufferLength: 30, maxMaxBufferLength: 60,
+                      manifestLoadingMaxRetry: 3, levelLoadingMaxRetry: 3, fragLoadingMaxRetry: 6,
+                      appendErrorMaxRetry: 3, testBandwidth: false
+                    };
+                  }
+                }}
+                onCanPlay={() => {
+                  if (!playerRef.current || !entry.currentTime) return;
+                  const duration = playerRef.current.state?.duration || 0;
+                  const parsedTime = entry.currentTime;
+                  const currentTime = playerRef.current.currentTime || 0;
+
+                  if (parsedTime > 10 && currentTime < 5 && duration > 0) {
+                    const timeDiff = Math.abs(parsedTime - currentTime);
+                    if (parsedTime < duration - 10 && timeDiff > 10) {
+                      playerRef.current.currentTime = parsedTime;
+                    }
+                  }
+                }}
+                onPlaying={() => setIsVideoReady(true)}
+                onError={(err) => {
+                  if (streamUrl && streamUrl.includes('proxypipe') && directUrl) {
+                    setStreamUrl(directUrl);
+                  }
+                }}
+                className="w-full h-full object-cover [&_video]:object-cover transition-transform duration-500 group-hover:scale-105"
+              >
+                <MediaProvider />
+              </MediaPlayer>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {timestampStr && (
+          <div className="absolute bottom-2.5 right-2 z-20 rounded-md bg-black/70 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-white shadow-lg backdrop-blur-md pointer-events-none border border-white/5">
+            {timestampStr}
           </div>
         )}
+
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20 z-10">
+          <div className="h-full bg-[var(--aw-accent)] shadow-[0_0_10px_var(--aw-accent-glow)] transition-all duration-500" style={{ width: `${Math.max(2, Math.min(100, progressNum))}%` }} />
+        </div>
+      </div>
+
+      <div className="flex items-start pt-3 pb-1 px-1 gap-1">
+        <div className="flex flex-col flex-1 min-w-0">
+          <h3 className="line-clamp-1 text-[15px] font-bold text-white/95 group-hover:text-[var(--aw-accent)] transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
+            {entry.animeTitle}
+          </h3>
+          <p className="text-[13px] font-medium text-zinc-400 mt-0.5" style={{ fontFamily: 'var(--aw-font-body)' }}>
+            <span className="text-white/80 font-bold mr-1">Ep {entry.episodeNumber || '?'}</span>
+            {entry.episodeTitle && entry.episodeTitle !== `Episode ${entry.episodeNumber}` ? (
+              <><span className="opacity-50">•</span> <span className="line-clamp-1 inline">{entry.episodeTitle}</span></>
+            ) : null}
+          </p>
+        </div>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
+            className={`flex h-7 w-7 items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 mt-1 ${menuOpen
+              ? 'bg-white/10 text-white'
+              : 'text-zinc-500 hover:text-white hover:bg-white/[0.06]'
+              }`}
+          >
+            <MoreVertical size={15} />
+          </button>
+          {menuOpen && (
+            <div
+              className="ctx-menu absolute right-0 bottom-full mb-2 z-50 w-[160px] rounded-[14px] py-1.5 overflow-hidden"
+              style={{
+                background: 'var(--app-bg, #0a0a0f)',
+                backgroundImage: 'linear-gradient(rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: '0 16px 40px rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(20px)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClear(); }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-colors whitespace-nowrap"
+              >
+                <Trash2 size={13} className="text-red-400/80 flex-shrink-0" />
+                Remove
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onClick(); }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[13px] font-medium text-zinc-300 hover:bg-white/[0.05] hover:text-white transition-colors whitespace-nowrap"
+              >
+                <RotateCcw size={13} className="text-zinc-400 flex-shrink-0" />
+                Restart
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ─────────────────────────────────────────
+// HORIZONTAL CAROUSEL
+// ─────────────────────────────────────────
+const HorizontalCarousel: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollRef.current) {
+      const scrollAmount = scrollRef.current.clientWidth * 0.8;
+      scrollRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    handleScroll();
+    window.addEventListener('resize', handleScroll);
+    return () => window.removeEventListener('resize', handleScroll);
+  }, [children]);
+
+  return (
+    <div className="relative group/carousel -mx-4 px-4 sm:mx-0 sm:px-0">
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 backdrop-blur-sm text-white/80 border border-white/[0.06] opacity-0 group-hover/carousel:opacity-100 transition-all duration-200 hover:text-white hover:bg-white/15 hover:scale-105 shadow-lg"
+        >
+          <ChevronLeft size={18} strokeWidth={2.5} />
+        </button>
+      )}
+
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 backdrop-blur-sm text-white/80 border border-white/[0.06] opacity-0 group-hover/carousel:opacity-100 transition-all duration-200 hover:text-white hover:bg-white/15 hover:scale-105 shadow-lg"
+        >
+          <ChevronRight size={18} strokeWidth={2.5} />
+        </button>
+      )}
+
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        // py-6 ensures drop shadows and hover transforms aren't clipped top/bottom
+        className="flex gap-3 overflow-x-auto overflow-y-visible snap-x snap-mandatory py-6 px-1"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <style>{`
+          .group\\/carousel .flex::-webkit-scrollbar { display: none; }
+        `}</style>
+        {children}
       </div>
     </div>
   );
@@ -489,14 +688,33 @@ const QFSelect: React.FC<QFSelectProps> = ({ id, label, value, options, onChange
 
 
 const AnimeHome: React.FC = () => {
+
+  // Dynamically Set Document Title for SPA
+  useEffect(() => {
+    document.title = 'Home';
+  }, []);
+
+  // ─────────────────────────────────────────
+  // CRUCIAL HLS.JS CODEC FIX 
+  // ─────────────────────────────────────────
+  useEffect(() => {
+    const original = MediaSource.prototype.addSourceBuffer;
+    MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
+      const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
+      if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
+      return original.call(this, fixed);
+    };
+    return () => { MediaSource.prototype.addSourceBuffer = original; };
+  }, []);
+
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [spotlight, setSpotlight] = useState<AnimeResult[]>([]);
   const [popularAnime, setPopularAnime] = useState<AnimeResult[]>([]);
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingEntry[]>([]);
+  const [friendsActivity, setFriendsActivity] = useState<FriendActivityData[]>([]);
 
-  // Hero Carousel State
   const [internalIndex, setInternalIndex] = useState(1);
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [anilistDescriptions, setAnilistDescriptions] = useState<Record<string, string>>({});
@@ -504,39 +722,11 @@ const AnimeHome: React.FC = () => {
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  // Physics Drag State
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragDistance, setDragDistance] = useState(0);
 
-  // Quick Filter State
-  const [qfGenre, setQfGenre] = useState('');
-  const [qfTheme, setQfTheme] = useState('');
-  const [qfCountry, setQfCountry] = useState('');
-  const [qfSeason, setQfSeason] = useState('');
-  const [qfYear, setQfYear] = useState('');
-  const [qfType, setQfType] = useState('');
-  const [qfStatus, setQfStatus] = useState('');
-  const [qfLanguage, setQfLanguage] = useState('');
-  const [qfSort, setQfSort] = useState('');
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-
-  const handleQuickFilter = useCallback(() => {
-    const params = new URLSearchParams();
-    if (qfGenre) {
-      const slug = qfGenre.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      params.set('genres', slug);
-    }
-    if (qfType) params.set('format', qfType);
-    if (qfStatus) params.set('status', qfStatus);
-    if (qfSeason) params.set('language', qfSeason); 
-    if (qfYear) params.set('year', qfYear);
-    if (qfSort) params.set('release', qfSort);
-    navigate(`/browse?${params.toString()}`);
-  }, [navigate, qfGenre, qfType, qfStatus, qfSeason, qfYear, qfSort]);
-
-  // Inject Design Styles
   useEffect(() => {
     const id = 'aw-design-styles';
     if (!document.getElementById(id)) {
@@ -546,6 +736,7 @@ const AnimeHome: React.FC = () => {
     return () => { document.getElementById(id)?.remove(); };
   }, []);
 
+  // Sync Watch History
   useEffect(() => {
     const syncContinue = async () => {
       try {
@@ -575,6 +766,71 @@ const AnimeHome: React.FC = () => {
     return () => { window.removeEventListener('storage', syncContinue); window.removeEventListener('focus', syncContinue); };
   }, [user]);
 
+  // Sync Friends True Activity Status (using explicit DB columns)
+  useEffect(() => {
+    if (!user) {
+      setFriendsActivity([]);
+      return;
+    }
+
+    const fetchFriends = async () => {
+      try {
+        const { data: fData } = await supabase.from('friendships').select('user_id, friend_id').eq('status', 'accepted').or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+        if (!fData || fData.length === 0) return;
+
+        const friendIds = fData.map(f => f.user_id === user.id ? f.friend_id : f.user_id);
+
+        // Include explicit DB columns: status_state, status_text, last_active_at
+        const { data: pData } = await supabase.from('profiles').select('id, display_name, avatar_url, role, status_state, status_text, last_active_at').in('id', friendIds);
+        if (!pData) return;
+
+        // Still fetch watch history just for the background image fallback
+        const { data: wData } = await supabase.from('anime_watch_history')
+          .select('user_id, anime_title, episode_number, updated_at, episode_image, anime_cover')
+          .in('user_id', friendIds)
+          .order('updated_at', { ascending: false });
+
+        const friendsMap = pData.map(p => {
+          const latestWatch = wData?.find(w => w.user_id === p.id);
+
+          const lastActiveTime = p.last_active_at ? new Date(p.last_active_at).getTime() : 0;
+          const isOnline = (Date.now() - lastActiveTime < 15 * 60 * 1000) && p.status_state && p.status_state !== 'offline';
+
+          return {
+            id: p.id,
+            display_name: p.display_name || 'Anonymous User',
+            avatar_url: p.avatar_url,
+            isOnline,
+            statusType: isOnline ? p.status_state : 'offline',
+            statusText: p.status_text || '',
+            lastActivity: latestWatch ? {
+              animeTitle: latestWatch.anime_title,
+              episodeNumber: latestWatch.episode_number,
+              timestamp: latestWatch.updated_at,
+              image: latestWatch.episode_image || latestWatch.anime_cover
+            } : undefined
+          };
+        });
+
+        friendsMap.sort((a, b) => {
+          if (a.isOnline && !b.isOnline) return -1;
+          if (!a.isOnline && b.isOnline) return 1;
+          const aTime = a.lastActivity ? new Date(a.lastActivity.timestamp).getTime() : 0;
+          const bTime = b.lastActivity ? new Date(b.lastActivity.timestamp).getTime() : 0;
+          return bTime - aTime;
+        });
+
+        setFriendsActivity(friendsMap);
+      } catch (err) {
+        console.error("Error fetching friends activity", err);
+      }
+    };
+
+    fetchFriends();
+    const intervalId = setInterval(fetchFriends, 60000);
+    return () => clearInterval(intervalId);
+  }, [user]);
+
   // Sync Bookmarks
   useEffect(() => {
     const syncBookmarks = async () => {
@@ -588,7 +844,7 @@ const AnimeHome: React.FC = () => {
         }
         const local = readBookmarks();
         setBookmarkedIds(new Set(local.map((b: BookmarkEntry) => b.malId)));
-      } catch (e) {}
+      } catch (e) { }
     };
     syncBookmarks();
     const onStorage = () => syncBookmarks();
@@ -617,7 +873,7 @@ const AnimeHome: React.FC = () => {
         const { data } = await supabase.from('anime_bookmarks').select('mal_id').eq('user_id', user.id);
         setBookmarkedIds(new Set((data || []).map((d: any) => parseInt(d.mal_id, 10)).filter((n: number) => !isNaN(n))));
       } else {
-        if (isBookmarked) { removeBookmark(malId); } 
+        if (isBookmarked) { removeBookmark(malId); }
         else {
           const current = readBookmarks();
           const entry: BookmarkEntry = { malId, title, cover, type: typeLabel, status: 'uncategorized', score: getAnimeScore(anime), updatedAt: Date.now() };
@@ -625,7 +881,7 @@ const AnimeHome: React.FC = () => {
         }
         setBookmarkedIds(new Set(readBookmarks().map((b: BookmarkEntry) => b.malId)));
       }
-    } catch (e) {} finally { setBookmarkLoading(false); }
+    } catch (e) { } finally { setBookmarkLoading(false); }
   }, [bookmarkedIds, bookmarkLoading, user]);
 
   const clearContinueWatching = useCallback(async (animeId: string) => {
@@ -643,8 +899,12 @@ const AnimeHome: React.FC = () => {
         setContinueWatching(filtered);
         window.dispatchEvent(new Event('storage'));
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [user]);
+
+  const handleOpenProfile = (userId: string) => {
+    window.dispatchEvent(new CustomEvent('openProfile', { detail: { userId } }));
+  };
 
   useEffect(() => {
     const fetchHome = async () => {
@@ -682,7 +942,7 @@ const AnimeHome: React.FC = () => {
       try {
         const info = await fetchAnimeInfo(Number(item.id));
         let cleanDesc = info?.description || info?.synopsis || 'No description available for this series.';
-        cleanDesc = cleanDesc.replace(/<[^>]*>?/gm, ''); 
+        cleanDesc = cleanDesc.replace(/<[^>]*>?/gm, '');
         return { id: item.id, desc: cleanDesc };
       } catch (e) { return { id: item.id, desc: 'No description available for this series.' }; }
     };
@@ -697,15 +957,29 @@ const AnimeHome: React.FC = () => {
     if (heroItems.length <= 1 || isDragging || !isTransitioning) return;
     const intervalId = setInterval(() => {
       if (document.hidden) return;
-      setInternalIndex((current) => current + 1);
+      setInternalIndex((current) => {
+        if (current >= heroItems.length + 1) return current;
+        return current + 1;
+      });
     }, 7000);
     return () => clearInterval(intervalId);
   }, [heroItems.length, isDragging, isTransitioning, internalIndex]);
 
   useEffect(() => {
+    if (!isTransitioning) return;
+    let fallback: ReturnType<typeof setTimeout>;
+    if (internalIndex <= 0) {
+      fallback = setTimeout(() => { setIsTransitioning(false); setInternalIndex(heroItems.length); }, 1000);
+    } else if (internalIndex >= heroItems.length + 1) {
+      fallback = setTimeout(() => { setIsTransitioning(false); setInternalIndex(1); }, 1000);
+    }
+    return () => { if (fallback) clearTimeout(fallback); };
+  }, [internalIndex, heroItems.length, isTransitioning]);
+
+  useEffect(() => {
     if (!isTransitioning) {
       if (sliderRef.current) void sliderRef.current.offsetHeight;
-      const timer = setTimeout(() => { setIsTransitioning(true); }, 40); 
+      const timer = setTimeout(() => { setIsTransitioning(true); }, 40);
       return () => clearTimeout(timer);
     }
   }, [isTransitioning]);
@@ -715,7 +989,11 @@ const AnimeHome: React.FC = () => {
   const handleDragEnd = () => {
     if (!isDragging) return;
     setIsDragging(false); setDragDistance(Math.abs(dragOffset));
-    if (dragOffset > 75) { setInternalIndex((prev) => prev - 1); } else if (dragOffset < -75) { setInternalIndex((prev) => prev + 1); }
+    if (dragOffset > 75) {
+      setInternalIndex((prev) => Math.max(0, prev - 1));
+    } else if (dragOffset < -75) {
+      setInternalIndex((prev) => Math.min(heroItems.length + 1, prev + 1));
+    }
     setDragOffset(0); setTouchStart(null);
   };
 
@@ -725,14 +1003,13 @@ const AnimeHome: React.FC = () => {
   };
 
   return (
-    <div className="aw-root aw-noise relative min-h-screen overflow-x-hidden text-white selection:bg-[var(--app-accent-muted)]">
+    <div className="aw-root relative min-h-screen overflow-x-hidden text-white selection:bg-[var(--app-accent-muted)]">
 
       <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: '1px solid var(--aw-border)', background: 'rgba(7,7,13,0.85)', backdropFilter: 'blur(20px)' }}></div>
 
-      {/* STAGGERED MOTION CONTAINER */}
       <motion.main variants={containerVariants} initial="hidden" animate="visible" className="relative z-10 mx-auto w-full max-w-[1540px] space-y-10 px-4 md:px-6 lg:px-8 py-8">
 
-        {/* === HERO SECTION === */}
+        {/* ── HERO SECTION ── */}
         <motion.section variants={itemVariants} className="w-full relative">
           {loading || heroItems.length === 0 ? (
             <div className="h-[400px] lg:h-[480px] w-full rounded-[24px] bg-[var(--app-surface-1)] animate-pulse border border-white/5 shadow-2xl" />
@@ -754,8 +1031,8 @@ const AnimeHome: React.FC = () => {
                 onTransitionEnd={(e) => {
                   if (e.target !== sliderRef.current) return;
                   if (heroItems.length <= 1) return;
-                  if (internalIndex === 0) { setIsTransitioning(false); setInternalIndex(heroItems.length); } 
-                  else if (internalIndex === carouselItems.length - 1) { setIsTransitioning(false); setInternalIndex(1); }
+                  if (internalIndex <= 0) { setIsTransitioning(false); setInternalIndex(heroItems.length); }
+                  else if (internalIndex >= carouselItems.length - 1) { setIsTransitioning(false); setInternalIndex(1); }
                 }}
               >
                 {carouselItems.map((anime, index) => {
@@ -764,10 +1041,17 @@ const AnimeHome: React.FC = () => {
                   const score = getAnimeScore(anime);
                   const desc = anilistDescriptions[anime.id] || anime.description || (anime as any).synopsis || 'Loading synopsis...';
 
+                  let realIndex = index - 1;
+                  if (heroItems.length > 1) {
+                    if (index === 0) realIndex = heroItems.length - 1;
+                    else if (index === carouselItems.length - 1) realIndex = 0;
+                  } else {
+                    realIndex = 0;
+                  }
+
                   return (
                     <div key={key} className="w-full h-full flex-shrink-0 relative flex flex-col md:flex-row items-center justify-between gap-10 lg:gap-14 p-8 md:p-12 lg:p-16 min-h-[400px] lg:min-h-[480px]">
 
-                      {/* Immersive Cinematic Background */}
                       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
                         <img
                           src={(anime as any).bannerImage || getAnimeCover(anime)}
@@ -780,7 +1064,6 @@ const AnimeHome: React.FC = () => {
                         <div className="absolute inset-0 bg-black/20" />
                       </div>
 
-                      {/* LEFT COLUMN: Text Content */}
                       <div className="w-full md:w-[55%] lg:w-[60%] flex flex-col gap-5 z-10">
                         <h1 className="text-3xl sm:text-4xl lg:text-[2.8rem] font-bold leading-[1.1] tracking-tight text-white drop-shadow-lg pr-4" style={{ fontFamily: 'var(--aw-font-display)' }}>
                           {title}
@@ -788,7 +1071,7 @@ const AnimeHome: React.FC = () => {
 
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           <span className="bg-[var(--app-accent)] text-[#04110d] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-md shadow-[0_0_15px_var(--app-accent-muted)] tracking-wider" style={{ fontFamily: 'var(--aw-font-display)' }}>
-                            #{index + 1} Spotlight
+                            #{realIndex + 1} Spotlight
                           </span>
                           <span className="border border-white/10 text-zinc-300 text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm bg-white/[0.05] uppercase tracking-wider backdrop-blur-md" style={{ fontFamily: 'var(--aw-font-display)' }}>
                             {getAnimeTypeLabel(anime) || 'TV'}
@@ -807,22 +1090,34 @@ const AnimeHome: React.FC = () => {
                         </p>
 
                         <div className="mt-2 flex flex-wrap gap-3">
-                          <button onClick={(e) => handleNavigation(e, `/watch/${anime.id}`)} onMouseDown={handleRippleMouseDown} className="ripple-button group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl px-7 py-3.5 text-[12px] font-black uppercase tracking-wider text-[#04110d] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)] transition-all hover:scale-[1.02] active:scale-[0.98]" style={{ backgroundColor: 'var(--app-accent)', fontFamily: 'var(--aw-font-display)' }}>
-                            <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
-                            <MonitorPlay size={16} fill="currentColor" className="relative z-10" />
+                          <button onClick={(e) => handleNavigation(e, `/watch/${anime.id}`)} onMouseDown={handleRippleMouseDown} className="aw-btn-primary group relative overflow-hidden press-squish flex h-[48px] items-center justify-center gap-2 rounded-[14px] px-6 text-sm font-bold shadow-[0_4px_14px_rgba(0,0,0,0.5)] hover:scale-[1.05] active:scale-[0.96] transition-all duration-300" style={{ backgroundColor: 'var(--aw-accent)', color: '#04110d', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }} onMouseEnter={(e) => { e.currentTarget.style.filter = 'brightness(1.15) drop-shadow(0 0 12px var(--aw-accent-muted))'; }} onMouseLeave={(e) => { e.currentTarget.style.filter = 'none'; }}>
+                            <div className="absolute inset-0 bg-white/25 translate-x-[-120%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[120%]" />
+                            <MonitorPlay size={16} fill="currentColor" className="relative z-10 transition-transform duration-300 group-hover:scale-110" />
                             <span className="relative z-10">Open Series</span>
                           </button>
 
-                          <button onClick={(e) => handleNavigation(e, '/browse')} onMouseDown={handleRippleMouseDown} className="ripple-button group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl px-7 py-3.5 text-[12px] font-black uppercase tracking-[0.18em] text-white border border-white/10 bg-white/[0.03] backdrop-blur-md transition-all hover:bg-white/[0.08] hover:border-white/20 hover:scale-[1.02] active:scale-[0.98]" style={{ fontFamily: 'var(--aw-font-display)' }}>
-                            <div className="absolute inset-0 bg-white/25 translate-x-[-100%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[100%]" />
-                            <span className="relative z-10">Browse Catalog</span>
+                          <button onClick={(e) => handleNavigation(e, '/browse')} onMouseDown={handleRippleMouseDown} className="aw-btn-ghost group relative overflow-hidden press-squish flex h-[48px] items-center justify-center gap-2 rounded-[14px] border px-6 text-sm font-bold shadow-md hover:scale-[1.05] active:scale-[0.96] transition-all duration-400" style={{ background: 'var(--aw-s1)', color: 'white', borderColor: 'var(--aw-border)', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }} onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aw-accent), transparent 85%)'; e.currentTarget.style.borderColor = 'var(--aw-accent)'; e.currentTarget.style.color = 'var(--aw-accent)'; }} onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--aw-s1)'; e.currentTarget.style.borderColor = 'var(--aw-border)'; e.currentTarget.style.color = 'white'; }}>
+                            <div className="absolute inset-0 bg-white/25 translate-x-[-120%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[120%]" />
+                            <span className="relative z-10 transition-transform duration-300 group-hover:scale-105">Browse Catalog</span>
                           </button>
 
                           {heroItems[activeHeroIndex] && (() => {
                             const currentAnime = heroItems[activeHeroIndex];
                             const isBookmarked = bookmarkedIds.has(Number(currentAnime.id));
                             return (
-                              <button onClick={(e) => { e.stopPropagation(); toggleBookmark(currentAnime); }} disabled={bookmarkLoading} className={`group relative flex h-[46px] w-[46px] items-center justify-center rounded-xl border transition-all duration-300 hover:scale-[1.08] active:scale-[0.95] ${isBookmarked ? 'border-[var(--app-accent)] bg-[var(--app-accent)]/15 text-[var(--app-accent)] shadow-[0_0_20px_rgba(var(--app-accent-rgb),0.25)]' : 'border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/20 hover:bg-white/[0.08]'} ${bookmarkLoading ? 'opacity-50 cursor-wait' : ''}`} title={isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleBookmark(currentAnime); }}
+                                disabled={bookmarkLoading}
+                                className={`group relative flex h-[48px] w-[48px] items-center justify-center overflow-hidden rounded-[14px] border hover:scale-[1.05] active:scale-[0.96] active:duration-100 ${isBookmarked ? 'text-[var(--aw-accent)]' : 'text-white'} ${bookmarkLoading ? 'opacity-50 cursor-wait' : ''}`}
+                                style={{
+                                  background: 'var(--aw-s1)',
+                                  borderColor: isBookmarked ? 'var(--aw-accent)' : 'var(--aw-border)',
+                                  transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aw-accent), transparent 85%)'; e.currentTarget.style.borderColor = 'var(--aw-accent)'; e.currentTarget.style.color = 'var(--aw-accent)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--aw-s1)'; e.currentTarget.style.borderColor = isBookmarked ? 'var(--aw-accent)' : 'var(--aw-border)'; e.currentTarget.style.color = isBookmarked ? 'var(--aw-accent)' : 'white'; }}
+                                title={isBookmarked ? 'Remove from bookmarks' : 'Add to bookmarks'}
+                              >
                                 {isBookmarked ? <BookmarkCheck size={20} className="transition-transform duration-300 group-hover:scale-110" /> : <Bookmark size={20} className="transition-transform duration-300 group-hover:scale-110" />}
                               </button>
                             );
@@ -830,7 +1125,6 @@ const AnimeHome: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* RIGHT COLUMN: Poster */}
                       <div className="hidden md:block w-48 lg:w-[260px] xl:w-[280px] flex-shrink-0 z-10 pb-4">
                         <div onClick={(e) => handleNavigation(e, `/watch/${anime.id}`)} className="group relative aspect-[2/3] w-full rounded-2xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 cursor-pointer transform transition-transform duration-500 hover:-translate-y-2 hover:scale-[1.02]">
                           <img src={getAnimeCover(anime)} alt={title} draggable="false" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 pointer-events-none" />
@@ -847,7 +1141,6 @@ const AnimeHome: React.FC = () => {
                 })}
               </div>
 
-              {/* Original Functional Carousel Dots Centered */}
               <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex gap-2.5 items-center z-20 pointer-events-auto" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
                 {heroItems.map((_, index) => (
                   <button
@@ -863,106 +1156,84 @@ const AnimeHome: React.FC = () => {
           )}
         </motion.section>
 
-        {/* === QUICK FILTER === */}
-        <motion.section variants={itemVariants} className="qf-section">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal size={14} style={{ color: 'var(--aw-accent)' }} />
-            <h2 style={{ fontFamily: 'var(--aw-font-display)', fontSize: 14, fontWeight: 700, color: 'var(--aw-text)', letterSpacing: '0.01em', margin: 0 }}>Quick Filters</h2>
-          </div>
-          <div className="qf-grid">
-            <QFSelect id="genre" label="Genre" value={qfGenre} options={QF_GENRE_OPTIONS} onChange={setQfGenre} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="theme" label="Theme" value={qfTheme} options={QF_THEME_OPTIONS} onChange={setQfTheme} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="country" label="Country" value={qfCountry} options={QF_COUNTRY_OPTIONS} onChange={setQfCountry} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="season" label="Season" value={qfSeason} options={QF_SEASON_OPTIONS} onChange={setQfSeason} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="year" label="Year" value={qfYear} options={QF_YEAR_OPTIONS} onChange={setQfYear} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="type" label="Type" value={qfType} options={QF_TYPE_OPTIONS} onChange={setQfType} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="status" label="Status" value={qfStatus} options={QF_STATUS_OPTIONS} onChange={setQfStatus} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-            <QFSelect id="language" label="Language" value={qfLanguage} options={QF_LANGUAGE_OPTIONS} onChange={setQfLanguage} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <QFSelect id="sort" label="Sort" value={qfSort} options={QF_SORT_OPTIONS} onChange={setQfSort} activeId={activeDropdown} setActiveId={setActiveDropdown} />
-<div className="flex flex-col gap-1">
-              <span style={{ fontSize: 9, opacity: 0 }}>‎</span>
-              <button className="qf-filter-btn group" onClick={handleQuickFilter}>
-                <SlidersHorizontal size={14} className="relative z-10 text-[var(--aw-accent)]" />
-                <span className="relative z-10">Filter</span>
-              </button>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* === CONTINUE WATCHING === */}
-        {continueWatching.length > 0 && (
-          <motion.section variants={itemVariants} style={{ padding: '24px 28px 36px', background: 'var(--aw-s1)', borderRadius: 16, border: '1px solid var(--aw-border)', display: 'flex', flexDirection: 'column', gap: 20 }}>
-            <SectionHeader title="Continue Watching" subtitle={`${continueWatching.length} in progress`} onViewMore={() => navigate('/continuewatching')} />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {continueWatching.slice(0, 8).map((entry) => {
-                const progressNum = entry.currentTime && entry.duration ? (entry.currentTime / entry.duration) * 100 : Math.floor(Math.random() * 60) + 20;
-                let timestampStr;
-                if (entry.currentTime && entry.duration) {
-                  timestampStr = `${formatTime(entry.currentTime)} / ${formatTime(entry.duration)}`;
-                }
-
-                return (
-                  <MediaCard
-                    key={`${entry.animeId}-${entry.episodeId}`}
-                    title={entry.animeTitle}
-                    image={entry.animeCover || ''}
-                    subtitle={`Episode ${entry.episodeNumber || '?'}`}
-                    badge="Watching"
-                    progress={progressNum}
-                    timestamp={timestampStr}
-                    onClick={() => navigate(entry.href || `/watch/${entry.animeId}`)}
-                    onClear={() => clearContinueWatching(entry.animeId)}
-                  />
-                );
-              })}
-            </div>
+        {/* ── FRIENDS ACTIVITY SECTION ── */}
+        {user && (
+          <motion.section variants={itemVariants} className="flex flex-col w-full mt-4">
+            <SectionHeader title="Friends Activity" subtitle="See what your network is watching" />
+            {friendsActivity.length > 0 ? (
+              <HorizontalCarousel>
+                {friendsActivity.map(friend => (
+                  <FriendCard key={friend.id} friend={friend} onClick={() => handleOpenProfile(friend.id)} />
+                ))}
+              </HorizontalCarousel>
+            ) : (
+              <div className="w-full rounded-[16px] border border-white/5 bg-[var(--aw-s1)] p-8 text-center flex flex-col items-center justify-center gap-3">
+                <Users size={24} className="text-zinc-600" />
+                <p className="text-[13px] text-zinc-400 font-medium max-w-sm">
+                  No friends activity yet. Connect with other users to build your network and see what they are watching!
+                </p>
+              </div>
+            )}
           </motion.section>
         )}
 
-        {/* === TRENDING NOW === */}
-        <motion.section variants={itemVariants} style={{ padding: '24px 28px 36px', background: 'var(--aw-s1)', borderRadius: 16, border: '1px solid var(--aw-border)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* ── CONTINUE WATCHING SECTION ── */}
+        {continueWatching.length > 0 && (
+          <motion.section variants={itemVariants} className="flex flex-col w-full mt-4">
+            <SectionHeader title="Continue Watching" subtitle={`${continueWatching.length} in progress`} onViewMore={() => navigate('/continuewatching')} />
+            <HorizontalCarousel>
+              {continueWatching.slice(0, 12).map((entry) => (
+                <ContinueWatchingCard
+                  key={`${entry.animeId}-${entry.episodeId}`}
+                  entry={entry}
+                  onClick={() => navigate(entry.href || `/watch/${entry.animeId}`)}
+                  onClear={() => clearContinueWatching(entry.animeId)}
+                />
+              ))}
+            </HorizontalCarousel>
+          </motion.section>
+        )}
+
+        {/* ── TRENDING NOW ── */}
+        <motion.section variants={itemVariants} className="flex flex-col w-full mt-4">
           <SectionHeader title="Trending Now" subtitle="The Most Popular Series This Week" onViewMore={() => navigate('/browse')} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <HorizontalCarousel>
             {loading
-              ? Array.from({ length: 12 }).map((_, index) => <div key={index} className="h-[135px] w-full rounded-[20px] bg-white/[0.02] border border-white/5 animate-pulse" />)
-              : popularAnime.slice(0, 12).map((anime) => {
-                  return (
-                    <MediaCard
-                      key={anime.id}
-                      title={getAnimeDisplayTitle(anime.title)}
-                      image={getAnimeCover(anime)}
-                      badge={getAnimeTypeLabel(anime) || 'TV'}
-                      score={getAnimeScore(anime)}
-                      subtitle={extractAnimeDetails(anime)}
-                      onClick={() => navigate(`/watch/${anime.id}`)}
-                    />
-                  );
-                })}
-          </div>
+              ? Array.from({ length: 10 }).map((_, index) => <div key={index} className="aspect-[2/3] w-[160px] sm:w-[175px] md:w-[190px] lg:w-[200px] flex-shrink-0 rounded-[12px] bg-white/[0.02] border border-white/5 animate-pulse" />)
+              : popularAnime.slice(0, 10).map((anime) => {
+                return (
+                  <MediaCard
+                    key={anime.id}
+                    title={getAnimeDisplayTitle(anime.title)}
+                    image={getAnimeCover(anime)}
+                    badge={getAnimeTypeLabel(anime) || 'TV'}
+                    subtitle={extractAnimeDetails(anime)}
+                    onClick={() => navigate(`/watch/${anime.id}`)}
+                  />
+                );
+              })}
+          </HorizontalCarousel>
         </motion.section>
 
-        {/* === RECOMMENDED FOR YOU === */}
-        <motion.section variants={itemVariants} style={{ padding: '24px 28px 36px', background: 'var(--aw-s1)', borderRadius: 16, border: '1px solid var(--aw-border)', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* ── RECOMMENDED ── */}
+        <motion.section variants={itemVariants} className="flex flex-col w-full mt-4">
           <SectionHeader title="Recommended For You" subtitle="Our personal choice for you" onViewMore={() => navigate('/browse')} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <HorizontalCarousel>
             {loading
-              ? Array.from({ length: 12 }).map((_, index) => <div key={index} className="h-[135px] w-full rounded-[20px] bg-white/[0.02] border border-white/5 animate-pulse" />)
-              : spotlight.slice(0, 12).map((anime) => {
-                  return (
-                    <MediaCard
-                      key={anime.id}
-                      title={getAnimeDisplayTitle(anime.title)}
-                      image={getAnimeCover(anime)}
-                      badge={getAnimeTypeLabel(anime) || 'TV'}
-                      score={getAnimeScore(anime)}
-                      subtitle={extractAnimeDetails(anime)}
-                      onClick={() => navigate(`/watch/${anime.id}`)}
-                    />
-                  );
-                })}
-          </div>
+              ? Array.from({ length: 10 }).map((_, index) => <div key={index} className="aspect-[2/3] w-[160px] sm:w-[175px] md:w-[190px] lg:w-[200px] flex-shrink-0 rounded-[12px] bg-white/[0.02] border border-white/5 animate-pulse" />)
+              : spotlight.slice(0, 10).map((anime) => {
+                return (
+                  <MediaCard
+                    key={anime.id}
+                    title={getAnimeDisplayTitle(anime.title)}
+                    image={getAnimeCover(anime)}
+                    badge={getAnimeTypeLabel(anime) || 'TV'}
+                    subtitle={extractAnimeDetails(anime)}
+                    onClick={() => navigate(`/watch/${anime.id}`)}
+                  />
+                );
+              })}
+          </HorizontalCarousel>
         </motion.section>
 
       </motion.main>
@@ -971,3 +1242,4 @@ const AnimeHome: React.FC = () => {
 };
 
 export default AnimeHome;
+/* --- END OF FILE AnimeHome.tsx --- */

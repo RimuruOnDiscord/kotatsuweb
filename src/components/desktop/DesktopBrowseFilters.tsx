@@ -12,7 +12,8 @@ import {
   Clock,
   ChevronDown,
   Check,
-  X
+  X,
+  Film
 } from 'lucide-react';
 
 type FilterOption = {
@@ -31,7 +32,7 @@ interface DesktopBrowseFiltersProps {
   setSearchQuery: (val: string) => void;
   submitSearch: () => void;
   searchPlaceholder?: string;
-  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release', string>>;
+  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release' | 'studio', string>>;
   activeDropdown: string | null;
   setActiveDropdown: (val: string | null) => void;
   typeFilter: string;
@@ -41,6 +42,7 @@ interface DesktopBrowseFiltersProps {
   yearFilter: string;
   lengthFilter: string;
   releaseFilter: string;
+  studioFilter: string;
   typeOptions: FilterOption[];
   genreOptions: GenreFilterOption[];
   statusOptions: FilterOption[];
@@ -48,6 +50,7 @@ interface DesktopBrowseFiltersProps {
   yearOptions: FilterOption[];
   lengthOptions: FilterOption[];
   releaseOptions: FilterOption[];
+  studioOptions: FilterOption[];
   updateTypeFilter: (val: string) => void;
   updateGenreFilter: (val: string) => void;
   updateStatusFilter: (val: string) => void;
@@ -55,6 +58,7 @@ interface DesktopBrowseFiltersProps {
   updateYearFilter: (val: string) => void;
   updateLengthFilter: (val: string) => void;
   updateReleaseFilter: (val: string) => void;
+  updateStudioFilter: (val: string) => void;
   hasActiveFilters: boolean;
   clearFilters: () => void;
 }
@@ -68,7 +72,7 @@ const dropdownVariants = {
     opacity: 1, y: 0, scale: 1, filter: 'blur(0px)',
     transition: { type: 'spring', damping: 25, stiffness: 300, staggerChildren: 0.03 }
   },
-  exit: { 
+  exit: {
     opacity: 0, y: -4, scale: 0.98, filter: 'blur(4px)',
     transition: { duration: 0.15, ease: 'easeIn' }
   }
@@ -152,47 +156,55 @@ const FilterDropdown = ({
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            variants={dropdownVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="absolute left-0 top-[calc(100%+10px)] z-50 min-w-[220px] max-h-[380px] overflow-y-auto rounded-[20px] border border-white/10 bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] p-2 backdrop-blur-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex flex-col gap-1 origin-top-left"
-          >
-            {options.map((opt) => {
-              if (opt.value === '' && isMultiple) return null;
-              
-              const isSelected = isMultiple ? value.includes(opt.value) : value === opt.value;
+          <div className="absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-50">
+            <motion.div
+              variants={dropdownVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className={`max-h-[380px] overflow-y-auto rounded-[20px] border border-white/10 bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] p-2 backdrop-blur-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] origin-top
+                ${options.length > 25 ? 'grid grid-cols-4 min-w-[580px] gap-1' : options.length > 15 ? 'grid grid-cols-3 min-w-[440px] gap-1' : options.length > 8 ? 'grid grid-cols-2 min-w-[320px] gap-1' : 'flex flex-col min-w-[220px] gap-1'}
+              `}
+            >
+              {options.map((opt) => {
+                if (opt.value === '') return null;
 
-              return (
-                <motion.button
-                  variants={itemVariants}
-                  key={opt.value}
-                  type="button"
-                  disabled={opt.disabled}
-                  onClick={() => {
-                    onChange(opt.value);
-                    if (!isMultiple) setActiveDropdown(null);
-                  }}
-                  className={`group flex w-full items-center justify-between rounded-[0.8rem] px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors duration-200
+                const isSelected = isMultiple ? value.includes(opt.value) : value === opt.value;
+
+                return (
+                  <motion.button
+                    variants={itemVariants}
+                    key={opt.value}
+                    type="button"
+                    disabled={opt.disabled}
+                    onClick={() => {
+                      if (isSelected && !isMultiple) {
+                        onChange('');
+                      } else {
+                        onChange(opt.value);
+                      }
+                      if (!isMultiple) setActiveDropdown(null);
+                    }}
+                    className={`group flex w-full items-center justify-between rounded-[0.8rem] px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors duration-200
                     ${opt.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/[0.05]'}
                     ${isSelected ? 'bg-white/[0.08] text-[var(--app-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]' : 'text-zinc-400 hover:text-white'}
                   `}
-                >
-                  <span className="truncate pr-4">{opt.label}</span>
-                  {isSelected && (
-                    <motion.div
-                      initial={{ scale: 0, rotate: -45 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", damping: 15, stiffness: 300 }}
-                    >
-                      <Check size={16} strokeWidth={2.5} className="flex-shrink-0 text-[var(--app-accent)]" />
-                    </motion.div>
-                  )}
-                </motion.button>
-              );
-            })}
-          </motion.div>
+                  >
+                    <span className="truncate pr-4">{opt.label}</span>
+                    {isSelected && (
+                      <motion.div
+                        initial={{ scale: 0, rotate: -45 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: "spring", damping: 15, stiffness: 300 }}
+                      >
+                        <Check size={16} strokeWidth={2.5} className="flex-shrink-0 text-[var(--app-accent)]" />
+                      </motion.div>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -212,17 +224,17 @@ export default function DesktopBrowseFilters(props: DesktopBrowseFiltersProps) {
 
   return (
     <motion.div layout className="hidden xl:flex flex-wrap items-center gap-2.5">
-      
+
       {/* Search Input - Polished Version */}
       <motion.div layout className="group relative flex min-w-[240px] max-w-[300px] flex-1 items-center">
         {/* Animated Background Glow */}
         <div className="absolute -inset-[1px] rounded-[1.25rem] opacity-0 blur-[2px] transition-opacity duration-500 group-focus-within:opacity-20" />
-        
-        <Search 
-          size={16} 
-          className="absolute left-4 z-10 text-zinc-500 transition-all duration-300 group-focus-within:scale-110 group-focus-within:text-[var(--app-accent)]" 
+
+        <Search
+          size={16}
+          className="absolute left-4 z-10 text-zinc-500 transition-all duration-300 group-focus-within:scale-110 group-focus-within:text-[var(--app-accent)]"
         />
-        
+
         <input
           type="text"
           value={props.searchQuery}
@@ -230,8 +242,8 @@ export default function DesktopBrowseFilters(props: DesktopBrowseFiltersProps) {
           onKeyDown={(e) => e.key === 'Enter' && props.submitSearch()}
           placeholder={props.searchPlaceholder || 'Search Manga...'}
           className={`peer relative h-11 w-full rounded-[16px] border pl-11 pr-10 text-[13px] font-medium text-white shadow-inner outline-none backdrop-blur-md transition-all duration-300 placeholder:text-zinc-500
-            ${props.searchQuery 
-              ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)]' 
+            ${props.searchQuery
+              ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)]'
               : 'border-white/5 bg-[color-mix(in_srgb,var(--app-accent),transparent_98%)]'
             }
             hover:bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] hover:border-white/20 
@@ -258,7 +270,7 @@ export default function DesktopBrowseFilters(props: DesktopBrowseFiltersProps) {
         {/* Keyboard Hint - Subtle "Enter" badge */}
         <AnimatePresence>
           {!props.searchQuery && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: 5 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 5 }}
@@ -276,7 +288,7 @@ export default function DesktopBrowseFilters(props: DesktopBrowseFiltersProps) {
       <FilterDropdown id="language" icon={Globe} label={labels.language} options={props.languageOptions} value={props.languageFilter} onChange={props.updateLanguageFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
       <FilterDropdown id="year" icon={Calendar} label={labels.year} options={props.yearOptions} value={props.yearFilter} onChange={props.updateYearFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
       <FilterDropdown id="length" icon={BookOpen} label={labels.length} options={props.lengthOptions} value={props.lengthFilter} onChange={props.updateLengthFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-      <FilterDropdown id="release" icon={Clock} label={labels.release} options={props.releaseOptions} value={props.releaseFilter} onChange={props.updateReleaseFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
+      <FilterDropdown id="studio" icon={Film} label={labels.studio || 'Studio'} options={props.studioOptions} value={props.studioFilter} onChange={props.updateStudioFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
 
       {/* Clear All Filters Button */}
       <AnimatePresence>

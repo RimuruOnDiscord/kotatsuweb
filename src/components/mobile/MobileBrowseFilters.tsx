@@ -13,7 +13,7 @@ interface MobileBrowseFiltersProps {
   setSearchQuery: (value: string) => void;
   submitSearch: () => void;
   searchPlaceholder?: string;
-  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release', string>>;
+  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release' | 'studio', string>>;
   typeFilter: string;
   genreFilter: string[];
   statusFilter: string;
@@ -21,6 +21,7 @@ interface MobileBrowseFiltersProps {
   yearFilter: string;
   lengthFilter: string;
   releaseFilter: string;
+  studioFilter: string;
   typeOptions: FilterOption[];
   genreOptions: FilterOption[];
   statusOptions: FilterOption[];
@@ -28,6 +29,7 @@ interface MobileBrowseFiltersProps {
   yearOptions: FilterOption[];
   lengthOptions: FilterOption[];
   releaseOptions: FilterOption[];
+  studioOptions: FilterOption[];
   updateTypeFilter: (value: string) => void;
   updateGenreFilter: (value: string) => void;
   updateStatusFilter: (value: string) => void;
@@ -35,6 +37,7 @@ interface MobileBrowseFiltersProps {
   updateYearFilter: (value: string) => void;
   updateLengthFilter: (value: string) => void;
   updateReleaseFilter: (value: string) => void;
+  updateStudioFilter: (value: string) => void;
   hasActiveFilters: boolean;
   clearFilters: () => void;
 }
@@ -52,6 +55,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
   yearFilter,
   lengthFilter,
   releaseFilter,
+  studioFilter,
   typeOptions,
   genreOptions,
   statusOptions,
@@ -59,6 +63,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
   yearOptions,
   lengthOptions,
   releaseOptions,
+  studioOptions,
   updateTypeFilter,
   updateGenreFilter,
   updateStatusFilter,
@@ -66,6 +71,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
   updateYearFilter,
   updateLengthFilter,
   updateReleaseFilter,
+  updateStudioFilter,
   hasActiveFilters,
   clearFilters,
 }) => {
@@ -79,6 +85,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
     year: fieldLabels?.year || 'Year',
     length: fieldLabels?.length || 'Length',
     release: fieldLabels?.release || 'Release',
+    studio: fieldLabels?.studio || 'Studio',
   };
 
   useEffect(() => {
@@ -99,6 +106,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
       [yearFilter, yearOptions],
       [lengthFilter, lengthOptions],
       [releaseFilter, releaseOptions],
+      [studioFilter, studioOptions],
     ] as const;
 
     const labels = groups
@@ -110,7 +118,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
       .map((option) => option.label);
 
     return [...labels, ...genreLabels];
-  }, [genreFilter, genreOptions, languageFilter, languageOptions, lengthFilter, lengthOptions, releaseFilter, releaseOptions, statusFilter, statusOptions, typeFilter, typeOptions, yearFilter, yearOptions]);
+  }, [genreFilter, genreOptions, languageFilter, languageOptions, lengthFilter, lengthOptions, releaseFilter, releaseOptions, statusFilter, statusOptions, typeFilter, typeOptions, yearFilter, yearOptions, studioFilter, studioOptions]);
 
   const FilterSection: React.FC<{
     label: string;
@@ -141,7 +149,14 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
               key={option.value}
               type="button"
               disabled={option.disabled}
-              onClick={() => !option.disabled && onChange(option.value)}
+              onClick={() => {
+                if (option.disabled) return;
+                if (isSelected && !Array.isArray(value)) {
+                  onChange('');
+                } else {
+                  onChange(option.value);
+                }
+              }}
               onPointerDown={option.disabled ? undefined : handleRippleMouseDown}
               className={`ripple-button overflow-hidden rounded-[1rem] border px-3 py-2.5 text-left text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
                 option.disabled
@@ -267,6 +282,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
               <FilterSection label={labels.year} value={yearFilter} options={yearOptions} onChange={updateYearFilter} columns="grid-cols-3" />
               <FilterSection label={labels.length} value={lengthFilter} options={lengthOptions} onChange={updateLengthFilter} />
               <FilterSection label={labels.release} value={releaseFilter} options={releaseOptions} onChange={updateReleaseFilter} />
+              <FilterSection label={labels.studio} value={studioFilter} options={studioOptions} onChange={updateStudioFilter} />
             </div>
 
             <div className="flex items-center gap-2 border-t border-white/[0.06] p-4">

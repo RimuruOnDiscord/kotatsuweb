@@ -255,6 +255,7 @@ const AnimeContinueWatching: React.FC = () => {
 
     // Inject Design Styles
     useEffect(() => {
+        document.title = 'Continue Watching';
         const id = 'aw-design-styles';
         if (!document.getElementById(id)) {
             const tag = document.createElement('style');

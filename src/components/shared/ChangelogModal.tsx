@@ -186,10 +186,17 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({
   }, [open, changelogUrl]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+    if (open) {
+      const prevTitle = document.title;
+      document.title = 'Changelog';
+      const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+      window.addEventListener('keydown', handler);
+      return () => {
+        window.removeEventListener('keydown', handler);
+        document.title = prevTitle;
+      };
+    }
+  }, [onClose, open]);
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });

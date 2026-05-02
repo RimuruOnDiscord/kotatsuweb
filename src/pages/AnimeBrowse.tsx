@@ -17,6 +17,7 @@ import {
   getAnimeDisplayTitle,
   getAnimeStatusLabel,
   getAnimeTypeLabel,
+  fetchAnimeByStudio,
 } from '../utils/animeApi';
 
 type FilterOption = { value: string; label: string; disabled?: boolean };
@@ -55,6 +56,21 @@ const EPISODE_OPTIONS: FilterOption[] = [
   { value: 'short', label: '1 - 12 Episodes' },
   { value: 'medium', label: '13 - 24 Episodes' },
   { value: 'long', label: '25+ Episodes' },
+];
+
+const STUDIO_OPTIONS: FilterOption[] = [
+  { value: '', label: 'Studio' },
+  { value: 'MAPPA', label: 'MAPPA' },
+  { value: 'ufotable', label: 'ufotable' },
+  { value: 'Bones', label: 'Bones' },
+  { value: 'Madhouse', label: 'Madhouse' },
+  { value: 'Kyoto Animation', label: 'Kyoto Animation' },
+  { value: 'A-1 Pictures', label: 'A-1 Pictures' },
+  { value: 'CloverWorks', label: 'CloverWorks' },
+  { value: 'Wit Studio', label: 'Wit Studio' },
+  { value: 'Trigger', label: 'Trigger' },
+  { value: 'Production I.G', label: 'Production I.G' },
+  { value: 'J.C.Staff', label: 'J.C.Staff' },
 ];
 
 const SORT_OPTIONS: FilterOption[] = [
@@ -690,6 +706,10 @@ const AnimeBrowse: React.FC = () => {
   }, [viewMode]);
 
   const currentPage = resolvePageParam(searchParams.get('page'));
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentPage]);
   const committedQuery = searchParams.get('q') || '';
   const committedFormat = searchParams.get('format') || '';
   const committedStatus = searchParams.get('status') || '';
@@ -697,6 +717,7 @@ const AnimeBrowse: React.FC = () => {
   const committedYear = searchParams.get('year') || '';
   const committedEpisodeLength = searchParams.get('length') || '';
   const committedSort = searchParams.get('release') || '';
+  const committedStudio = searchParams.get('studio') || '';
 
   const rawGenres = searchParams.get('genres');
   const committedGenres = useMemo(() => parseMultiValueParam(rawGenres), [rawGenres]);
@@ -709,6 +730,7 @@ const AnimeBrowse: React.FC = () => {
   const [yearFilter, setYearFilter] = useState(committedYear);
   const [episodeFilter, setEpisodeFilter] = useState(committedEpisodeLength);
   const [sortFilter, setSortFilter] = useState(committedSort);
+  const [studioFilter, setStudioFilter] = useState(committedStudio);
 
   const [animeList, setAnimeList] = useState<AnimeResult[]>([]);
   const [pageInfo, setPageInfo] = useState({ currentPage: 1, lastPage: 1, hasNextPage: false, total: 0 });
@@ -790,8 +812,8 @@ const AnimeBrowse: React.FC = () => {
 
   const visiblePages = useMemo(() => getVisiblePages(pageInfo.currentPage, pageInfo.lastPage), [pageInfo.currentPage, pageInfo.lastPage]);
 
-  // Inject Design Styles
   useEffect(() => {
+    document.title = 'Browse';
     const id = 'aw-design-styles-anime';
     if (!document.getElementById(id)) {
       const tag = document.createElement('style');
@@ -821,12 +843,12 @@ const AnimeBrowse: React.FC = () => {
   useEffect(() => { setSearchQuery(committedQuery); }, [committedQuery]);
 
   const commitBrowseParams = useCallback(
-    (overrides?: Partial<Record<'q' | 'format' | 'status' | 'language' | 'year' | 'length' | 'release', string> & { genres: string[] }> & { page?: number }) => {
+    (overrides?: Partial<Record<'q' | 'format' | 'status' | 'language' | 'year' | 'length' | 'release' | 'studio', string> & { genres: string[] }> & { page?: number }) => {
       const nextParams = new URLSearchParams(searchParams);
       const nextValues = {
         q: (overrides?.q ?? searchQuery).trim(), format: overrides?.format ?? formatFilter, genres: overrides?.genres ?? genreFilter,
         status: overrides?.status ?? statusFilter, language: overrides?.language ?? seasonFilter, year: (overrides?.year ?? yearFilter).trim(),
-        length: overrides?.length ?? episodeFilter, release: overrides?.release ?? sortFilter, page: overrides?.page ?? 1,
+        length: overrides?.length ?? episodeFilter, release: overrides?.release ?? sortFilter, studio: overrides?.studio ?? studioFilter, page: overrides?.page ?? 1,
       };
 
       Object.entries(nextValues).forEach(([key, value]) => {
@@ -838,12 +860,12 @@ const AnimeBrowse: React.FC = () => {
       if (nextValues.page > 1) nextParams.set('page', String(nextValues.page)); else nextParams.delete('page');
 
       setSearchParams(nextParams);
-    }, [episodeFilter, formatFilter, genreFilter, searchParams, searchQuery, seasonFilter, setSearchParams, sortFilter, statusFilter, yearFilter]
+    }, [episodeFilter, formatFilter, genreFilter, searchParams, searchQuery, seasonFilter, setSearchParams, sortFilter, statusFilter, studioFilter, yearFilter]
   );
 
   const clearFilters = useCallback(() => {
     setSearchQuery(''); setFormatFilter(''); setGenreFilter([]); setStatusFilter('');
-    setSeasonFilter(''); setYearFilter(''); setEpisodeFilter(''); setSortFilter('');
+    setSeasonFilter(''); setYearFilter(''); setEpisodeFilter(''); setSortFilter(''); setStudioFilter('');
     setSearchParams(new URLSearchParams());
   }, [setSearchParams]);
 
@@ -865,6 +887,9 @@ const AnimeBrowse: React.FC = () => {
 
         if (isSearch) {
           payload = await fetchAnimeSearch(committedQuery.trim(), currentPage);
+        } else if (committedStudio) {
+          const res = await fetchAnimeByStudio(committedStudio, ITEMS_PER_PAGE, currentPage);
+          payload = { results: res.results, hasNextPage: res.hasNextPage, total: res.results.length };
         } else {
           const params = new URLSearchParams({ page: String(currentPage), per_page: String(ITEMS_PER_PAGE), sort: committedSort || 'POPULARITY_DESC' });
           params.set('isAdult', 'false');
@@ -929,9 +954,9 @@ const AnimeBrowse: React.FC = () => {
 
     run();
     return () => { controller.abort(); };
-  }, [committedEpisodeLength, committedFormat, committedGenres, committedQuery, committedSeason, committedSort, committedStatus, committedYear, currentPage]);
+  }, [committedEpisodeLength, committedFormat, committedGenres, committedQuery, committedSeason, committedSort, committedStatus, committedStudio, committedYear, currentPage]);
 
-  const hasActiveFilters = Boolean(committedQuery || committedFormat || committedGenres.length || committedStatus || committedSeason || committedYear || committedEpisodeLength || committedSort);
+  const hasActiveFilters = Boolean(committedQuery || committedFormat || committedGenres.length || committedStatus || committedSeason || committedYear || committedEpisodeLength || committedSort || committedStudio);
 
   const updateGenreFilter = useCallback((value: string) => {
     const nextValue = value === '' ? [] : genreFilter.includes(value) ? genreFilter.filter((entry) => entry !== value) : [...genreFilter, value];
@@ -939,7 +964,7 @@ const AnimeBrowse: React.FC = () => {
   }, [commitBrowseParams, genreFilter]);
 
   // Key to force animation when page/filters change
-  const contentKey = `${viewMode}-${currentPage}-${committedQuery}-${committedFormat}-${committedStatus}-${committedSeason}-${committedYear}-${committedEpisodeLength}-${committedSort}-${committedGenres.join()}`;
+  const contentKey = `${viewMode}-${currentPage}-${committedQuery}-${committedFormat}-${committedStatus}-${committedSeason}-${committedYear}-${committedEpisodeLength}-${committedSort}-${committedStudio}-${committedGenres.join()}`;
 
   return (
     <div className="aw-root aw-noise relative min-h-screen overflow-x-hidden text-white selection:bg-[var(--aw-accent-muted)]">
@@ -961,28 +986,29 @@ const AnimeBrowse: React.FC = () => {
           <div className="min-w-0 flex-1">
             <DesktopBrowseFilters
               searchQuery={searchQuery} setSearchQuery={setSearchQuery} submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
-              searchPlaceholder="Search Anime..." fieldLabels={{ genre: 'Genre', status: 'Status', language: 'Season', year: 'Year', length: 'Episodes', release: 'Sort' }}
+              searchPlaceholder="Search Anime..." fieldLabels={{ genre: 'Genre', status: 'Status', language: 'Season', year: 'Year', length: 'Episodes', release: 'Sort', studio: 'Studio' }}
               activeDropdown={activeDropdown} setActiveDropdown={setActiveDropdown} typeFilter={formatFilter} genreFilter={genreFilter}
-              statusFilter={statusFilter} languageFilter={seasonFilter} yearFilter={yearFilter} lengthFilter={episodeFilter} releaseFilter={sortFilter}
+              statusFilter={statusFilter} languageFilter={seasonFilter} yearFilter={yearFilter} lengthFilter={episodeFilter} releaseFilter={sortFilter} studioFilter={studioFilter}
               typeOptions={FORMAT_OPTIONS} genreOptions={GENRE_OPTIONS} statusOptions={STATUS_OPTIONS} languageOptions={SEASON_OPTIONS} yearOptions={yearOptions}
-              lengthOptions={EPISODE_OPTIONS} releaseOptions={SORT_OPTIONS}
+              lengthOptions={EPISODE_OPTIONS} releaseOptions={SORT_OPTIONS} studioOptions={STUDIO_OPTIONS}
               updateTypeFilter={(v) => { setFormatFilter(v); commitBrowseParams({ format: v, page: 1 }); }} updateGenreFilter={updateGenreFilter}
               updateStatusFilter={(v) => { setStatusFilter(v); commitBrowseParams({ status: v, page: 1 }); }}
               updateLanguageFilter={(v) => { setSeasonFilter(v); commitBrowseParams({ language: v, page: 1 }); }}
               updateYearFilter={(v) => { setYearFilter(v); commitBrowseParams({ year: v, page: 1 }); }}
               updateLengthFilter={(v) => { setEpisodeFilter(v); commitBrowseParams({ length: v, page: 1 }); }}
               updateReleaseFilter={(v) => { setSortFilter(v); commitBrowseParams({ release: v, page: 1 }); }}
+              updateStudioFilter={(v) => { setStudioFilter(v); commitBrowseParams({ studio: v, page: 1 }); }}
               hasActiveFilters={hasActiveFilters} clearFilters={clearFilters}
             />
             <MobileBrowseFilters
               searchQuery={searchQuery} setSearchQuery={setSearchQuery} submitSearch={() => commitBrowseParams({ q: searchQuery, page: 1 })}
-              searchPlaceholder="Search Anime..." fieldLabels={{ type: 'Format', genre: 'Genre', status: 'Status', language: 'Season', year: 'Year', length: 'Episodes', release: 'Sort' }}
-              typeFilter={formatFilter} genreFilter={genreFilter} statusFilter={statusFilter} languageFilter={seasonFilter} yearFilter={yearFilter} lengthFilter={episodeFilter} releaseFilter={sortFilter}
-              typeOptions={FORMAT_OPTIONS} genreOptions={GENRE_OPTIONS} statusOptions={STATUS_OPTIONS} languageOptions={SEASON_OPTIONS} yearOptions={yearOptions} lengthOptions={EPISODE_OPTIONS} releaseOptions={SORT_OPTIONS}
+              searchPlaceholder="Search Anime..." fieldLabels={{ type: 'Format', genre: 'Genre', status: 'Status', language: 'Season', year: 'Year', length: 'Episodes', release: 'Sort', studio: 'Studio' }}
+              typeFilter={formatFilter} genreFilter={genreFilter} statusFilter={statusFilter} languageFilter={seasonFilter} yearFilter={yearFilter} lengthFilter={episodeFilter} releaseFilter={sortFilter} studioFilter={studioFilter}
+              typeOptions={FORMAT_OPTIONS} genreOptions={GENRE_OPTIONS} statusOptions={STATUS_OPTIONS} languageOptions={SEASON_OPTIONS} yearOptions={yearOptions} lengthOptions={EPISODE_OPTIONS} releaseOptions={SORT_OPTIONS} studioOptions={STUDIO_OPTIONS}
               updateTypeFilter={(v) => { setFormatFilter(v); commitBrowseParams({ format: v, page: 1 }); }} updateGenreFilter={updateGenreFilter}
               updateStatusFilter={(v) => { setStatusFilter(v); commitBrowseParams({ status: v, page: 1 }); }} updateLanguageFilter={(v) => { setSeasonFilter(v); commitBrowseParams({ language: v, page: 1 }); }}
               updateYearFilter={(v) => { setYearFilter(v); commitBrowseParams({ year: v, page: 1 }); }} updateLengthFilter={(v) => { setEpisodeFilter(v); commitBrowseParams({ length: v, page: 1 }); }}
-              updateReleaseFilter={(v) => { setSortFilter(v); commitBrowseParams({ release: v, page: 1 }); }} hasActiveFilters={hasActiveFilters} clearFilters={clearFilters}
+              updateReleaseFilter={(v) => { setSortFilter(v); commitBrowseParams({ release: v, page: 1 }); }} updateStudioFilter={(v) => { setStudioFilter(v); commitBrowseParams({ studio: v, page: 1 }); }} hasActiveFilters={hasActiveFilters} clearFilters={clearFilters}
             />
           </div>
 

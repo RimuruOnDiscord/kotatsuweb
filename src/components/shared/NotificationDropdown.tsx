@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Bell, CheckCheck, UserPlus, Check, X, User, Loader2, Sparkles, Megaphone, Inbox, Users
+  Bell, CheckCheck, UserPlus, Check, X, User, Loader2, Sparkles, Megaphone, Inbox, Users, PlayCircle, Tv, BellRing
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useAuth } from '../../lib/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { readFollows, toggleFollow, BookmarkEntry } from '../../utils/bookmarks';
 
 const APP_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
@@ -34,8 +36,9 @@ export interface AppNotification {
   icon: React.ElementType;
   color: string;
   coverImage?: string;
-  type?: 'default' | 'friend_request' | 'news';
+  type?: 'default' | 'friend_request' | 'news' | 'release';
   actionId?: string;
+  slug?: string;
 }
 
 export const INITIAL_NOTIFICATIONS: AppNotification[] = [
@@ -58,12 +61,36 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     icon: Megaphone,
     color: '#f59e0b',
     type: 'news'
+  },
+  {
+    id: 'rel_demon_slayer',
+    title: 'Demon Slayer: Hashira Training Arc',
+    message: 'Episode 4 is now available in 1080p!',
+    time: '30m ago',
+    unread: true,
+    icon: PlayCircle,
+    color: '#3b82f6',
+    type: 'release',
+    slug: 'demon-slayer-hashira-training-arc'
+  },
+  {
+    id: 'rel_solo_leveling',
+    title: 'Solo Leveling',
+    message: 'Season 2 has been officially announced! Check out the details.',
+    time: '2h ago',
+    unread: true,
+    icon: Tv,
+    color: '#eab308',
+    type: 'release',
+    slug: 'solo-leveling'
   }
 ];
 
 const TABS = [
   { id: 'all', label: 'All Notifications', icon: Inbox, desc: 'Everything in one place' },
   { id: 'unread', label: 'Unread', icon: Bell, desc: 'Needs your attention' },
+  { id: 'releases', label: 'New Releases', icon: PlayCircle, desc: 'Latest episodes & anime' },
+  { id: 'subscriptions', label: 'Subscriptions', icon: BellRing, desc: 'Anime you\'re tracking' },
   { id: 'requests', label: 'Friend Requests', icon: Users, desc: 'Pending connections' },
 ] as const;
 
@@ -84,8 +111,8 @@ const SectionCard: React.FC<{ children: React.ReactNode; className?: string }> =
   <motion.div
     variants={fadeUpItem}
     className={`rounded-[16px] shadow-lg ${className}`}
-    style={{ 
-      background: 'rgba(255,255,255,0.02)', 
+    style={{
+      background: 'rgba(255,255,255,0.02)',
       border: '1px solid rgba(255,255,255,0.06)',
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)'
     }}
@@ -116,7 +143,7 @@ const AvatarImg = ({ src, alt, className }: { src?: string; alt?: string; classN
 // ─── Main Modal Component ─────────────────────────────────────────────────────
 export default function NotificationDropdown({
   open = false, // Added to convert to modal pattern
-  onClose = () => {}, // Added to convert to modal pattern
+  onClose = () => { }, // Added to convert to modal pattern
   notifications: propNotifications,
   setNotifications: setPropNotifications,
 }: {
@@ -126,10 +153,12 @@ export default function NotificationDropdown({
   setNotifications: React.Dispatch<React.SetStateAction<AppNotification[]>>;
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('all');
   const [friendRequests, setFriendRequests] = useState<AppNotification[]>([]);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [subscribedAnime, setSubscribedAnime] = useState<BookmarkEntry[]>([]);
 
   // Esc key to close
   useEffect(() => {
@@ -168,7 +197,7 @@ export default function NotificationDropdown({
                 time: timeAgo(req.created_at),
                 unread: true,
                 icon: UserPlus,
-                color: 'var(--app-accent, #8b5cf6)', 
+                color: 'var(--app-accent, #8b5cf6)',
                 coverImage: profile?.avatar_url,
                 actionId: req.user_id,
               };
@@ -188,6 +217,12 @@ export default function NotificationDropdown({
     fetchFriendRequests();
   }, [user?.id, open]);
 
+  // Load subscriptions
+  useEffect(() => {
+    if (!open) return;
+    setSubscribedAnime(readFollows());
+  }, [open]);
+
   // Derived State
   const allNotifications = useMemo(() => {
     return [...friendRequests, ...propNotifications].sort((a, b) => {
@@ -203,6 +238,8 @@ export default function NotificationDropdown({
   const filteredNotifications = useMemo(() => {
     if (activeTab === 'unread') return allNotifications.filter(n => n.unread);
     if (activeTab === 'requests') return friendRequests;
+    if (activeTab === 'releases') return allNotifications.filter(n => n.type === 'release');
+    if (activeTab === 'subscriptions') return []; // handled separately
     return allNotifications;
   }, [activeTab, allNotifications, friendRequests]);
 
@@ -289,22 +326,17 @@ export default function NotificationDropdown({
                     if (tab.id === 'all') count = allNotifications.length;
                     if (tab.id === 'unread') count = unreadCount;
                     if (tab.id === 'requests') count = friendRequests.length;
+                    if (tab.id === 'releases') count = allNotifications.filter(n => n.type === 'release').length;
+                    if (tab.id === 'subscriptions') count = subscribedAnime.length;
 
                     return (
-                      <motion.button
+                      <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        initial={false}
-                        animate={{
-                          backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255, 255, 255, 0)',
-                          color: active ? '#ffffff' : 'rgb(161, 161, 170)'
-                        }}
-                        whileHover={{
-                          backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255, 255, 255, 0.06)',
-                          color: '#ffffff'
-                        }}
-                        transition={{ duration: 0.2 }}
-                        className="relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-[12px] text-[13.5px] font-medium text-left"
+                        className={`relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-[12px] text-[13.5px] font-medium text-left transition-all duration-200 active:scale-[0.98] ${active
+                            ? 'bg-[var(--app-accent-muted)] text-white'
+                            : 'bg-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-white'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : '' }}>
@@ -317,7 +349,7 @@ export default function NotificationDropdown({
                             {count}
                           </span>
                         )}
-                      </motion.button>
+                      </button>
                     );
                   })}
                 </nav>
@@ -325,14 +357,12 @@ export default function NotificationDropdown({
                 {/* Footer Actions */}
                 {unreadCount > 0 && (
                   <div className="relative z-10 px-3 pt-5 mt-2 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <motion.button
+                    <button
                       onClick={markAllAsRead}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-all duration-200 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 hover:scale-[1.02] active:scale-[0.95]"
                     >
                       <CheckCheck size={15} /> Mark all as read
-                    </motion.button>
+                    </button>
                   </div>
                 )}
               </aside>
@@ -352,16 +382,12 @@ export default function NotificationDropdown({
                     </h3>
                     <p className="text-[12.5px] text-zinc-400 mt-1">{activeTabMeta.desc}</p>
                   </motion.div>
-                  <motion.button
+                  <button
                     onClick={onClose}
-                    whileHover={{ scale: 1.1, rotate: 90, backgroundColor: 'rgba(255,255,255,0.1)' }}
-                    whileTap={{ scale: 0.9 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 bg-white/[0.03] border border-white/[0.05] transition-all duration-300 hover:scale-110 hover:rotate-90 hover:bg-white/10 hover:text-white active:scale-90"
                   >
-                    <X size={16} strokeWidth={2.5} />
-                  </motion.button>
+                    <X size={15} strokeWidth={2.5} />
+                  </button>
                 </div>
 
                 <main className="flex-1 overflow-y-auto overflow-x-hidden py-6 px-8" style={{ scrollbarGutter: 'stable' }}>
@@ -382,7 +408,63 @@ export default function NotificationDropdown({
                         variants={staggerContainer} initial="hidden" animate="show" exit="exit"
                         className="flex flex-col gap-6"
                       >
-                        {filteredNotifications.length === 0 ? (
+                        {activeTab === 'subscriptions' ? (
+                          subscribedAnime.length === 0 ? (
+                            <motion.div variants={fadeUpItem} className="flex flex-col items-center justify-center py-16 text-center">
+                              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.08] mb-5 shadow-inner">
+                                <BellRing size={28} className="text-zinc-600" />
+                              </div>
+                              <p className="text-[16px] font-bold text-white tracking-tight" style={{ fontFamily: DISPLAY_FONT }}>
+                                No subscriptions yet
+                              </p>
+                              <p className="mt-1.5 text-[13px] text-zinc-500">
+                                Subscribe to anime to get notified about new episodes.
+                              </p>
+                            </motion.div>
+                          ) : (
+                            <div>
+                              <SectionLabel>Tracking {subscribedAnime.length} anime</SectionLabel>
+                              <SectionCard>
+                                {subscribedAnime.map((anime, i) => (
+                                  <div
+                                    key={anime.malId}
+                                    className="relative flex items-center gap-4 px-4 py-3.5 transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px] cursor-pointer hover:bg-white/[0.04]"
+                                    style={i < subscribedAnime.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
+                                    onClick={() => {
+                                      const slug = anime.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+                                      onClose();
+                                      navigate(`/watch/${slug}`);
+                                    }}
+                                  >
+                                    <div
+                                      className="flex h-[40px] w-[40px] items-center justify-center rounded-[12px] shadow-sm shrink-0"
+                                      style={{ background: 'color-mix(in srgb, var(--app-accent) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--app-accent) 30%, transparent)', color: 'var(--app-accent)' }}
+                                    >
+                                      <BellRing size={18} strokeWidth={2} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="truncate text-[13.5px] font-semibold text-white">{anime.title}</h4>
+                                      <p className="text-[12px] text-zinc-500 mt-0.5">
+                                        {anime.status === 'NOT_YET_RELEASED' ? 'Awaiting release' : anime.status === 'RELEASING' ? 'Currently airing' : anime.status || 'Tracking'}
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleFollow({ malId: anime.malId, title: anime.title, cover: anime.cover, type: anime.type, status: anime.status });
+                                        setSubscribedAnime(prev => prev.filter(a => a.malId !== anime.malId));
+                                      }}
+                                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[11px] font-bold uppercase tracking-wider transition-all duration-200 bg-white/[0.04] border border-white/[0.08] text-zinc-400 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-[0.96]"
+                                    >
+                                      <X size={12} strokeWidth={2.5} />
+                                      Unsub
+                                    </button>
+                                  </div>
+                                ))}
+                              </SectionCard>
+                            </div>
+                          )
+                        ) : filteredNotifications.length === 0 ? (
                           <motion.div variants={fadeUpItem} className="flex flex-col items-center justify-center py-16 text-center">
                             <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white/[0.02] border border-white/[0.08] mb-5 shadow-inner">
                               <activeTabMeta.icon size={28} className="text-zinc-600" />
@@ -408,42 +490,63 @@ export default function NotificationDropdown({
                                     onClick={() => {
                                       if (isFriendRequest) return;
                                       setPropNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, unread: false } : n));
+                                      if (notification.slug) {
+                                        onClose();
+                                        navigate(`/watch/${notification.slug}`);
+                                      }
                                     }}
-                                    className={`relative flex items-start gap-4 px-4 py-4 transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px] ${
-                                      notification.unread 
-                                        ? 'bg-white/[0.03] hover:bg-white/[0.06]' 
+                                    className={`relative flex items-start gap-4 px-4 py-4 transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px] ${notification.unread
+                                        ? 'bg-white/[0.03] hover:bg-white/[0.06]'
                                         : 'hover:bg-white/[0.02]'
-                                    } ${!isFriendRequest ? 'cursor-pointer' : ''}`}
+                                      } ${!isFriendRequest ? 'cursor-pointer' : ''}`}
                                     style={i < filteredNotifications.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
                                   >
 
                                     {/* Thumbnail or Icon */}
-                                    <div className="relative shrink-0 ml-1 mt-0.5">
+                                    <div
+                                      className={`relative shrink-0 ml-1 mt-0.5 ${isFriendRequest ? 'cursor-pointer' : ''}`}
+                                      onClick={(e) => {
+                                        if (isFriendRequest && notification.actionId) {
+                                          e.stopPropagation();
+                                          onClose();
+                                          window.dispatchEvent(new CustomEvent('open-profile-modal', { detail: { userId: notification.actionId } }));
+                                        }
+                                      }}
+                                    >
                                       {notification.coverImage ? (
                                         <div className="h-[42px] w-[42px] overflow-hidden rounded-[10px] border border-white/[0.1] bg-[#1a1a1c] shadow-sm">
                                           <img src={notification.coverImage} alt="" className="h-full w-full object-cover" draggable={false} />
                                         </div>
                                       ) : (
-                                        <div 
+                                        <div
                                           className="flex h-[40px] w-[40px] items-center justify-center rounded-[12px] shadow-sm"
                                           style={{ background: `color-mix(in srgb, ${notification.color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${notification.color} 30%, transparent)`, color: notification.color }}
                                         >
                                           {isFriendRequest && !notification.coverImage ? <User size={18} strokeWidth={2} /> : <Icon size={18} strokeWidth={2} />}
                                         </div>
                                       )}
-                                      
+
                                       {isFriendRequest && notification.coverImage && (
-                                         <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-black shadow-sm"
-                                              style={{ background: 'var(--app-accent)', border: '2px solid var(--app-bg)' }}>
-                                           <UserPlus size={10} strokeWidth={3} />
-                                         </div>
+                                        <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-black shadow-sm"
+                                          style={{ background: 'var(--app-accent)', border: '2px solid var(--app-bg)' }}>
+                                          <UserPlus size={10} strokeWidth={3} />
+                                        </div>
                                       )}
                                     </div>
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center justify-between gap-2 mb-0.5">
-                                        <h4 className={`truncate text-[13.5px] font-semibold ${notification.unread ? 'text-white' : 'text-zinc-300'}`}>
+                                        <h4
+                                          className={`truncate text-[13.5px] font-semibold ${notification.unread ? 'text-white' : 'text-zinc-300'} ${isFriendRequest ? 'cursor-pointer hover:text-[var(--app-accent)] transition-colors' : ''}`}
+                                          onClick={(e) => {
+                                            if (isFriendRequest && notification.actionId) {
+                                              e.stopPropagation();
+                                              onClose();
+                                              window.dispatchEvent(new CustomEvent('open-profile-modal', { detail: { userId: notification.actionId } }));
+                                            }
+                                          }}
+                                        >
                                           {notification.title}
                                         </h4>
                                         <span className="shrink-0 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
@@ -457,26 +560,22 @@ export default function NotificationDropdown({
                                       {/* Friend Request Action Buttons */}
                                       {isFriendRequest && notification.actionId && (
                                         <div className="flex items-center gap-2 mt-3.5">
-                                          <motion.button 
+                                          <button
                                             disabled={processingId === notification.actionId}
                                             onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'decline', notification.id); }}
-                                            whileHover={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                                            whileTap={{ scale: 0.96 }}
-                                            className="flex-1 h-[34px] rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-zinc-400 text-[12.5px] font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                                            className="flex-1 h-[34px] rounded-[10px] bg-white/[0.04] border border-white/[0.08] text-zinc-400 text-[12.5px] font-bold flex items-center justify-center gap-1.5 transition-all duration-200 disabled:opacity-50 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-[0.96]"
                                           >
                                             <X size={14} strokeWidth={2.5} /> Decline
-                                          </motion.button>
-                                          
-                                          <motion.button 
+                                          </button>
+
+                                          <button
                                             disabled={processingId === notification.actionId}
                                             onClick={(e) => { e.stopPropagation(); handleFriendAction(notification.actionId!, 'accept', notification.id); }}
-                                            whileHover={{ filter: 'brightness(1.1)' }}
-                                            whileTap={{ scale: 0.96 }}
-                                            className="flex-1 h-[34px] rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-1.5 text-black disabled:opacity-50"
+                                            className="flex-1 h-[34px] rounded-[10px] text-[12.5px] font-bold flex items-center justify-center gap-1.5 text-black disabled:opacity-50 transition-all duration-200 hover:brightness-110 active:scale-[0.96]"
                                             style={{ background: 'var(--app-accent)' }}
                                           >
                                             {processingId === notification.actionId ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} strokeWidth={3} />} Accept
-                                          </motion.button>
+                                          </button>
                                         </div>
                                       )}
                                     </div>

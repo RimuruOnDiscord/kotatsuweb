@@ -15,6 +15,7 @@ export interface BookmarkEntry {
 
 export const BOOKMARKS_STORAGE_KEY = 'mangavel:bookmarks';
 export const ANIME_BOOKMARKS_STORAGE_KEY = 'mangavel:anime-bookmarks';
+export const ANIME_FOLLOWS_STORAGE_KEY = 'mangavel:anime-follows';
 
 export const getBookmarksStorageKey = (mode: ContentMode = getStoredContentMode()) =>
   mode === 'anime' ? ANIME_BOOKMARKS_STORAGE_KEY : BOOKMARKS_STORAGE_KEY;
@@ -79,4 +80,39 @@ export const removeBookmark = (malId: number) => {
   }
 
   return nextEntries;
+};
+
+export const readFollows = (): BookmarkEntry[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(ANIME_FOLLOWS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isBookmarkEntry) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const writeFollows = (entries: BookmarkEntry[]) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(ANIME_FOLLOWS_STORAGE_KEY, JSON.stringify(entries));
+};
+
+export const isFollowed = (malId: number, entries?: BookmarkEntry[]) => {
+  const followEntries = entries ?? readFollows();
+  return followEntries.some((entry) => entry.malId === malId);
+};
+
+export const toggleFollow = (entry: Omit<BookmarkEntry, 'updatedAt'>) => {
+  const existing = readFollows();
+  const alreadyFollowed = existing.some((f) => f.malId === entry.malId);
+  const nextEntries = alreadyFollowed
+    ? existing.filter((f) => f.malId !== entry.malId)
+    : [{ ...entry, updatedAt: Date.now() }, ...existing].sort((a, b) => b.updatedAt - a.updatedAt);
+  
+  if (nextEntries.length > 0) writeFollows(nextEntries);
+  else if (typeof window !== 'undefined') window.localStorage.removeItem(ANIME_FOLLOWS_STORAGE_KEY);
+  
+  return { nextEntries, followed: !alreadyFollowed };
 };

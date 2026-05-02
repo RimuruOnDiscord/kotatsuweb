@@ -1,16 +1,17 @@
-
+/* --- START OF FILE ProfileModal.tsx --- */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  X, User, Bookmark, Activity as ActivityIcon, Users, 
+  X, User, Bookmark, Activity as ActivityIcon, Users,
   Award, ExternalLink, Calendar, MessageSquare, MessageSquareReply, Check, Loader2, ChevronRight,
-  Crown, Terminal, BadgeCheck, Gem, Flame, UserPlus, UserMinus, Shield
+  Crown, Terminal, BadgeCheck, Gem, Flame, UserPlus, UserMinus, Shield, Play
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabaseUrl, supabaseAnonKey, supabase } from '../../lib/supabase';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { fetchAnimeEpisodes } from '../../utils/animeApi';
 
 const APP_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
@@ -29,11 +30,11 @@ const fadeUpItem: Variants = {
 
 // ─── Constants & Mock Data ────────────────────────────────────────────────────
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: User,         desc: 'At a glance' },
-  { id: 'activity',  label: 'Activity',  icon: ActivityIcon, desc: 'Recent interactions' },
-  { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark,     desc: 'Saved content' },
-  { id: 'friends',   label: 'Friends',   icon: Users,        desc: 'Network and requests' },
-  { id: 'badges',    label: 'Badges',    icon: Award,        desc: 'Earned achievements' },
+  { id: 'overview', label: 'Overview', icon: User, desc: 'At a glance' },
+  { id: 'activity', label: 'Activity', icon: ActivityIcon, desc: 'Recent interactions' },
+  { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark, desc: 'Saved content' },
+  { id: 'friends', label: 'Friends', icon: Users, desc: 'Network and requests' },
+  { id: 'badges', label: 'Badges', icon: Award, desc: 'Earned achievements' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -48,7 +49,7 @@ const MOCK_BADGES = [
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface ProfileModalProps { open?: boolean; onClose?: () => void; userId?: string; }
-interface CommentItem { id: string; content: string; created_at: string; page_type: string; page_id: string; likes_count: number; type: 'comment' | 'reply'; }
+interface CommentItem { id: string; content: string; created_at: string; page_type: string; page_id: string; likes_count: number; type: 'comment' | 'reply' | 'watch'; href?: string; anime_cover?: string; episode_image?: string; episode_title?: string; anime_title?: string; episode_number?: number; }
 interface BookmarkItem { mal_id: string; title: string; cover: string; type: string; status: string; }
 interface FriendItem { id: string; display_name: string; avatar_url: string; role?: string | string[]; friendship_date?: string; }
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted';
@@ -78,8 +79,8 @@ const SectionCard: React.FC<{ children: React.ReactNode; className?: string }> =
   <motion.div
     variants={fadeUpItem}
     className={`rounded-[16px] shadow-lg ${className}`}
-    style={{ 
-      background: 'rgba(255,255,255,0.02)', 
+    style={{
+      background: 'rgba(255,255,255,0.02)',
       border: '1px solid rgba(255,255,255,0.06)',
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)'
     }}
@@ -125,7 +126,7 @@ const renderRoleTag = (rawRole: any) => {
     <div className="flex items-center gap-1.5 flex-shrink-0">
       {cleanRoles.map((role, idx) => {
         const lowerRole = role.toLowerCase();
-        let Icon = Award; let color = 'var(--app-accent)'; 
+        let Icon = Award; let color = 'var(--app-accent)';
         if (lowerRole === 'developer' || lowerRole === 'dev') { Icon = Terminal; color = '#38bdf8'; }
         else if (lowerRole === 'founder') { Icon = Crown; color = '#a855f7'; }
         else if (lowerRole === 'verified') { Icon = BadgeCheck; color = '#10b981'; }
@@ -137,27 +138,27 @@ const renderRoleTag = (rawRole: any) => {
 
         return (
           <div key={idx} className="relative group/role flex items-center justify-center cursor-default z-10">
-            <motion.div 
+            <motion.div
               whileHover={{ scale: 1.15, y: -2 }}
               className="flex items-center justify-center w-[26px] h-[26px] rounded-[6px]"
               style={{ color: color, backgroundColor: `${color}15`, border: `1px solid ${color}30` }}
             >
               <Icon size={13} strokeWidth={2.5} />
             </motion.div>
-            
+
             {/* Seamless Themed Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 opacity-0 group-hover/role:opacity-100 transition-all duration-300 pointer-events-none flex flex-col items-center translate-y-1 group-hover/role:translate-y-0 z-50">
-              
-              <div 
+
+              <div
                 className="relative px-3 py-1.5 rounded-[8px] border text-[11.5px] font-bold text-white whitespace-nowrap backdrop-blur-md"
-                style={{ 
+                style={{
                   fontFamily: APP_FONT,
                   backgroundColor: bgColor,
-                  borderColor: borderColor 
+                  borderColor: borderColor
                 }}
               >
                 {/* The Eraser - Hides the bottom border line where the triangle connects */}
-                <div 
+                <div
                   className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-3 h-[1.5px] z-20"
                   style={{ backgroundColor: bgColor }}
                 />
@@ -165,11 +166,11 @@ const renderRoleTag = (rawRole: any) => {
               </div>
 
               {/* Triangle (pointing down) */}
-              <div 
+              <div
                 className="w-2.5 h-2.5 rotate-45 border-r border-b -mt-[6px] backdrop-blur-md"
-                style={{ 
+                style={{
                   backgroundColor: bgColor,
-                  borderColor: borderColor 
+                  borderColor: borderColor
                 }}
               />
             </div>
@@ -186,15 +187,16 @@ const renderRoleTag = (rawRole: any) => {
 const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) => {
   const navigate = useNavigate();
   const { user, profile: authProfile } = useAuth();
-  
+
   const [internalOpen, setInternalOpen] = useState(open || false);
   const [activeUserId, setActiveUserId] = useState<string | null>(userId || null);
   const [activeProfile, setActiveProfile] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'watch' | 'comments'>('all');
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
-  
+
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [pendingRequests, setPendingRequests] = useState<FriendItem[]>([]);
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>('none');
@@ -202,6 +204,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
 
   const [loading, setLoading] = useState(true);
   const hasFetchedFor = useRef<string | null>(null);
+
+  // Track Original Document Title
+  const originalTitleRef = useRef<string>(document.title);
 
   useEffect(() => { if (open !== undefined) setInternalOpen(open); }, [open]);
   useEffect(() => { if (userId !== undefined) setActiveUserId(userId); }, [userId]);
@@ -216,7 +221,11 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     return () => { window.removeEventListener('open-profile-modal', handleOpenEvent); window.removeEventListener('openProfile', handleOpenEvent); };
   }, []);
 
-  const handleClose = () => { setInternalOpen(false); if (onClose) onClose(); };
+  const handleClose = () => {
+    setInternalOpen(false);
+    document.title = originalTitleRef.current;
+    if (onClose) onClose();
+  };
 
   const activeUserBadges = useMemo(() => {
     if (!activeProfile && comments.length === 0) return [MOCK_BADGES.find(b => b.id === 'verified')!].filter(Boolean);
@@ -245,28 +254,74 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     const uid = activeUserId || user?.id;
     if (!uid) { setLoading(false); return; }
     setLoading(true);
-    
+
     try {
       const headers = { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` };
-      
-      // We explicitly fetch the profile data directly from the DB rather than local context
-      // to guarantee we have up-to-date roles and badges even when viewing our own profile.
-      const pRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${uid}&select=*`, { headers });
-      const pList = pRes.ok ? await pRes.json() : []; 
-      setActiveProfile(pList[0] || null);
 
-      const [cRes, rRes, bRes] = await Promise.all([
+      // We explicitly fetch the profile data directly from the DB rather than local context
+      const pRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${uid}&select=*`, { headers });
+      const pList = pRes.ok ? await pRes.json() : [];
+      const profileData = pList[0] || null;
+      setActiveProfile(profileData);
+
+      // Update Document Title Dynamically 
+      if (profileData?.display_name) {
+        document.title = `${profileData.display_name}'s Profile`;
+      }
+
+      const [cRes, rRes, bRes, wRes] = await Promise.all([
         fetch(`${supabaseUrl}/rest/v1/comments?user_id=eq.${uid}&parent_id=is.null&select=id,content,created_at,page_type,page_id,likes_count&order=created_at.desc`, { headers }),
         fetch(`${supabaseUrl}/rest/v1/comments?user_id=eq.${uid}&parent_id=not.is.null&select=id,content,created_at,page_type,page_id,likes_count&order=created_at.desc`, { headers }),
         fetch(`${supabaseUrl}/rest/v1/anime_bookmarks?user_id=eq.${uid}&select=mal_id,title,cover,type,status&order=created_at.desc`, { headers }),
+        fetch(`${supabaseUrl}/rest/v1/anime_watch_history?user_id=eq.${uid}&select=*&order=updated_at.desc&limit=10`, { headers }),
       ]);
 
       const cList = cRes.ok ? await cRes.json() : [];
       const rList = rRes.ok ? await rRes.json() : [];
       const bList = bRes.ok ? await bRes.json() : [];
-      const combinedActivity = [...cList.map((c: any) => ({ ...c, type: 'comment' as const })), ...rList.map((r: any) => ({ ...r, type: 'reply' as const }))]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
+      const wList = wRes.ok ? await wRes.json() : [];
+
+      // Fetch episode thumbnails from the API for each unique anime in watch history
+      const thumbMap: Record<string, Record<number, string>> = {};
+      if (wList.length > 0) {
+        const uniqueAnimeIds = [...new Set(wList.map((w: any) => String(w.anime_id)))] as string[];
+        const epResults = await Promise.allSettled(uniqueAnimeIds.map(id => fetchAnimeEpisodes(id)));
+        epResults.forEach((result, idx) => {
+          if (result.status === 'fulfilled' && result.value?.providers) {
+            const providerKey = Object.keys(result.value.providers)[0];
+            if (providerKey) {
+              const eps = result.value.providers[providerKey]?.episodes?.sub || result.value.providers[providerKey]?.episodes?.dub || [];
+              const map: Record<number, string> = {};
+              eps.forEach((ep: any) => { if (ep.number && ep.image) map[ep.number] = ep.image; });
+              thumbMap[uniqueAnimeIds[idx]] = map;
+            }
+          }
+        });
+      }
+
+      const combinedActivity = [
+        ...cList.map((c: any) => ({ ...c, type: 'comment' as const })),
+        ...rList.map((r: any) => ({ ...r, type: 'reply' as const })),
+        ...wList.map((w: any) => {
+          const epThumb = thumbMap[String(w.anime_id)]?.[w.episode_number];
+          return {
+            id: `watch-${w.anime_id}-${w.episode_id}`,
+            content: `Watched Episode ${w.episode_number} of ${w.anime_title}`,
+            created_at: w.updated_at,
+            page_type: 'anime',
+            page_id: w.anime_id,
+            likes_count: 0,
+            type: 'watch' as const,
+            anime_cover: w.anime_cover,
+            episode_image: epThumb || w.episode_image || null,
+            href: w.href,
+            episode_title: w.episode_title,
+            anime_title: w.anime_title,
+            episode_number: w.episode_number,
+          };
+        })
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
       setComments(combinedActivity); setBookmarks(bList);
 
       let fetchedFriends: FriendItem[] = []; let fetchedPending: FriendItem[] = []; let relStatus: FriendshipStatus = 'none';
@@ -299,9 +354,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     } catch (err) { console.error('Profile fetch error:', err); } finally { setLoading(false); }
   }, [activeUserId, user?.id]);
 
-  useEffect(() => { 
-    if (internalOpen && hasFetchedFor.current !== activeUserId) { setActiveTab('overview'); fetchData(); hasFetchedFor.current = activeUserId; } 
-    else if (!internalOpen) hasFetchedFor.current = null;
+  useEffect(() => {
+    if (internalOpen && hasFetchedFor.current !== activeUserId) {
+      setActiveTab('overview');
+      originalTitleRef.current = document.title;
+      fetchData();
+      hasFetchedFor.current = activeUserId;
+    }
+    else if (!internalOpen) {
+      hasFetchedFor.current = null;
+    }
   }, [internalOpen, activeUserId, fetchData]);
 
   useEffect(() => {
@@ -351,6 +413,15 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
   const displayName = activeProfile?.display_name || 'Anonymous User';
   const avatarUrl = activeProfile?.avatar_url;
 
+  // ─── True Status Logic from Explicit DB Columns ───
+  const lastActiveTime = activeProfile?.last_active_at ? new Date(activeProfile.last_active_at).getTime() : 0;
+  const isOnline = (Date.now() - lastActiveTime < 15 * 60 * 1000) && activeProfile?.status_state && activeProfile.status_state !== 'offline';
+  const statusState = activeProfile?.status_state;
+  const statusText = activeProfile?.status_text;
+
+  // Fallback to latest watch activity if offline
+  const latestWatch = comments.find(c => c.type === 'watch');
+
   const modalStyles = {
     fontFamily: APP_FONT,
     background: 'var(--app-bg, #09090b)',
@@ -386,35 +457,51 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                 style={{ background: 'rgba(255,255,255,0.015)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
               >
                 {/* Clean, Sleek Profile Banner Block */}
-                <div 
+                <div
                   className="absolute top-0 left-0 right-0 h-[100px] pointer-events-none rounded-tl-[20px] overflow-hidden z-0"
                   style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
                 >
-                  <div 
-                    className="absolute inset-0 opacity-[0.85]" 
-                    style={{ 
+                  <div
+                    className="absolute inset-0 opacity-[0.85]"
+                    style={{
                       background: `linear-gradient(135deg, var(--app-accent) 0%, color-mix(in srgb, var(--app-accent) 30%, black) 100%)`
-                    }} 
+                    }}
                   />
                 </div>
 
                 {/* Profile Identity Block */}
-                {/* pt-[58px] ensures the 84px avatar precisely intersects the 100px banner halfway */}
                 <div className="relative z-10 px-6 pt-[58px] pb-5 flex flex-col">
                   {/* Avatar with thick cutout border matching modal background */}
-                  <div 
-                    className="w-[84px] h-[84px] rounded-full shadow-2xl flex-shrink-0 flex items-center justify-center mb-3.5 relative z-20" 
-                    style={{ background: 'var(--app-bg)', border: '4px solid var(--app-bg)' }}
-                  >
-                    <AvatarImg src={avatarUrl} alt={displayName} className="w-full h-full object-cover rounded-full" />
+                  <div className="relative z-20 mb-3.5 w-[84px] h-[84px] flex-shrink-0">
+                    <div
+                      className="w-full h-full rounded-full shadow-2xl flex items-center justify-center relative z-10"
+                      style={{ background: 'var(--app-bg)', border: '4px solid var(--app-bg)' }}
+                    >
+                      <AvatarImg src={avatarUrl} alt={displayName} className="w-full h-full object-cover rounded-full" />
+                    </div>
+                    {/* The Big Avatar Status Dot */}
+                    <div
+                      className={`absolute bottom-0 right-0 w-[22px] h-[22px] rounded-full border-[4px] z-30 transition-colors duration-500 ${isOnline ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-zinc-600'}`}
+                      style={{ borderColor: 'var(--app-bg)' }}
+                    />
                   </div>
-                  
+
                   {/* Name and Badges inline container */}
-                  <div className="flex items-center gap-2 max-w-full">
+                  <div className="relative z-30 flex items-center gap-2 max-w-full">
                     <h2 className="text-[19px] text-white leading-tight truncate font-bold" style={{ fontFamily: DISPLAY_FONT, letterSpacing: '-0.02em' }}>
                       {displayName}
                     </h2>
                     {renderRoleTag(activeProfile?.role)}
+                  </div>
+
+                  {/* True Status Text under Name */}
+                  <div className="relative z-30 mt-1 flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-zinc-600'}`} />
+                    <span className={`text-[11px] font-semibold tracking-wide truncate ${isOnline ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                      {isOnline
+                        ? (statusState === 'watching' ? `Watching: ${statusText}` : statusText || 'Online')
+                        : (latestWatch ? `Seen ${timeAgo(latestWatch.created_at)}` : 'Offline')}
+                    </span>
                   </div>
                 </div>
 
@@ -455,18 +542,17 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                       disabled={isProcessingFriend}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.95 }}
-                      className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors ${
-                        friendshipStatus === 'accepted' ? 'bg-white/5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10' 
+                      className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[12px] text-[13px] font-medium transition-colors ${friendshipStatus === 'accepted' ? 'bg-white/5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10'
                         : friendshipStatus === 'pending_sent' ? 'bg-yellow-500/10 text-yellow-500 hover:text-red-400 hover:bg-red-500/10'
-                        : friendshipStatus === 'pending_received' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                        : 'bg-white/5 text-white hover:text-[var(--app-accent)] hover:bg-[var(--app-accent-muted)]'
-                      }`}
+                          : friendshipStatus === 'pending_received' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-white/5 text-white hover:text-[var(--app-accent)] hover:bg-[var(--app-accent-muted)]'
+                        }`}
                     >
                       {isProcessingFriend ? <Loader2 size={15} className="animate-spin opacity-70" />
-                      : friendshipStatus === 'accepted' ? <><UserMinus size={15} /> Remove Friend</>
-                      : friendshipStatus === 'pending_sent' ? <><UserMinus size={15} /> Cancel Request</>
-                      : friendshipStatus === 'pending_received' ? <><Check size={15} /> Accept Request</>
-                      : <><UserPlus size={15} /> Add Friend</>}
+                        : friendshipStatus === 'accepted' ? <><UserMinus size={15} /> Remove Friend</>
+                          : friendshipStatus === 'pending_sent' ? <><UserMinus size={15} /> Cancel Request</>
+                            : friendshipStatus === 'pending_received' ? <><Check size={15} /> Accept Request</>
+                              : <><UserPlus size={15} /> Add Friend</>}
                     </motion.button>
                   )}
 
@@ -542,6 +628,44 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                         {/* ── OVERVIEW ── */}
                         {activeTab === 'overview' && (
                           <>
+                            {/* Discord-style Rich Presence Activity */}
+                            {(() => {
+                              // Always use latest watch for the card, regardless of if they are currently watching or just browsing
+                              if (latestWatch) {
+                                const epNum = latestWatch.episode_number || latestWatch.content.match(/Episode (\d+)/)?.[1] || '?';
+                                const thumbSrc = latestWatch.episode_image || latestWatch.anime_cover;
+                                const isCurrentlyWatching = isOnline && statusState === 'watching';
+
+                                return (
+                                  <div className="mb-2">
+                                    <SectionLabel>{isCurrentlyWatching ? 'Currently Watching' : 'Last Watched'}</SectionLabel>
+                                    <SectionCard
+                                      className={`overflow-hidden cursor-pointer group ${!isCurrentlyWatching ? 'opacity-50 grayscale-[30%]' : ''}`}
+                                      onClick={() => latestWatch.href && navigate(latestWatch.href)}
+                                    >
+                                      <div className="flex items-center gap-4 p-3.5 transition-colors duration-300 group-hover:bg-white/[0.04]">
+                                        <div className="relative w-[80px] h-[46px] rounded-lg overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                                          <img src={thumbSrc} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        </div>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                          <span className="text-[13.5px] font-bold text-white truncate group-hover:text-white/90 transition-colors">{latestWatch.anime_title || latestWatch.content.split(' of ')[1]}</span>
+                                          <span className="text-[12px] text-zinc-400 truncate mt-0.5">
+                                            <span className="font-bold text-[var(--app-accent)]">Episode {epNum}</span>
+                                            {latestWatch.episode_title && latestWatch.episode_title !== `Episode ${epNum}` && <span className="text-zinc-500"> — {latestWatch.episode_title}</span>}
+                                          </span>
+                                          <span className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1.5">
+                                            <div className={`w-1.5 h-1.5 rounded-full ${isCurrentlyWatching ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+                                            {timeAgo(latestWatch.created_at)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </SectionCard>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+
                             <div>
                               <SectionLabel>Stats</SectionLabel>
                               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -551,23 +675,34 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                                   { icon: Users, label: "Friends", val: stats.friends },
                                   { icon: Award, label: "Badges", val: stats.badges }
                                 ].map((stat, i) => (
-                                  <motion.div key={i} variants={fadeUpItem}>
-                                    <SectionCard className="p-3 flex flex-col items-center justify-center text-center group cursor-default hover:bg-white/[0.04] transition-colors aspect-square w-full">
-                                      <stat.icon size={16} className="text-[var(--app-accent)] mb-2 opacity-80 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                                      
-                                      {/* Ensuring joined date perfectly matches dimensions of regular stats */}
-                                      {stat.label === 'Joined' ? (
-                                        <div className="flex flex-col flex-1 items-center justify-center min-h-[40px] w-full gap-0.5">
-                                          <span className="text-[14px] font-bold text-white leading-tight">{stat.val.split(' ')[0]}</span>
-                                          <span className="text-[18px] font-bold text-white leading-none" style={{ fontFamily: DISPLAY_FONT }}>{stat.val.split(' ')[1]}</span>
+                                  <motion.div key={i} variants={fadeUpItem} className="h-full">
+                                    <SectionCard className="overflow-hidden group cursor-default h-full">
+                                      <div className="flex flex-col items-center justify-center text-center p-4 transition-colors duration-300 group-hover:bg-white/[0.04] aspect-square w-full relative h-full">
+
+                                        {/* Soft radial glow on hover */}
+                                        <div
+                                          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                                          style={{ background: 'radial-gradient(circle at center, color-mix(in srgb, var(--app-accent) 8%, transparent) 0%, transparent 70%)' }}
+                                        />
+
+                                        <div className="w-[34px] h-[34px] rounded-full mb-3 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-0.5 shadow-sm relative z-10">
+                                          <stat.icon size={16} className="text-zinc-400 group-hover:text-[var(--app-accent)] transition-colors duration-300 flex-shrink-0" strokeWidth={2} />
                                         </div>
-                                      ) : (
-                                        <div className="flex flex-col flex-1 items-center justify-center min-h-[40px] w-full">
-                                          <span className="text-[24px] font-bold text-white leading-none" style={{ fontFamily: DISPLAY_FONT }}>{stat.val}</span>
-                                        </div>
-                                      )}
-                                      
-                                      <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1 flex-shrink-0">{stat.label}</span>
+
+                                        {/* Ensuring joined date perfectly matches dimensions of regular stats */}
+                                        {stat.label === 'Joined' ? (
+                                          <div className="flex flex-col flex-1 items-center justify-center min-h-[40px] w-full gap-0.5 relative z-10">
+                                            <span className="text-[13px] font-bold text-zinc-300 group-hover:text-white transition-colors leading-tight">{stat.val.split(' ')[0]}</span>
+                                            <span className="text-[18px] font-bold text-white group-hover:text-white/90 transition-colors leading-none" style={{ fontFamily: DISPLAY_FONT }}>{stat.val.split(' ')[1]}</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col flex-1 items-center justify-center min-h-[40px] w-full relative z-10">
+                                            <span className="text-[24px] font-bold text-white group-hover:text-white/90 transition-colors leading-none" style={{ fontFamily: DISPLAY_FONT }}>{stat.val}</span>
+                                          </div>
+                                        )}
+
+                                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1 flex-shrink-0 relative z-10">{stat.label}</span>
+                                      </div>
                                     </SectionCard>
                                   </motion.div>
                                 ))}
@@ -587,16 +722,34 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                                   comments.slice(0, 3).map((c, i) => (
                                     <div
                                       key={c.id}
-                                      onClick={() => handleContentNavigation(navigate, c.page_type, c.page_id, handleClose)}
-                                      className="flex items-start gap-4 px-4 py-3.5 cursor-pointer hover:bg-white/[0.03] transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px]"
+                                      onClick={() => c.type === 'watch' && c.href ? navigate(c.href) : handleContentNavigation(navigate, c.page_type, c.page_id, handleClose)}
+                                      className="flex items-center gap-3.5 px-4 py-3 cursor-pointer group hover:bg-white/[0.03] transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px]"
                                       style={i < Math.min(comments.length, 3) - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
                                     >
-                                      <div className="mt-1 flex-shrink-0 text-zinc-500">
-                                        {c.type === 'reply' ? <MessageSquareReply size={15} /> : <MessageSquare size={15} />}
-                                      </div>
-                                      <div className="flex flex-col">
-                                        <span className="text-[13.5px] text-zinc-200 leading-relaxed line-clamp-2">{c.content}</span>
-                                        <span className="text-[11.5px] text-zinc-500 mt-1 capitalize">{c.type} • {timeAgo(c.created_at)}</span>
+                                      {c.type === 'watch' ? (
+                                        <div className="flex-shrink-0 w-[64px] h-[36px] rounded-[8px] overflow-hidden bg-[#111] border border-white/10 relative">
+                                          <img src={c.episode_image || c.anime_cover} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                        </div>
+                                      ) : (
+                                        <div className="flex-shrink-0 text-zinc-500 group-hover:text-[var(--app-accent)] transition-colors">
+                                          {c.type === 'reply' ? <MessageSquareReply size={15} /> : <MessageSquare size={15} />}
+                                        </div>
+                                      )}
+                                      <div className="flex flex-col min-w-0 flex-1">
+                                        {c.type === 'watch' ? (
+                                          <>
+                                            <span className="text-[13px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">{c.anime_title || c.content.split(' of ')[1]}</span>
+                                            <span className="text-[11.5px] text-zinc-500 mt-0.5 truncate">
+                                              <span className="font-bold text-[var(--app-accent)]">EP {c.episode_number || c.content.match(/Episode (\d+)/)?.[1]}</span>
+                                              {c.episode_title && c.episode_title !== `Episode ${c.episode_number}` && <span> — {c.episode_title}</span>}
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="text-[13px] text-zinc-200 leading-relaxed line-clamp-2 group-hover:text-white transition-colors">{c.content}</span>
+                                            <span className="text-[11.5px] text-zinc-500 mt-0.5 capitalize">{c.type} • {timeAgo(c.created_at)}</span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   ))
@@ -608,36 +761,78 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
 
                         {/* ── ACTIVITY ── */}
                         {activeTab === 'activity' && (
-                          <SectionCard>
-                            {comments.length === 0 ? (
-                              <div className="p-8 text-center flex flex-col items-center gap-2">
-                                <ActivityIcon size={24} className="text-zinc-600" />
-                                <span className="text-[13px] text-zinc-500">No activity to display.</span>
-                              </div>
-                            ) : (
-                              comments.map((c, i) => (
-                                <div
-                                  key={c.id}
-                                  onClick={() => handleContentNavigation(navigate, c.page_type, c.page_id, handleClose)}
-                                  className="flex items-start gap-4 px-4 py-4 cursor-pointer group hover:bg-white/[0.03] transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px]"
-                                  style={i < comments.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
+                          <div className="flex flex-col gap-4">
+                            <div className="relative flex items-center gap-0 bg-black/30 p-1 rounded-xl w-fit border border-white/[0.06]">
+                              {['all', 'watch', 'comments'].map(f => (
+                                <button
+                                  key={f}
+                                  onClick={() => setActivityFilter(f as any)}
+                                  className={`relative z-10 px-5 py-1.5 rounded-lg text-[12px] font-bold capitalize transition-colors duration-200 ${activityFilter === f ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                 >
-                                  <div className="mt-1 flex-shrink-0 text-zinc-500 group-hover:text-[var(--app-accent)] transition-colors">
-                                    {c.type === 'reply' ? <MessageSquareReply size={16} /> : <MessageSquare size={16} />}
+                                  {activityFilter === f && (
+                                    <motion.div
+                                      layoutId="activity-filter-indicator"
+                                      className="absolute inset-0 rounded-lg shadow-sm border"
+                                      style={{
+                                        background: 'color-mix(in srgb, var(--app-accent) 12%, transparent)',
+                                        borderColor: 'color-mix(in srgb, var(--app-accent) 50%, transparent)'
+                                      }}
+                                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                                    />
+                                  )}
+                                  <span className="relative z-10">{f === 'watch' ? 'History' : f}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <SectionCard>
+                              {(() => {
+                                const filtered = comments.filter(c => activityFilter === 'all' || (activityFilter === 'watch' ? c.type === 'watch' : c.type !== 'watch'));
+                                if (filtered.length === 0) return (
+                                  <div className="p-8 text-center flex flex-col items-center gap-2">
+                                    <ActivityIcon size={24} className="text-zinc-600" />
+                                    <span className="text-[13px] text-zinc-500">No activity to display.</span>
                                   </div>
-                                  <div className="flex flex-col">
-                                    <span className="text-[13.5px] text-zinc-200 leading-relaxed group-hover:text-white transition-colors">{c.content}</span>
-                                    <div className="flex items-center gap-2 mt-1.5 text-[11.5px] text-zinc-500">
-                                      <span className="capitalize font-medium">{c.type}</span> 
-                                      <span>•</span>
-                                      <span>{timeAgo(c.created_at)}</span> 
-                                      {c.likes_count > 0 && <><span>•</span><span>{c.likes_count} likes</span></>}
+                                );
+                                return filtered.map((c, i) => (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => c.type === 'watch' && c.href ? navigate(c.href) : handleContentNavigation(navigate, c.page_type, c.page_id, handleClose)}
+                                    className="flex items-start gap-4 px-4 py-4 cursor-pointer group hover:bg-white/[0.03] transition-colors duration-200 first:rounded-t-[16px] last:rounded-b-[16px]"
+                                    style={i < filtered.length - 1 ? { borderBottom: '1px solid rgba(255,255,255,0.04)' } : {}}
+                                  >
+                                    {c.type === 'watch' ? (
+                                      <div className="mt-0.5 flex-shrink-0 w-[100px] h-[56px] rounded-[10px] overflow-hidden bg-[#111] border border-white/10 shadow-md relative">
+                                        <img src={c.episode_image || c.anime_cover} alt="Thumbnail" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500" />
+                                      </div>
+                                    ) : (
+                                      <div className="mt-1 flex-shrink-0 text-zinc-500 group-hover:text-[var(--app-accent)] transition-colors">
+                                        {c.type === 'reply' ? <MessageSquareReply size={16} /> : <MessageSquare size={16} />}
+                                      </div>
+                                    )}
+                                    <div className="flex flex-col flex-1 justify-center min-w-0">
+                                      <span className="text-[13.5px] text-zinc-200 leading-relaxed group-hover:text-white transition-colors truncate w-full">
+                                        {c.type === 'watch' ? (
+                                          <span className="flex flex-col gap-0.5">
+                                            <span className="font-semibold text-white/90 truncate">{c.anime_title || c.content.split(' of ')[1]}</span>
+                                            <span className="text-[12px] text-zinc-400 truncate">
+                                              <span className="font-bold text-[var(--app-accent)]">Episode {c.episode_number || c.content.match(/Episode (\d+)/)?.[1]}</span>
+                                              {c.episode_title && c.episode_title !== `Episode ${c.episode_number}` && <span className="text-zinc-500"> — {c.episode_title}</span>}
+                                            </span>
+                                          </span>
+                                        ) : c.content}
+                                      </span>
+                                      <div className="flex items-center gap-2 mt-2 text-[11px] text-zinc-500">
+                                        <span className="capitalize font-medium text-white/40">{c.type}</span>
+                                        <span className="text-white/20">•</span>
+                                        <span>{timeAgo(c.created_at)}</span>
+                                        {c.likes_count > 0 && <><span className="text-white/20">•</span><span>{c.likes_count} likes</span></>}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))
-                            )}
-                          </SectionCard>
+                                ));
+                              })()}
+                            </SectionCard>
+                          </div>
                         )}
 
                         {/* ── BOOKMARKS ── */}
@@ -796,3 +991,4 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
 };
 
 export default ProfileModal;
+/* --- END OF FILE ProfileModal.tsx --- */

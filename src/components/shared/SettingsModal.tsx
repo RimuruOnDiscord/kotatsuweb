@@ -5,9 +5,10 @@ import {
   Palette, X, User, Loader2, LogOut,
   Play, Radio, Subtitles, Eye, ChevronDown, Check
 } from 'lucide-react';
-import { THEME_OPTIONS, ThemeKey, getStoredTheme, setTheme } from '../../utils/theme';
+import { THEME_OPTIONS, ThemeKey, getStoredTheme, setTheme, PATTERN_OPTIONS, PatternKey, getStoredPattern, setPattern } from '../../utils/theme';
 import { useAuth } from '../../lib/AuthContext';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+
 
 const APP_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
@@ -16,9 +17,6 @@ const DISPLAY_FONT = '"Syne", sans-serif';
 const TABS = [
   { id: 'profile',    label: 'Profile',    icon: User,      desc: 'Avatar & display name' },
   { id: 'appearance', label: 'Appearance', icon: Palette,   desc: 'Theme & accent color' },
-  { id: 'player',     label: 'Player',     icon: Play,      desc: 'Playback behaviour' },
-  { id: 'streaming',  label: 'Streaming',  icon: Radio,     desc: 'Source & quality' },
-  { id: 'subtitles',  label: 'Subtitles',  icon: Subtitles, desc: 'Display & language' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -39,59 +37,259 @@ const fadeUpItem: Variants = {
 };
 
 // ─── ThemePicker ─────────────────────────────────────────────────────────────
-const ThemePicker: React.FC<{ theme: ThemeKey; onThemeChange: (theme: ThemeKey) => void }> = ({ theme, onThemeChange }) => (
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-    {THEME_OPTIONS.map((option) => {
-      const active = theme === option.key;
-      return (
+const ThemePicker: React.FC<{ theme: ThemeKey; onThemeChange: (theme: ThemeKey) => void }> = ({ theme, onThemeChange }) => {
+  const isCustom = theme.startsWith('#');
+  const customColor = isCustom ? theme : '#3b82f6';
+  const [showPicker, setShowPicker] = useState(false);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {THEME_OPTIONS.map((option) => {
+          const active = theme === option.key;
+          return (
+            <motion.button
+              key={option.key}
+              variants={fadeUpItem}
+              onClick={() => { onThemeChange(option.key); setShowPicker(false); }}
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              className="relative rounded-[16px] p-2 transition-all duration-300 ease-out border"
+              style={{
+                backgroundColor: active ? `${option.color}15` : 'rgba(255,255,255,0.03)',
+                borderColor: active ? `${option.color}60` : 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <div
+                className="aspect-[16/10] w-full rounded-[10px] overflow-hidden flex flex-col relative"
+                style={{ background: 'var(--app-bg)', border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                {/* Topbar Wireframe */}
+                <div className="h-[14%] w-full border-b flex items-center px-2 gap-1.5 shrink-0 z-10" style={{ borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+                  <motion.div initial={false} animate={{ backgroundColor: option.color }} className="w-2 h-2 rounded-full" />
+                  <div className="w-6 h-[3px] rounded-full bg-white/30" />
+                  <div className="w-3 h-[3px] rounded-full bg-white/10 ml-1.5" />
+                  <div className="w-3 h-[3px] rounded-full bg-white/10" />
+                  <div className="w-2 h-2 rounded-full bg-white/20 ml-auto" />
+                </div>
+
+                {/* Content Wireframe */}
+                <div className="flex-1 flex flex-col gap-1.5 p-1.5">
+                  {/* Hero Banner */}
+                  <div className="relative w-full h-[45%] rounded-[4px] overflow-hidden flex flex-col justify-end p-1.5 border border-white/5" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                    <motion.div
+                      initial={false}
+                      animate={{ 
+                        background: `linear-gradient(135deg, ${option.color}50 0%, ${option.color}00 80%)`,
+                        opacity: active ? 1 : 0.5
+                      }}
+                      className="absolute inset-0"
+                    />
+                    <div className="w-1/2 h-[4px] rounded-full bg-white/90 relative z-10 mb-1" />
+                    <div className="w-1/3 h-[3px] rounded-full bg-white/50 relative z-10 mb-1.5" />
+                    <motion.div 
+                      initial={false}
+                      animate={{ backgroundColor: option.color }}
+                      className="w-6 h-[5px] rounded-[2px] relative z-10"
+                    />
+                  </div>
+
+                  {/* Grid / Continue Watching */}
+                  <div className="flex gap-1 flex-1">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="flex-1 rounded-[3px] bg-white/5 relative overflow-hidden border border-white/5">
+                        {i === 1 && (
+                          <div className="absolute bottom-0 left-0 w-full h-[2px] bg-white/10">
+                            <motion.div 
+                              initial={false}
+                              animate={{ backgroundColor: option.color }}
+                              className="h-full w-[60%]"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <AnimatePresence>
+                  {active && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center shadow-md"
+                      style={{ background: option.color }}
+                    >
+                      <Check size={12} strokeWidth={3} className="text-black" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <p className="mt-2.5 mb-1 text-center text-[12px] font-semibold tracking-wide" style={{ color: active ? 'white' : 'rgb(161, 161, 170)' }}>
+                {option.label}
+              </p>
+            </motion.button>
+          );
+        })}
+
+        {/* Custom Color Option */}
         <motion.button
-          key={option.key}
           variants={fadeUpItem}
-          onClick={() => onThemeChange(option.key)}
+          onClick={() => {
+            if (!isCustom) onThemeChange(customColor);
+            setShowPicker(!showPicker);
+          }}
           whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.97 }}
-          className="relative rounded-[16px] p-2 transition-all duration-300 ease-out border"
+          className="relative rounded-[16px] p-2 transition-all duration-300 ease-out border cursor-pointer"
           style={{
-            backgroundColor: active ? `${option.color}15` : 'rgba(255,255,255,0.03)',
-            borderColor: active ? `${option.color}60` : 'rgba(255,255,255,0.08)',
+            backgroundColor: isCustom ? `${customColor}15` : 'rgba(255,255,255,0.03)',
+            borderColor: isCustom ? `${customColor}60` : 'rgba(255,255,255,0.08)',
           }}
         >
           <div
-            className="aspect-[16/10] w-full rounded-[10px] overflow-hidden flex relative"
+            className="aspect-[16/10] w-full rounded-[10px] overflow-hidden flex flex-col relative"
             style={{ background: 'var(--app-bg)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
-            <motion.div
-              initial={false}
-              animate={{ backgroundColor: option.color, width: active ? '35%' : '25%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="h-full opacity-90"
-            />
-            <div className="flex-1 p-2.5 flex flex-col justify-end gap-1.5">
-              <div className="h-[4px] w-full rounded-full bg-white/20" />
-              <div className="h-[4px] w-2/3 rounded-full bg-white/10" />
+            {/* Topbar Wireframe */}
+            <div className="h-[14%] w-full border-b flex items-center px-2 gap-1.5 shrink-0 z-10" style={{ borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+              <motion.div initial={false} animate={{ backgroundColor: isCustom ? customColor : '#ffffff' }} className="w-2 h-2 rounded-full" />
+              <div className="w-6 h-[3px] rounded-full bg-white/30" />
+              <div className="w-3 h-[3px] rounded-full bg-white/10 ml-1.5" />
+              <div className="w-3 h-[3px] rounded-full bg-white/10" />
+              <div className="w-2 h-2 rounded-full bg-white/20 ml-auto" />
             </div>
+
+            {/* Content Wireframe */}
+            <div className="flex-1 flex flex-col gap-1.5 p-1.5">
+              {/* Hero Banner */}
+              <div className="relative w-full h-[45%] rounded-[4px] overflow-hidden flex flex-col justify-end p-1.5 border border-white/5" style={{ backgroundColor: 'rgba(255,255,255,0.01)' }}>
+                <motion.div
+                  initial={false}
+                  animate={{ 
+                    background: isCustom ? `linear-gradient(135deg, ${customColor}50 0%, ${customColor}00 80%)` : `linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 80%)`,
+                    opacity: isCustom ? 1 : 0.5
+                  }}
+                  className="absolute inset-0"
+                />
+                <div className="w-1/2 h-[4px] rounded-full bg-white/90 relative z-10 mb-1" />
+                <div className="w-1/3 h-[3px] rounded-full bg-white/50 relative z-10 mb-1.5" />
+                <motion.div 
+                  initial={false}
+                  animate={{ backgroundColor: isCustom ? customColor : '#ffffff' }}
+                  className="w-6 h-[5px] rounded-[2px] relative z-10"
+                />
+              </div>
+
+              {/* Grid / Continue Watching */}
+              <div className="flex gap-1 flex-1">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex-1 rounded-[3px] bg-white/5 relative overflow-hidden border border-white/5">
+                    {i === 1 && (
+                      <div className="absolute bottom-0 left-0 w-full h-[2px] bg-white/10">
+                        <motion.div 
+                          initial={false}
+                          animate={{ backgroundColor: isCustom ? customColor : '#ffffff' }}
+                          className="h-full w-[60%]"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <AnimatePresence>
-              {active && (
+              {isCustom && (
                 <motion.div
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
                   className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center shadow-md"
-                  style={{ background: option.color }}
+                  style={{ background: customColor, zIndex: 30, pointerEvents: 'none' }}
                 >
                   <Check size={12} strokeWidth={3} className="text-black" />
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          <p className="mt-2.5 mb-1 text-center text-[12px] font-semibold tracking-wide" style={{ color: active ? 'white' : 'rgb(161, 161, 170)' }}>
-            {option.label}
+          <p className="mt-2.5 mb-1 text-center text-[12px] font-semibold tracking-wide" style={{ color: isCustom ? 'white' : 'rgb(161, 161, 170)' }}>
+            Custom
           </p>
         </motion.button>
-      );
-    })}
-  </div>
-);
+      </div>
+
+      <AnimatePresence>
+        {showPicker && isCustom && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginTop: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+            exit={{ opacity: 0, height: 0, marginTop: 0 }}
+            className="overflow-hidden"
+          >
+            <div 
+              className="p-5 rounded-[16px] border flex flex-col gap-6"
+              style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <div className="flex flex-col sm:flex-row gap-6 items-start">
+                <div 
+                  className="w-full sm:w-[120px] aspect-square rounded-[12px] border border-white/10 shadow-lg shrink-0 flex items-center justify-center relative overflow-hidden"
+                  style={{ backgroundColor: customColor }}
+                >
+                  <input
+                    type="color"
+                    value={customColor}
+                    onChange={(e) => onThemeChange(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-[150%] h-[150%] -top-1 -left-1"
+                    title="Open OS color picker"
+                  />
+                  <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full text-white text-[11px] font-semibold tracking-wide pointer-events-none border border-white/10">
+                    {customColor.toUpperCase()}
+                  </div>
+                </div>
+
+                <div className="flex flex-col flex-1 w-full gap-5">
+                  <div>
+                    <p className="text-[14px] font-semibold text-white tracking-wide mb-1">Custom Accent Color</p>
+                    <p className="text-[13px] text-zinc-400 leading-relaxed">
+                      Enter a hex code or use the system picker by clicking the preview box.
+                    </p>
+                  </div>
+                  
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-mono text-[14px]">#</div>
+                    <input 
+                      type="text" 
+                      value={customColor.replace('#', '')}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').substring(0, 6);
+                        onThemeChange(`#${v}`);
+                      }}
+                      className="w-full bg-white/5 border border-white/10 rounded-[10px] pl-7 pr-3 py-2.5 text-white font-mono text-[14px] outline-none transition-all focus:border-white/30 focus:bg-white/10 uppercase uppercase"
+                      placeholder="FFFFFF"
+                    />
+                  </div>
+                  
+                  {/* Preset Quick Colors */}
+                  <div className="flex gap-2 pt-1">
+                    {['#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#64748b'].map(c => (
+                      <button 
+                        key={c}
+                        onClick={() => onThemeChange(c)}
+                        className="w-6 h-6 rounded-full border border-white/20 transition-transform hover:scale-110"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
 // ─── UI Primitives ────────────────────────────────────────────────────────────
 const SectionCard: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
@@ -226,6 +424,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
   const { user, profile, updateProfile, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>('profile');
   const [currentTheme, setCurrentTheme] = useState<ThemeKey>(getStoredTheme());
+  const [currentPattern, setCurrentPattern] = useState<PatternKey>(getStoredPattern());
+
+  const handleThemeChange = (theme: ThemeKey) => {
+    setCurrentTheme(theme);
+    setTheme(theme);
+  };
+
+  const handlePatternChange = (patternLabel: string) => {
+    const opt = PATTERN_OPTIONS.find(p => p.label === patternLabel);
+    if (opt) {
+      setCurrentPattern(opt.key);
+      setPattern(opt.key);
+    }
+  };
 
   const [displayName, setDisplayName] = useState('');
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
@@ -239,6 +451,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
     preferredSource: 'kiwi (External)', audioLang: 'Subbed (Japanese audio)', quality: 'Auto (FHD)',
     showSubs: true, subPosition: 'Bottom', subSize: '100%', subBgOpacity: '70%', subBgColor: '#000000',
     skipOp: true, skipEd: true, showSpoilers: true, listFormat: 'Grid',
+    posterStyle: 'Standard', fontFamily: 'Inter (Sans)', titleCase: 'Original',
+    cinematicGlow: true, blurIntensity: 'Medium (Standard)', reducedMotion: false
   });
 
   const updateSetting = (key: keyof typeof mockSettings, val: any) => setMockSettings(prev => ({ ...prev, [key]: val }));
@@ -251,7 +465,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
   useEffect(() => { setImgError(false); }, [avatarUrlInput]);
 
   useLayoutEffect(() => {
-    const t = THEME_OPTIONS.find(t => t.key === currentTheme);
+    const isCustom = currentTheme.startsWith('#');
+    const t = isCustom ? { color: currentTheme } : THEME_OPTIONS.find(t => t.key === currentTheme);
     if (t) {
       const r = document.documentElement;
       r.style.setProperty('--app-accent', t.color);
@@ -262,12 +477,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
   }, [currentTheme]);
 
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
-  }, [onClose]);
+    if (open) {
+      const prevTitle = document.title;
+      document.title = 'Settings';
+      const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+      window.addEventListener('keydown', esc);
+      return () => {
+        window.removeEventListener('keydown', esc);
+        document.title = prevTitle;
+      };
+    }
+  }, [onClose, open]);
 
-  const handleThemeChange = (t: ThemeKey) => { setCurrentTheme(t); setTheme(t); };
+
 
   const handleSaveProfile = async () => {
     if (!user || isSaving) return;
@@ -289,7 +511,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
   const handleLogout = async () => { await signOut(); onClose(); window.location.reload(); };
 
   const activeTabMeta = TABS.find(t => t.id === activeTab)!;
-  const activeThemeDef = THEME_OPTIONS.find(t => t.key === currentTheme) || THEME_OPTIONS[0];
+  const isCustomTheme = currentTheme.startsWith('#');
+  const activeThemeDef = isCustomTheme ? { color: currentTheme } : (THEME_OPTIONS.find(t => t.key === currentTheme) || THEME_OPTIONS[0]);
 
   // Pass variables directly to the container to ensure 0ms latency render (prevents flicker FOUC)
   const modalStyles = {
@@ -536,7 +759,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                       <motion.div
                         key="appearance"
                         variants={staggerContainer} initial="hidden" animate="show" exit="exit"
-                        className="flex flex-col gap-5"
+                        className="flex flex-col gap-8 pb-4"
                       >
                         <div>
                           <SectionLabel>Accent Color</SectionLabel>
@@ -545,6 +768,58 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onClose }) => {
                           </motion.p>
                           <ThemePicker theme={currentTheme} onThemeChange={handleThemeChange} />
                         </div>
+
+                        <motion.div variants={fadeUpItem}>
+                          <SectionLabel>Background Pattern</SectionLabel>
+                          <SectionCard>
+                            <SettingRow title="Global Pattern" description="Subtle texture applied behind the content" last>
+                              <Select 
+                                value={PATTERN_OPTIONS.find(p => p.key === currentPattern)?.label || 'Noise'} 
+                                options={PATTERN_OPTIONS.map(p => p.label)} 
+                                onChange={handlePatternChange} 
+                              />
+                            </SettingRow>
+                          </SectionCard>
+                        </motion.div>
+
+                        <motion.div variants={fadeUpItem}>
+                          <SectionLabel>Layout & Structure</SectionLabel>
+                          <SectionCard>
+                            <SettingRow title="Default Browse Layout" description="How anime titles are displayed by default">
+                              <Select value={mockSettings.listFormat} options={['Grid', 'List', 'Compact Grid']} onChange={v => updateSetting('listFormat', v)} />
+                            </SettingRow>
+                            <SettingRow title="Poster Style" description="Amount of information density on anime cards" last>
+                              <Select value={mockSettings.posterStyle} options={['Standard', 'Minimal', 'Text Only']} onChange={v => updateSetting('posterStyle', v)} />
+                            </SettingRow>
+                          </SectionCard>
+                        </motion.div>
+
+                        <motion.div variants={fadeUpItem}>
+                          <SectionLabel>Typography</SectionLabel>
+                          <SectionCard>
+                            <SettingRow title="Font Family" description="Primary font used for titles and interface">
+                              <Select value={mockSettings.fontFamily} options={['Inter (Sans)', 'Onest (Modern)', 'Syne (Display)']} onChange={v => updateSetting('fontFamily', v)} />
+                            </SettingRow>
+                            <SettingRow title="Title Case" description="Capitalization style for anime titles" last>
+                              <Select value={mockSettings.titleCase} options={['Original', 'UPPERCASE', 'lowercase']} onChange={v => updateSetting('titleCase', v)} />
+                            </SettingRow>
+                          </SectionCard>
+                        </motion.div>
+
+                        <motion.div variants={fadeUpItem}>
+                          <SectionLabel>Effects & Animations</SectionLabel>
+                          <SectionCard>
+                            <SettingRow title="Cinematic Glow" description="Dynamic background shimmer based on poster colors">
+                              <Toggle checked={mockSettings.cinematicGlow} onChange={() => updateSetting('cinematicGlow', !mockSettings.cinematicGlow)} />
+                            </SettingRow>
+                            <SettingRow title="Glassmorphism Intensity" description="Adjust the blur level on modals and sidebars">
+                              <Select value={mockSettings.blurIntensity} options={['Low (Performance)', 'Medium (Standard)', 'High (Cinematic)']} onChange={v => updateSetting('blurIntensity', v)} />
+                            </SettingRow>
+                            <SettingRow title="Reduced Motion" description="Minimize animations and layout transitions" last>
+                              <Toggle checked={mockSettings.reducedMotion} onChange={() => updateSetting('reducedMotion', !mockSettings.reducedMotion)} />
+                            </SettingRow>
+                          </SectionCard>
+                        </motion.div>
                       </motion.div>
                     )}
 

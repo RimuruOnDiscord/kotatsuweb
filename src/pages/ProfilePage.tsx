@@ -93,6 +93,9 @@ const ProfilePage: React.FC = () => {
       const profileRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=*`, { headers });
       const pList = profileRes.ok ? await profileRes.json() : [];
       setProfile(pList[0] || null);
+      if (pList[0]?.display_name) {
+        document.title = `${pList[0].display_name}'s Profile`;
+      }
 
       // 2. Fetch Activity & Bookmarks
       const [cRes, rRes, bRes] = await Promise.all([

@@ -107,6 +107,7 @@ const AnimeSchedule: React.FC = () => {
     const [scheduleData, setScheduleData] = useState<ScheduleItem[]>([]);
 
     useEffect(() => {
+        document.title = 'Schedule';
         const id = 'aw-schedule-styles';
         if (!document.getElementById(id)) {
             const tag = document.createElement('style');

@@ -212,6 +212,55 @@ export const fetchAnimeSuggestions = (query: string) =>
     `${MIRUO_API_BASE}/suggestions?query=${encodeURIComponent(query)}`
   );
 
+/** Search for anime produced by a specific studio using AniList GraphQL */
+export const fetchAnimeByStudio = async (studioQuery: string, limit = 10, page = 1): Promise<{ results: AnimeResult[], hasNextPage: boolean }> => {
+  const query = `
+    query ($search: String, $perPage: Int, $mediaPage: Int, $mediaPerPage: Int) {
+      Page(page: 1, perPage: $perPage) {
+        studios(search: $search) {
+          id
+          name
+          media(sort: POPULARITY_DESC, isMain: true, page: $mediaPage, perPage: $mediaPerPage) {
+            pageInfo { hasNextPage }
+            nodes {
+              id idMal
+              title { romaji english native }
+              coverImage { large extraLarge }
+              bannerImage format season seasonYear episodes status
+              averageScore meanScore genres isAdult
+              studios(isMain: true) { nodes { name isAnimationStudio } }
+              startDate { year month day }
+            }
+          }
+        }
+      }
+    }
+  `;
+  try {
+    const res = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query, variables: { search: studioQuery, perPage: 1, mediaPage: page, mediaPerPage: limit } }),
+    });
+    const json = await res.json();
+    const studios = json?.data?.Page?.studios || [];
+    const allMedia: AnimeResult[] = [];
+    let hasNextPage = false;
+    for (const studio of studios) {
+      if (studio?.media?.pageInfo?.hasNextPage) hasNextPage = true;
+      const media = studio?.media?.nodes || [];
+      for (const m of media) {
+        if (m && !m.isAdult && !allMedia.some(e => e.id === m.id)) {
+          allMedia.push(m);
+        }
+      }
+    }
+    return { results: allMedia, hasNextPage };
+  } catch {
+    return { results: [], hasNextPage: false };
+  }
+};
+
 export const fetchAnimeFilter = (params: URLSearchParams, signal?: AbortSignal) =>
   fetchJson<AnimeSearchResponse>(`${MIRUO_API_BASE}/filter?${params.toString()}`, signal);
 

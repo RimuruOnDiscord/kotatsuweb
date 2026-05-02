@@ -1,5 +1,5 @@
-import { Tv } from 'lucide-react';
-import { readBookmarks } from './bookmarks';
+import { Tv, Sparkles } from 'lucide-react';
+import { readBookmarks, readFollows, writeFollows } from './bookmarks';
 import { fetchAnimeInfo } from './animeApi';
 
 // ─── TRACKER STORAGE ───
@@ -41,20 +41,41 @@ const writeUpdateTracker = (tracker: Record<string, AnimeUpdateRecord>): void =>
 // The `color` must be `'var(--aw-accent, #3b82f6)'` so it respects the active theme.
 // The `coverImage` field is NEW — NotificationDropdown will be updated to render it.
 
+const toSlug = (str: string) =>
+  str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 const buildAnimeUpdateNotification = (
   malId: number,
   title: string,
   episodeNumber: number,
-  coverImage: string | undefined
+  _coverImage: string | undefined
 ) => ({
-  id: Date.now() + malId,           // unique numeric id
+  id: Date.now() + malId,
   title: 'New Episode Available',
   message: `${title} — Episode ${episodeNumber} just dropped!`,
   time: 'Just now',
   unread: true,
-  icon: Tv,                          // lucide-react Tv icon
-  color: 'var(--aw-accent, #3b82f6)', // always uses the current theme accent
-  coverImage: coverImage ?? undefined, // optional thumbnail — may be undefined
+  icon: Tv,
+  color: 'var(--aw-accent, #3b82f6)',
+  type: 'release' as const,
+  slug: toSlug(title),
+});
+
+const buildFollowUpdateNotification = (
+  malId: number,
+  title: string,
+  newStatus: string,
+  _coverImage: string | undefined
+) => ({
+  id: Date.now() + malId,
+  title: 'Status Update',
+  message: `${title} is now ${newStatus}!`,
+  time: 'Just now',
+  unread: true,
+  icon: Sparkles,
+  color: '#eab308',
+  type: 'release' as const,
+  slug: toSlug(title),
 });
 
 // ─── MAIN CHECKER ───
@@ -146,6 +167,39 @@ export const checkBookmarksForUpdates = async (
 
   // Persist the updated tracker
   writeUpdateTracker(updatedTracker);
+
+  // ─── CHECK FOLLOWS ───
+  const follows = readFollows();
+  const remainingFollows = [];
+  
+  if (follows.length > 0) {
+    for (const follow of follows) {
+      try {
+        const info = await fetchAnimeInfo(follow.malId);
+        
+        // If it's no longer 'NOT_YET_RELEASED' (e.g. RELEASING or FINISHED)
+        // and we have successfully retrieved a status.
+        if (info.status && info.status !== 'NOT_YET_RELEASED' && info.status !== 'Unknown') {
+          const title = info.title?.english || info.title?.romaji || info.title?.native || follow.title;
+          const coverImage = info.coverImage?.large ?? info.coverImage?.extraLarge ?? follow.cover;
+          
+          newNotifications.push(
+            buildFollowUpdateNotification(follow.malId, title, info.status, coverImage)
+          );
+          // Do NOT add to remainingFollows, so it is effectively removed/unfollowed
+        } else {
+          remainingFollows.push(follow);
+        }
+      } catch {
+        remainingFollows.push(follow); // keep it if fetch fails
+      }
+    }
+    
+    // Update the local storage with any unfollowed items
+    if (remainingFollows.length !== follows.length) {
+      writeFollows(remainingFollows);
+    }
+  }
 
   // Prepend new notifications to the existing list (newest at top)
   if (newNotifications.length > 0) {

@@ -33,6 +33,17 @@ const WatchTogetherModal: React.FC<WatchTogetherModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevTitleRef = useRef(document.title);
+
+  React.useEffect(() => {
+    if (open) {
+      prevTitleRef.current = document.title;
+      document.title = 'Watch Together';
+      return () => {
+        document.title = prevTitleRef.current;
+      };
+    }
+  }, [open]);
 
   if (!open) return null;
 

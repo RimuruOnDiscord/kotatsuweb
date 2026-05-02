@@ -5,10 +5,10 @@ import {
   ArrowLeft, ChevronRight, Star, Loader2, Bookmark, BookmarkCheck, Languages,
   Info, ArrowDownUp, Youtube, Clock,
   Users, ExternalLink, TrendingUp, Heart,
-  Calendar, Library, Play, Film, Tv
+  Calendar, Library, Play, Film, Tv, Bell
 } from 'lucide-react';
 
-import { readBookmarks, toggleBookmark } from '../utils/bookmarks';
+import { readBookmarks, toggleBookmark, isFollowed, toggleFollow } from '../utils/bookmarks';
 import {
   AnimeWatchProviderPayload,
   fetchAnimeEpisodes,
@@ -546,7 +546,7 @@ const NextAiringTimer: React.FC<{ airingAt: number; episode: number; compact?: b
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeLeft(airingAt * 1000 - Date.now());
-    }, 60000); 
+    }, 60000);
     return () => clearInterval(interval);
   }, [airingAt]);
 
@@ -645,6 +645,7 @@ const AnimeDetail: React.FC = () => {
   const [isLinking, setIsLinking] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [savedBookmarkId, setSavedBookmarkId] = useState<string | null>(null);
   const isSyncingBookmark = React.useRef(false);
   const [watchProgress, setWatchProgress] = useState<ContinueWatchingData | null>(null);
@@ -841,6 +842,9 @@ const AnimeDetail: React.FC = () => {
         if (!info) throw new Error('API returned no info data');
 
         setData(info);
+        if (info.title) {
+          document.title = info.title.english || info.title.romaji || info.title.native || 'Anime Details';
+        }
 
         const providersMap = epsPayload?.providers || {};
         setEpisodesData(providersMap);
@@ -907,7 +911,7 @@ const AnimeDetail: React.FC = () => {
 
       let isFound = false;
       let foundId: string | null = null;
-      
+
       const targetIdMal = data?.idMal ? String(data.idMal) : null;
       const targetIdAni = data?.id ? String(data.id) : null;
       const targetIdStr = String(urlSlug);
@@ -918,7 +922,7 @@ const AnimeDetail: React.FC = () => {
         try {
           const { data: dbData } = await supabase.from('anime_bookmarks').select('*').eq('user_id', user.id);
           if (dbData) {
-            const match = dbData.find(b => 
+            const match = dbData.find(b =>
               (targetIdMal && b.mal_id === targetIdMal) ||
               (targetIdAni && b.mal_id === targetIdAni) ||
               b.mal_id === targetIdStr ||
@@ -934,7 +938,7 @@ const AnimeDetail: React.FC = () => {
         } catch { }
       } else {
         const localBookmarks = readBookmarks();
-        const match = localBookmarks.find(b => 
+        const match = localBookmarks.find(b =>
           (targetIdMal && String(b.malId) === targetIdMal) ||
           (targetIdAni && String(b.malId) === targetIdAni) ||
           String(b.malId) === targetIdStr ||
@@ -950,15 +954,19 @@ const AnimeDetail: React.FC = () => {
 
       setBookmarked(isFound);
       setSavedBookmarkId(foundId);
+
+      if (data) {
+        setIsFollowing(isFollowed(Number(foundId || data.idMal || data.id)));
+      }
     };
 
     syncBookmarkState();
-    window.addEventListener('storage', syncBookmarkState); 
+    window.addEventListener('storage', syncBookmarkState);
     window.addEventListener('focus', syncBookmarkState);
     window.addEventListener('mv_bookmark_updated', syncBookmarkState);
-    return () => { 
-      window.removeEventListener('storage', syncBookmarkState); 
-      window.removeEventListener('focus', syncBookmarkState); 
+    return () => {
+      window.removeEventListener('storage', syncBookmarkState);
+      window.removeEventListener('focus', syncBookmarkState);
       window.removeEventListener('mv_bookmark_updated', syncBookmarkState);
     };
   }, [data, user, urlSlug, resolvedSlug]);
@@ -1000,7 +1008,7 @@ const AnimeDetail: React.FC = () => {
           });
           if (error) {
             console.error('Failed to add bookmark:', error);
-            setBookmarked(previousState); 
+            setBookmarked(previousState);
           } else {
             setSavedBookmarkId(targetId);
           }
@@ -1013,13 +1021,30 @@ const AnimeDetail: React.FC = () => {
       }
     } catch (err) {
       console.error('Bookmark toggle exploded:', err);
-      setBookmarked(previousState); 
+      setBookmarked(previousState);
     } finally {
       isSyncingBookmark.current = false;
       window.dispatchEvent(new Event('mv_bookmark_updated'));
       window.dispatchEvent(new Event('storage'));
     }
   }, [data, user, bookmarked, savedBookmarkId]);
+
+  const handleFollowToggle = useCallback(() => {
+    if (!data) return;
+    const targetId = savedBookmarkId || String(data.idMal || data.id);
+    const numericId = Number(targetId) || 0;
+    const title = data.title?.english || data.title?.romaji || data.title?.native || 'Unknown Title';
+    const coverUrl = data.coverImage?.extraLarge || data.coverImage?.large || data.coverImage;
+
+    const result = toggleFollow({
+      malId: numericId,
+      title,
+      cover: coverUrl,
+      type: data.format || 'Anime',
+      status: data.status || 'Unknown'
+    });
+    setIsFollowing(result.followed);
+  }, [data, savedBookmarkId]);
 
 
   const sortedEpisodes = [...providerEpisodes].sort((a, b) => {
@@ -1047,21 +1072,21 @@ const AnimeDetail: React.FC = () => {
   const statsUrl = data?.id ? `https://anilist.co/anime/${data.id}/stats` : undefined;
   const displayTitle = data?.title?.english || data?.title?.romaji || data?.title?.native || '?';
 
-if (loading) {
-  return (
-    <div className="aw-root min-h-screen flex flex-col p-8 anim-fade-in-up">
-      <div className="flex-1 flex items-center justify-center">
-        <div className="relative">
-          <div 
-            className="w-12 h-12 border-[3px] border-t-transparent rounded-full spin-smooth" 
-            style={{ borderColor: 'var(--aw-accent)', borderTopColor: 'transparent' }} 
-          />
-          <div className="absolute inset-0 rounded-full pulse-ring" />
+  if (loading) {
+    return (
+      <div className="aw-root min-h-screen flex flex-col p-8 anim-fade-in-up">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="relative">
+            <div
+              className="w-12 h-12 border-[3px] border-t-transparent rounded-full spin-smooth"
+              style={{ borderColor: 'var(--aw-accent)', borderTopColor: 'transparent' }}
+            />
+            <div className="absolute inset-0 rounded-full pulse-ring" />
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 
   if (!data || loadFailed) {
@@ -1097,7 +1122,7 @@ if (loading) {
       <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: '1px solid var(--aw-border)', background: 'rgba(7,7,13,0.85)', backdropFilter: 'blur(20px)' }} />
 
       <div className="relative z-10 mx-auto w-full max-w-[1460px] px-4 pt-8 anim-fade-in-up">
-        
+
         {/* Main Content Back Button */}
         <button
           onClick={() => navigate(-1)}
@@ -1169,28 +1194,18 @@ if (loading) {
 
             <div className="flex flex-wrap items-center gap-3">
               {watchProgress ? (
-                <>
-                  <button
-                    onClick={() => { setIsLinking(true); navigate(watchProgress.href); }}
-                    disabled={isLinking}
-                    className="aw-btn-primary group relative overflow-hidden press-squish flex h-[48px] items-center gap-2 rounded-[14px] px-6 text-sm font-bold disabled:opacity-60"
-                    style={{ backgroundColor: 'var(--aw-accent)', color: '#04110d', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                  >
-                    <div className="absolute inset-0 bg-white/25 translate-x-[-120%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[120%]" />
-                    <span className="relative z-10 flex items-center gap-2">
-                      {isLinking ? <Loader2 className="spin-smooth" size={16} /> : <Play size={15} fill="currentColor" />}
-                      Resume {watchProgress.episodeNumber ? `Ep. ${watchProgress.episodeNumber}` : 'Watching'}
-                    </span>
-                  </button>
-                  <div className={`flex items-center gap-3 transition-all ${!providerEpisodes.length ? 'opacity-40 pointer-events-none' : ''}`}>
-                    <button onClick={handleWatchFirst} disabled={!providerEpisodes.length || isLinking} className="aw-btn-ghost group relative overflow-hidden press-squish flex h-[48px] items-center justify-center rounded-[14px] border px-5 text-sm font-bold" style={{ background: 'var(--aw-s1)', color: 'white', borderColor: 'var(--aw-border)', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      <span className="relative z-10">First</span>
-                    </button>
-                    <button onClick={handleWatchLatest} disabled={!providerEpisodes.length || isLinking} className="aw-btn-ghost group relative overflow-hidden press-squish flex h-[48px] items-center justify-center rounded-[14px] border px-5 text-sm font-bold" style={{ background: 'var(--aw-s1)', color: 'white', borderColor: 'var(--aw-border)', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      <span className="relative z-10">Latest</span>
-                    </button>
-                  </div>
-                </>
+                <button
+                  onClick={() => { setIsLinking(true); navigate(watchProgress.href); }}
+                  disabled={isLinking}
+                  className="aw-btn-primary group relative overflow-hidden press-squish flex h-[48px] items-center gap-2 rounded-[14px] px-6 text-sm font-bold disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--aw-accent)', color: '#04110d', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                >
+                  <div className="absolute inset-0 bg-white/25 translate-x-[-120%] skew-x-[-20deg] transition-transform duration-500 group-hover:translate-x-[120%]" />
+                  <span className="relative z-10 flex items-center gap-2">
+                    {isLinking ? <Loader2 className="spin-smooth" size={16} /> : <Play size={15} fill="currentColor" />}
+                    Resume {watchProgress.episodeNumber ? `Ep. ${watchProgress.episodeNumber}` : 'Watching'}
+                  </span>
+                </button>
               ) : (
                 <div className={`flex items-center gap-3 transition-all ${!providerEpisodes.length ? 'opacity-40 pointer-events-none' : ''}`}>
                   <button onClick={handleWatchFirst} disabled={!providerEpisodes.length || isLinking} className="aw-btn-primary group relative overflow-hidden press-squish flex h-[48px] items-center justify-center rounded-[14px] border px-6 text-sm font-bold disabled:opacity-60" style={{ background: 'var(--aw-accent-dim)', color: 'var(--aw-accent)', borderColor: 'var(--aw-accent)', fontFamily: 'var(--aw-font-display)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1228,9 +1243,46 @@ if (loading) {
 
               <button
                 type="button"
+                onClick={handleFollowToggle}
+                className="group relative overflow-hidden press-squish flex h-[48px] items-center justify-center rounded-[14px] border px-6 text-sm font-bold hover:scale-[1.05] active:scale-[0.96] active:duration-100"
+                style={{
+                  // 1. Start transparent when NOT following (Subscribe)
+                  // 2. Go transparent when FOLLOWING (Subscribed)
+                  background: 'transparent',
+                  // Start with a dark border; change to accent if following
+                  borderColor: isFollowing ? 'var(--aw-accent)' : 'var(--aw-border)',
+                  color: isFollowing ? 'var(--aw-accent)' : 'white',
+                  fontFamily: 'var(--aw-font-display)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}
+                onMouseEnter={(e) => {
+                  // Add the tint back only on hover
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aw-accent), transparent 85%)';
+                  e.currentTarget.style.borderColor = 'var(--aw-accent)';
+                  e.currentTarget.style.color = isFollowing ? 'var(--aw-accent)' : 'white';
+                }}
+                onMouseLeave={(e) => {
+                  // Return to the "empty" state
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.borderColor = isFollowing ? 'var(--aw-accent)' : 'var(--aw-border)';
+                  e.currentTarget.style.color = isFollowing ? 'var(--aw-accent)' : 'white';
+                }}
+              >
+                <span className="relative z-10 flex items-center gap-2 transition-all duration-300 group-hover:scale-105">
+                  <Bell size={18} className={isFollowing ? 'fill-current' : ''} />
+                  {isFollowing ? 'Subscribed' : 'Subscribe'}
+                </span>
+              </button>
+
+
+
+              <button
+                type="button"
                 onClick={handleBookmarkToggle}
-                style={{ 
-                  background: 'var(--aw-s1)', 
+                style={{
+                  background: 'var(--aw-s1)',
                   borderColor: bookmarked ? 'var(--aw-accent)' : 'var(--aw-border)',
                   transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
@@ -1241,10 +1293,12 @@ if (loading) {
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--aw-accent), transparent 85%)';
                   e.currentTarget.style.borderColor = 'var(--aw-accent)';
+                  e.currentTarget.style.color = 'var(--aw-accent)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'var(--aw-s1)';
                   e.currentTarget.style.borderColor = bookmarked ? 'var(--aw-accent)' : 'var(--aw-border)';
+                  e.currentTarget.style.color = bookmarked ? 'var(--aw-accent)' : 'white';
                 }}
               >
                 <span className="relative z-10 flex items-center justify-center transition-all duration-300 group-hover:scale-110">
