@@ -27,7 +27,7 @@ import { MediaPlayer, MediaProvider, Track, type MediaPlayerInstance, isHLSProvi
 import { defaultLayoutIcons, DefaultVideoLayout } from '@vidstack/react/player/layouts/default';
 
 /* ─── Proxy Configuration ───────────────────────────────────────── */
-const WORKER_PROXY_URL = "https://proxypipe.vercel.app";
+const WORKER_PROXY_URL = "https://proxypipe-production.up.railway.app/";
 
 /* ─── Font & Design Tokens Injection ─────────────────────────────── */
 const DESIGN_STYLES = `
@@ -1360,7 +1360,7 @@ if (!data.intro && !data.outro && mounted) {
     setIsProxifying(true);
     try {
       const b64 = btoa(activeStream.url).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-      const url = `https://proxypipe.vercel.app/proxy/${b64}`;
+      const url = `https://proxypipe-production.up.railway.app/proxy/${b64}`;
       if (mounted) {
         if (prevProxifiedUrlRef.current) {
           URL.revokeObjectURL(prevProxifiedUrlRef.current);
