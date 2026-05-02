@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 > **Development Notice:** Moving forward, site updates will be released on a periodic, weekly schedule. This shift from irregular, massive updates to a steady weekly cadence allows us to deliver features faster, iterate on community feedback more effectively, and ensure greater overall platform stability.
 
-## [1.4.0] - 2025-05-24
+## [1.1.0] - 2025-05-02
+### Added
+- **Anime Subscription System:** Subscribe to any releasing or upcoming anime directly from its detail page. When its status changes (e.g. from "Not Yet Released" to "Releasing"), you'll receive a notification on your next visit.
+- **Subscriptions Tab:** New dedicated tab inside the Notification Center to view and manage all your tracked anime, with one-click unsubscribe and direct navigation to each title.
+- **New Releases Tab:** Dedicated notification tab for new episode drops and anime announcements, keeping release alerts cleanly separated from general notifications.
+- **Clickable Notifications:** Release and episode notifications now navigate you directly to the anime's detail page when clicked.
+
+### Changed
+- **Notification Performance:** Replaced all Framer Motion `whileHover` JavaScript-driven animations with hardware-accelerated CSS transitions for significantly smoother hover interactions across the entire Notification Center.
+- **Notification Icons:** Release notifications now display clean, color-tinted icons instead of cover art thumbnails for a more consistent, polished look.
+- **Detail Page Actions:** The "Watch First" and "Watch Latest" buttons are now hidden when a Resume button is present, reducing clutter and prioritizing the most relevant action.
+- **Carousel Seamlessness:** Fixed the Spotlight numbering on cloned carousel slides so the infinite loop transition is perfectly seamless with no visible text flicker.
+
+### Fixed
+- **Home Carousel Stability:** Resolved an intermittent issue where the hero banner would render blank after being backgrounded, by adding strict bounds-clamping and a fallback timeout for missed `transitionend` events.
+
+## [1.0.0] - 2025-05-24
 ### Added
 - **New Release Cadence:** Officially transitioned to a weekly update schedule to ensure consistent platform improvements and better stability.
 
@@ -21,38 +37,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Removed legacy solid borders from media cards, quick filter dropdowns, and navigation tabs to achieve a cleaner, modern look.
-
-## [1.3.0] - 2025-04-30
-### Added
-- Changelog modal that reads directly from this file on GitHub
-- Animated version sidebar with NEW badge on latest release
-- Color-coded category pills (Added, Fixed, Changed, Removed, Security)
-- Live preview in subtitle settings panel
-
-### Changed
-- Sidebar navigation now highlights active tab with accent-colored indicator
-- Theme picker previews now animate width on selection
-- Modal spring physics tuned for snappier feel
-
-### Fixed
-- Avatar image no longer flickers on first load
-- Select dropdown now closes on outside click in all browsers
-
-## [1.2.1] - 2025-03-14
-### Fixed
-- Fixed an issue where settings would not save on certain browsers
-- Minor UI alignment fixes in the navigation bar
-
-## [1.2.0] - 2025-02-20
-### Added
-- Initial implementation of the settings panel
-- Support for custom user avatars
-
-## [1.1.0] - 2025-01-05
-### Changed
-- Replaced standard scrollbars with custom unified scrollbars across the app
-- Optimized image loading for faster perceived performance
-
-## [1.0.0] - 2024-12-01
-### Added
-- Initial public release
