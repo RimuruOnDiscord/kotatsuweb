@@ -20,6 +20,12 @@ export interface AnimeResult {
   format?: string | null;
   type?: string | null;
   season?: string | null;
+  parsedSeason?: {
+    season: number;
+    part: number;
+    parsedString: string;
+    isParsed: boolean;
+  } | null;
   seasonYear?: number | null;
   episodes?: number | null;
   duration?: number | null;
@@ -155,6 +161,158 @@ const fetchJson = async <T,>(url: string, signal?: AbortSignal): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+// ─── Jikan (MAL) Fallback Fields ──────────────────────────────────────────────
+// Mirrors the fields in MEDIA_LIST_FIELDS from the Python backend
+const ANILIST_MEDIA_LIST_FIELDS = `
+  id idMal
+  title { romaji english native }
+  coverImage { large extraLarge }
+  bannerImage
+  format
+  season
+  seasonYear
+  episodes
+  duration
+  status
+  averageScore
+  meanScore
+  popularity
+  favourites
+  genres
+  source
+  countryOfOrigin
+  isAdult
+  studios(isMain: true) { nodes { name isAnimationStudio } }
+  nextAiringEpisode { episode airingAt timeUntilAiring }
+  startDate { year month day }
+  endDate { year month day }
+`;
+
+/**
+ * Maps a raw Jikan anime entry to the AnimeResult shape so the app can
+ * display it even when AniList's idMal_in step also fails.
+ * NOTE: `id` here is the MAL ID — the watch page handles this via slug routing.
+ */
+const mapJikanToAnimeResult = (d: any): AnimeResult => ({
+  id: d.mal_id,
+  idMal: d.mal_id,
+  title: {
+    romaji: d.title,
+    english: d.title_english || d.title,
+    native: d.title_japanese || null,
+  },
+  coverImage: {
+    large: d.images?.jpg?.large_image_url || d.images?.jpg?.image_url || null,
+    extraLarge: d.images?.jpg?.large_image_url || null,
+  },
+  bannerImage: null,
+  format: (d.type || 'TV').toUpperCase().replace('TV (SHORT)', 'TV_SHORT'),
+  status: d.status === 'Finished Airing' ? 'FINISHED'
+    : d.status === 'Currently Airing' ? 'RELEASING'
+    : d.status === 'Not yet aired' ? 'NOT_YET_RELEASED'
+    : 'FINISHED',
+  seasonYear: d.year || null,
+  episodes: d.episodes || null,
+  averageScore: d.score ? Math.round(d.score * 10) : null,
+  meanScore: d.score ? Math.round(d.score * 10) : null,
+  popularity: d.popularity || null,
+  genres: (d.genres || []).map((g: any) => g.name),
+  isAdult: d.rating?.includes('Rx') ?? false,
+  studios: { nodes: (d.studios || []).map((s: any) => ({ name: s.name, isAnimationStudio: true })) },
+  startDate: { year: d.year || null, month: null, day: null },
+});
+
+/**
+ * Jikan (MyAnimeList) → AniList fallback search.
+ * Used when the primary AniList search endpoint returns empty results.
+ *
+ * Tier 1: Jikan search → AniList idMal_in → full AniList objects with real AniList IDs ✓
+ * Tier 2: If idMal_in also returns nothing → map Jikan raw data to AnimeResult shape
+ *         (uses MAL ID as `id`, navigates via title slug — still works correctly)
+ */
+const fetchAnimeSearchViaJikan = async (query: string, limit = 20): Promise<AnimeSearchResponse> => {
+  // ── Step 1: Jikan search ───────────────────────────────────────────────────
+  let jikanItems: any[] = [];
+  try {
+    const jRes = await fetch(
+      `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(query)}&limit=${Math.min(limit, 25)}&sfw=true`
+    );
+    if (jRes.ok) {
+      const jJson = await jRes.json();
+      jikanItems = (jJson.data as any[]) || [];
+    }
+  } catch { /* Jikan unavailable — return empty */ }
+
+  if (jikanItems.length === 0) {
+    return { page: 1, perPage: limit, total: 0, hasNextPage: false, results: [] };
+  }
+
+  const malIds: number[] = jikanItems.map((d: any) => d.mal_id).filter(Boolean);
+
+  // ── Step 2: AniList idMal_in → proper AniList IDs + full metadata ──────────
+  try {
+    const gql = `
+      query ($ids: [Int], $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          pageInfo { total currentPage hasNextPage perPage }
+          media(idMal_in: $ids, type: ANIME) {
+            ${ANILIST_MEDIA_LIST_FIELDS}
+          }
+        }
+      }
+    `;
+    const aRes = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query: gql, variables: { ids: malIds, perPage: malIds.length } }),
+    });
+
+    if (aRes.ok) {
+      const aJson = await aRes.json();
+      const pageData = aJson?.data?.Page ?? {};
+      const info = pageData?.pageInfo ?? {};
+      const anilistMedia = (pageData?.media ?? []) as AnimeResult[];
+
+      if (anilistMedia.length > 0) {
+        // Re-sort to match Jikan's relevance order
+        const byMalId: Record<number, AnimeResult> = {};
+        for (const m of anilistMedia) {
+          if (m.idMal) byMalId[m.idMal] = m;
+        }
+        const results = malIds
+          .map((id) => byMalId[id])
+          .filter((m): m is AnimeResult => Boolean(m) && !m.isAdult);
+
+        if (results.length > 0) {
+          return {
+            page: info.currentPage ?? 1,
+            perPage: info.perPage ?? limit,
+            total: info.total ?? results.length,
+            hasNextPage: info.hasNextPage ?? false,
+            results,
+          };
+        }
+      }
+    }
+  } catch { /* AniList idMal_in failed — fall through to tier 2 */ }
+
+  // ── Step 3 (Tier 2): Pure Jikan mapping as last resort ─────────────────────
+  // IDs here are MAL IDs. Navigation works because the watch page resolves via title slug.
+  console.info('[animeApi] AniList idMal_in returned nothing — using raw Jikan data as last resort');
+  const results = jikanItems
+    .filter((d: any) => !d.rating?.includes('Rx')) // filter adult
+    .map(mapJikanToAnimeResult)
+    .slice(0, limit);
+
+  return {
+    page: 1,
+    perPage: limit,
+    total: results.length,
+    hasNextPage: false,
+    results,
+  };
+};
+
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
 export const getAnimeDisplayTitle = (title?: AnimeTitle): string =>
@@ -201,16 +359,53 @@ export const getAnimeTypeLabel = (entry?: Pick<AnimeResult, 'format' | 'type'>):
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
-/** Keyword search – returns a list of results */
-export const fetchAnimeSearch = (query: string, limit = 20) =>
-  fetchJson<AnimeSearchResponse>(
-    `${MIRUO_API_BASE}/search?query=${encodeURIComponent(query)}&limit=${limit}`
-  );
+/** Keyword search – returns a list of results.
+ *  Tries the backend proxy first. If AniList search is down (empty results),
+ *  automatically falls back to Jikan (MAL) → AniList idMal_in lookup.
+ */
+export const fetchAnimeSearch = async (query: string, limit = 20): Promise<AnimeSearchResponse> => {
+  try {
+    const data = await fetchJson<AnimeSearchResponse>(
+      `${MIRUO_API_BASE}/search?query=${encodeURIComponent(query)}&limit=${limit}`
+    );
+    if ((data.results?.length ?? 0) > 0) return data;
+    // Primary returned empty — try Jikan fallback
+    console.info('[animeApi] AniList search returned 0 results, falling back to Jikan (MAL)…');
+    return await fetchAnimeSearchViaJikan(query, limit);
+  } catch {
+    // Primary threw — try Jikan fallback
+    console.info('[animeApi] AniList search failed, falling back to Jikan (MAL)…');
+    return await fetchAnimeSearchViaJikan(query, limit);
+  }
+};
 
-export const fetchAnimeSuggestions = (query: string) =>
-  fetchJson<{ results?: AnimeResult[] }>(
-    `${MIRUO_API_BASE}/suggestions?query=${encodeURIComponent(query)}`
-  );
+/** Autocomplete suggestions for the search dropdown.
+ *  Tries the backend proxy first. Falls back to Jikan (MAL) → AniList when empty.
+ */
+export const fetchAnimeSuggestions = async (
+  query: string,
+  signal?: AbortSignal
+): Promise<{ results?: AnimeResult[] }> => {
+  try {
+    const data = await fetchJson<{ results?: AnimeResult[]; suggestions?: AnimeResult[] }>(
+      `${MIRUO_API_BASE}/suggestions?query=${encodeURIComponent(query)}`,
+      signal
+    );
+    // Backend may return { suggestions } or { results }
+    const results = data.results ?? (data as any).suggestions ?? [];
+    if (results.length > 0) return { results };
+    // Primary returned empty — fall back to Jikan
+    console.info('[animeApi] AniList suggestions returned 0 results, falling back to Jikan (MAL)…');
+    const fallback = await fetchAnimeSearchViaJikan(query, 8);
+    return { results: fallback.results };
+  } catch (err: any) {
+    // Propagate AbortError so callers can detect cancellation
+    if (err?.name === 'AbortError') throw err;
+    console.info('[animeApi] AniList suggestions failed, falling back to Jikan (MAL)…');
+    const fallback = await fetchAnimeSearchViaJikan(query, 8);
+    return { results: fallback.results };
+  }
+};
 
 /** Search for anime produced by a specific studio using AniList GraphQL */
 export const fetchAnimeByStudio = async (studioQuery: string, limit = 10, page = 1): Promise<{ results: AnimeResult[], hasNextPage: boolean }> => {
@@ -285,6 +480,36 @@ export const fetchAnimeStreams = (
   fetchJson<AnimeStreamsResponse>(
     `${MIRUO_API_BASE}/watch/${encodeURIComponent(provider)}/${animeId}/${category}/${encodeURIComponent(slug)}`
   );
+
+export interface AnimeHybridStreamsResponse {
+  videoUrl?: string;
+  audioUrl?: string;
+  videoCategory?: string;
+  audioCategory?: string;
+  subtitles?: Array<{ file: string; label?: string; kind?: string }>;
+  intro?: { start: number; end: number };
+  outro?: { start: number; end: number };
+}
+
+export const fetchAnimeHybridStreams = (
+  provider: string,
+  animeId: number | string,
+  episodeId: string,
+  videoCategory: 'sub' | 'dub' = 'sub',
+  audioCategory: 'sub' | 'dub' = 'dub'
+) =>
+  fetchJson<AnimeHybridStreamsResponse>(
+    `${MIRUO_API_BASE}/sources/${encodeURIComponent(provider)}/hybrid?episodeId=${encodeURIComponent(episodeId)}&anilistId=${animeId}&videoCategory=${videoCategory}&audioCategory=${audioCategory}`
+  );
+
+export const fetchRemuxStream = async (
+  videoUrl: string,
+  audioUrl: string,
+  proxyUrl: string
+): Promise<string> => {
+  const b64e = (s: string) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${proxyUrl}/remux?videoUrl=${b64e(videoUrl)}&audioUrl=${b64e(audioUrl)}`;
+};
 
 // ─── Provider helpers ─────────────────────────────────────────────────────────
 
