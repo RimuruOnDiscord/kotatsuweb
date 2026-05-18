@@ -384,7 +384,7 @@ const ProfilePage: React.FC = () => {
     return (
       <div className="aw-root aw-noise relative min-h-screen flex flex-col pb-24">
         <div className="absolute top-0 left-0 right-0 h-[220px] md:h-[320px] w-full overflow-hidden pointer-events-none z-0" style={{ background: 'var(--app-surface-1)' }}>
-          <div className="absolute inset-0 opacity-[0.35] mix-blend-screen" style={{ background: 'radial-gradient(circle at 50% 0%, var(--app-accent, #8b5cf6) 0%, transparent 60%)' }} />
+          <div className="absolute inset-0 opacity-[0.35]" style={{ background: 'radial-gradient(circle at 50% 0%, var(--app-accent, #8b5cf6) 0%, transparent 60%)' }} />
           <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[var(--app-bg)] to-transparent" />
         </div>
 
@@ -435,7 +435,7 @@ const ProfilePage: React.FC = () => {
 
       {/* ─── IMMERSIVE BANNER ─── */}
       <div className="absolute top-0 left-0 right-0 h-[220px] md:h-[320px] w-full overflow-hidden pointer-events-none z-0" style={{ background: 'var(--app-surface-1)' }}>
-        <div className="absolute inset-0 opacity-[0.35] mix-blend-screen" style={{ background: 'radial-gradient(circle at 50% 0%, var(--app-accent, #8b5cf6) 0%, transparent 60%)' }} />
+        <div className="absolute inset-0 opacity-[0.35]" style={{ background: 'radial-gradient(circle at 50% 0%, var(--app-accent, #8b5cf6) 0%, transparent 60%)' }} />
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[var(--app-bg)] to-transparent" />
       </div>
 

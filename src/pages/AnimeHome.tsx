@@ -1714,8 +1714,8 @@ const AnimeHome: React.FC = () => {
 
       {/* ══ AMBIENT BACKGROUND GLOWS ══ */}
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[15%] left-[20%] w-[500px] h-[500px] rounded-full blur-[130px] opacity-[0.06]" style={{ background: 'var(--app-accent)' }} />
-        <div className="absolute bottom-[20%] right-[20%] w-[450px] h-[450px] rounded-full blur-[120px] opacity-[0.04]" style={{ background: 'var(--app-accent)' }} />
+        <div className="absolute top-[15%] left-[20%] w-[500px] h-[500px] rounded-full opacity-[0.06]" style={{ background: 'radial-gradient(circle at center, var(--app-accent) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-[20%] right-[20%] w-[450px] h-[450px] rounded-full opacity-[0.04]" style={{ background: 'radial-gradient(circle at center, var(--app-accent) 0%, transparent 70%)' }} />
       </div>
 
       <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'transparent', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}></div>
@@ -1828,7 +1828,7 @@ const AnimeHome: React.FC = () => {
                           alt=""
                         />
                         {isActiveSlide && trailerUrl && (
-                          <div className="absolute inset-0 opacity-30 mix-blend-screen pointer-events-none">
+                          <div className="absolute inset-0 opacity-30 pointer-events-none">
                             <MediaPlayer src={trailerUrl} autoPlay loop muted playsInline className="w-full h-full object-cover">
                               <MediaProvider />
                             </MediaPlayer>
@@ -1925,7 +1925,7 @@ const AnimeHome: React.FC = () => {
                         {/* Editorial Japanese Title Texture */}
                         {(anime.title as any)?.native && (
                           <div
-                            className="absolute right-6 top-1/2 -translate-y-1/2 text-[100px] xl:text-[140px] font-black tracking-widest text-white opacity-[0.04] select-none pointer-events-none mix-blend-overlay"
+                            className="absolute right-6 top-1/2 -translate-y-1/2 text-[100px] xl:text-[140px] font-black tracking-widest text-white opacity-[0.04] select-none pointer-events-none"
                             style={{ writingMode: 'vertical-rl', textOrientation: 'upright', fontFamily: 'var(--aw-font-display)' }}
                           >
                             {(anime.title as any).native}
