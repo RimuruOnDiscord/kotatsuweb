@@ -1126,13 +1126,15 @@ const AnimeHome: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const original = MediaSource.prototype.addSourceBuffer;
-    MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
-      const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
-      if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
-      return original.call(this, fixed);
-    };
-    return () => { MediaSource.prototype.addSourceBuffer = original; };
+    if (typeof window !== 'undefined' && (window as any).MediaSource) {
+      const original = (window as any).MediaSource.prototype.addSourceBuffer;
+      (window as any).MediaSource.prototype.addSourceBuffer = function (mimeType: string) {
+        const fixed = mimeType.replace('mp4a.40.1', 'mp4a.40.2');
+        if (fixed !== mimeType) console.log('[codec-fix] Remapped:', mimeType, '->', fixed);
+        return original.call(this, fixed);
+      };
+      return () => { (window as any).MediaSource.prototype.addSourceBuffer = original; };
+    }
   }, []);
 
   const navigate = useNavigate();
