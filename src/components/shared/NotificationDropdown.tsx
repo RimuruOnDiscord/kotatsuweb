@@ -293,7 +293,7 @@ export default function NotificationDropdown({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative flex w-full max-w-[800px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
+              className="aw-material-modal relative flex w-full max-w-[800px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
               style={modalStyles}
               onClick={e => e.stopPropagation()}
             >
@@ -305,9 +305,7 @@ export default function NotificationDropdown({
               >
                 {/* Header Block */}
                 <div className="px-6 mb-8 flex flex-col gap-3">
-                  <div className="w-[48px] h-[48px] rounded-[14px] flex items-center justify-center shadow-lg" style={{ background: 'var(--app-accent-muted)', border: '1px solid var(--app-accent-soft)' }}>
-                    <Bell size={22} style={{ color: 'var(--app-accent)' }} strokeWidth={2} />
-                  </div>
+
                   <div>
                     <h2 className="text-[19px] text-white leading-tight font-bold" style={{ fontFamily: DISPLAY_FONT, letterSpacing: '-0.02em' }}>
                       Notifications
@@ -339,7 +337,7 @@ export default function NotificationDropdown({
                           }`}
                       >
                         <div className="flex items-center gap-3">
-                          <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : '' }}>
+                          <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : undefined }}>
                             <tab.icon size={16} strokeWidth={active ? 2.5 : 2} style={{ flexShrink: 0 }} />
                           </motion.div>
                           <span className="leading-none">{tab.label}</span>

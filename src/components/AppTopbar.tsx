@@ -53,8 +53,11 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
           const data = await fetchAnimeSearch(trimmedQuery, 6);
           if (abortController.signal.aborted) return;
 
+          const showNSFW = localStorage.getItem('nsfwShowContent') === 'true';
           const mapped = Array.isArray(data.results)
-            ? data.results.map((entry) => ({
+            ? data.results
+                .filter((entry: any) => showNSFW || (!entry.isAdult && !(entry.genres || []).includes('Hentai')))
+                .map((entry: any) => ({
                 id: entry.id,
                 mal_id: entry.idMal || entry.id,
                 title: getAnimeDisplayTitle(entry.title),
@@ -142,14 +145,18 @@ const AppTopbar: React.FC<AppTopbarProps> = ({ searchQuery, onSearchQueryChange,
   };
 
   const openResult = (result: SearchResult) => {
-    setShowSearch(false);
-    navigate(isAnimeMode ? `/read/${result.id}` : `/read/${createSlug(result.title)}`);
+    const title = typeof result.title === 'string' ? result.title : '';
+    const slug = title
+      ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      : String(result.id);
+    clearSearch(); // clears query → prevents debounce from reopening dropdown
+    navigate(isAnimeMode ? `/watch/${slug}` : `/read/${createSlug(result.title)}`);
   };
 
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-[100] w-full border-b border-white/5 bg-[var(--app-bg)] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.9)]"
+      className="sticky top-0 z-[100] w-full border-b border-white/[0.06] bg-black/60 backdrop-blur-xl saturate-[160%] shadow-[0_4px_30px_rgba(0,0,0,0.3)] transition-all duration-300"
     >
       <MobileTopbar
         searchQuery={searchQuery}

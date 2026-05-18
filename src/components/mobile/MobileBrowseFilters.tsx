@@ -13,30 +13,24 @@ interface MobileBrowseFiltersProps {
   setSearchQuery: (value: string) => void;
   submitSearch: () => void;
   searchPlaceholder?: string;
-  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release' | 'studio', string>>;
-  typeFilter: string;
+  fieldLabels?: Partial<Record<'format' | 'genre' | 'status' | 'year' | 'length' | 'studio', string>>;
+  formatFilter: string;
   genreFilter: string[];
   statusFilter: string;
-  languageFilter: string;
   yearFilter: string;
   lengthFilter: string;
-  releaseFilter: string;
   studioFilter: string;
-  typeOptions: FilterOption[];
+  formatOptions: FilterOption[];
   genreOptions: FilterOption[];
   statusOptions: FilterOption[];
-  languageOptions: FilterOption[];
   yearOptions: FilterOption[];
   lengthOptions: FilterOption[];
-  releaseOptions: FilterOption[];
   studioOptions: FilterOption[];
-  updateTypeFilter: (value: string) => void;
+  updateFormatFilter: (value: string) => void;
   updateGenreFilter: (value: string) => void;
   updateStatusFilter: (value: string) => void;
-  updateLanguageFilter: (value: string) => void;
   updateYearFilter: (value: string) => void;
   updateLengthFilter: (value: string) => void;
-  updateReleaseFilter: (value: string) => void;
   updateStudioFilter: (value: string) => void;
   hasActiveFilters: boolean;
   clearFilters: () => void;
@@ -48,29 +42,23 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
   submitSearch,
   searchPlaceholder,
   fieldLabels,
-  typeFilter,
+  formatFilter,
   genreFilter,
   statusFilter,
-  languageFilter,
   yearFilter,
   lengthFilter,
-  releaseFilter,
   studioFilter,
-  typeOptions,
+  formatOptions,
   genreOptions,
   statusOptions,
-  languageOptions,
   yearOptions,
   lengthOptions,
-  releaseOptions,
   studioOptions,
-  updateTypeFilter,
+  updateFormatFilter,
   updateGenreFilter,
   updateStatusFilter,
-  updateLanguageFilter,
   updateYearFilter,
   updateLengthFilter,
-  updateReleaseFilter,
   updateStudioFilter,
   hasActiveFilters,
   clearFilters,
@@ -78,13 +66,11 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMounted, setSheetMounted] = useState(false);
   const labels = {
-    type: fieldLabels?.type || 'Type',
+    format: fieldLabels?.format || 'Format',
     genre: fieldLabels?.genre || 'Genre',
     status: fieldLabels?.status || 'Status',
-    language: fieldLabels?.language || 'Language',
     year: fieldLabels?.year || 'Year',
     length: fieldLabels?.length || 'Length',
-    release: fieldLabels?.release || 'Release',
     studio: fieldLabels?.studio || 'Studio',
   };
 
@@ -100,12 +86,10 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
 
   const activeLabels = useMemo(() => {
     const groups = [
-      [typeFilter, typeOptions],
+      [formatFilter, formatOptions],
       [statusFilter, statusOptions],
-      [languageFilter, languageOptions],
       [yearFilter, yearOptions],
       [lengthFilter, lengthOptions],
-      [releaseFilter, releaseOptions],
       [studioFilter, studioOptions],
     ] as const;
 
@@ -118,7 +102,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
       .map((option) => option.label);
 
     return [...labels, ...genreLabels];
-  }, [genreFilter, genreOptions, languageFilter, languageOptions, lengthFilter, lengthOptions, releaseFilter, releaseOptions, statusFilter, statusOptions, typeFilter, typeOptions, yearFilter, yearOptions, studioFilter, studioOptions]);
+  }, [genreFilter, genreOptions, statusFilter, statusOptions, formatFilter, formatOptions, yearFilter, yearOptions, studioFilter, studioOptions]);
 
   const FilterSection: React.FC<{
     label: string;
@@ -158,12 +142,12 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
                 }
               }}
               onPointerDown={option.disabled ? undefined : handleRippleMouseDown}
-              className={`ripple-button overflow-hidden rounded-[1rem] border px-3 py-2.5 text-left text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
+              className={`aw-material-control ripple-button overflow-hidden rounded-[14px] px-3 py-2.5 text-left text-[11px] font-black uppercase tracking-[0.14em] transition-all ${
                 option.disabled
-                  ? 'cursor-not-allowed border-white/[0.04] bg-white/[0.02] text-zinc-700'
+                  ? 'cursor-not-allowed text-zinc-700'
                   : isSelected
                     ? 'border-[var(--app-border)] bg-[var(--app-accent-muted)] text-[var(--app-accent)]'
-                    : 'border-[var(--app-border)] bg-[var(--app-surface-2)] text-zinc-300'
+                    : 'text-zinc-300'
               }`}
             >
               {option.label}
@@ -176,7 +160,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
           type="button"
           onClick={() => onChange('')}
           onPointerDown={handleRippleMouseDown}
-          className="ripple-button inline-flex rounded-[1rem] border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:bg-[var(--app-card)] hover:text-white"
+          className="aw-material-control ripple-button inline-flex rounded-[14px] px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
         >
           Clear Genres
         </button>
@@ -186,7 +170,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
 
   return (
     <div className="space-y-3 lg:hidden">
-      <div className="relative flex items-center overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-[0_20px_55px_-34px_rgba(0,0,0,0.95)]">
+      <div className="aw-material-control relative flex items-center overflow-hidden rounded-2xl shadow-[0_20px_55px_-34px_rgba(0,0,0,0.95)]">
         <Search
           className={`absolute left-4 transition-all duration-300 ${
             searchQuery.trim() ? 'text-[var(--app-accent)]' : 'text-zinc-600'
@@ -214,7 +198,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
           type="button"
           onClick={() => setSheetOpen(true)}
           onPointerDown={handleRippleMouseDown}
-          className="ripple-button inline-flex h-11 items-center gap-2 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:bg-[var(--app-card)] hover:text-white"
+          className="aw-material-control ripple-button inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
         >
           <SlidersHorizontal size={14} />
           Filters
@@ -225,7 +209,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
             type="button"
             onClick={clearFilters}
             onPointerDown={handleRippleMouseDown}
-            className="ripple-button inline-flex h-11 items-center rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:bg-[var(--app-card)] hover:text-white"
+            className="aw-material-control ripple-button inline-flex h-11 items-center rounded-2xl px-4 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-300 transition-colors hover:text-white"
           >
             Clear
           </button>
@@ -237,7 +221,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
           {activeLabels.map((label) => (
             <span
               key={label}
-              className="whitespace-nowrap rounded-full border border-[var(--app-border)] bg-[var(--app-accent-muted)] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[var(--app-accent)]"
+              className="aw-material-control whitespace-nowrap rounded-full bg-[var(--app-accent-muted)] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[var(--app-accent)]"
             >
               {label}
             </span>
@@ -251,15 +235,15 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
             type="button"
             aria-label="Close filters"
             onClick={() => setSheetOpen(false)}
-            className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${sheetOpen ? 'opacity-100' : 'opacity-0'}`}
+            className={`absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300 ${sheetOpen ? 'opacity-100' : 'opacity-0'}`}
           />
 
           <div
-            className={`absolute inset-x-3 bottom-3 overflow-hidden rounded-[1.8rem] border border-[var(--app-border)] bg-[var(--app-surface-1)] shadow-[0_30px_80px_-24px_rgba(0,0,0,0.96)] transition-all duration-300 ${
+            className={`aw-material-modal absolute inset-x-3 bottom-3 overflow-hidden rounded-[1.8rem] shadow-[0_30px_80px_-24px_rgba(0,0,0,0.96)] transition-all duration-300 ${
               sheetOpen ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
             }`}
           >
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-4 py-4">
+            <div className="aw-material-modal-header flex items-center justify-between border-b border-white/[0.06] px-4 py-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-500">Mobile Filters</p>
                 <h3 className="mt-1 text-lg font-black uppercase tracking-tight text-white">Browse Controls</h3>
@@ -268,24 +252,22 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
                 type="button"
                 onClick={() => setSheetOpen(false)}
                 onPointerDown={handleRippleMouseDown}
-                className="ripple-button flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-[var(--app-border)] bg-[var(--app-surface-2)] text-zinc-300"
+                className="aw-material-control ripple-button flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-zinc-300"
               >
                 <X size={14} />
               </button>
             </div>
 
             <div className="no-scrollbar max-h-[70vh] space-y-5 overflow-y-auto px-4 py-4">
-              <FilterSection label={labels.type} value={typeFilter} options={typeOptions} onChange={updateTypeFilter} />
+              <FilterSection label={labels.format} value={formatFilter} options={formatOptions} onChange={updateFormatFilter} />
               <FilterSection label={labels.genre} value={genreFilter} options={genreOptions} onChange={updateGenreFilter} columns="grid-cols-2" />
               <FilterSection label={labels.status} value={statusFilter} options={statusOptions} onChange={updateStatusFilter} />
-              <FilterSection label={labels.language} value={languageFilter} options={languageOptions} onChange={updateLanguageFilter} />
               <FilterSection label={labels.year} value={yearFilter} options={yearOptions} onChange={updateYearFilter} columns="grid-cols-3" />
               <FilterSection label={labels.length} value={lengthFilter} options={lengthOptions} onChange={updateLengthFilter} />
-              <FilterSection label={labels.release} value={releaseFilter} options={releaseOptions} onChange={updateReleaseFilter} />
               <FilterSection label={labels.studio} value={studioFilter} options={studioOptions} onChange={updateStudioFilter} />
             </div>
 
-            <div className="flex items-center gap-2 border-t border-white/[0.06] p-4">
+            <div className="aw-material-modal-header flex items-center gap-2 border-t border-white/[0.06] p-4">
               <button
                 type="button"
                 onClick={() => setSheetOpen(false)}
@@ -300,7 +282,7 @@ const MobileBrowseFilters: React.FC<MobileBrowseFiltersProps> = ({
                   type="button"
                   onClick={clearFilters}
                   onPointerDown={handleRippleMouseDown}
-                  className="ripple-button rounded-[1rem] border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300"
+                  className="aw-material-control ripple-button rounded-[1rem] px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-zinc-300"
                 >
                   Reset
                 </button>

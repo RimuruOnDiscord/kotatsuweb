@@ -10,7 +10,13 @@ export interface BookmarkEntry {
   author?: string;
   year?: number;
   updatedAt: number;
-  originLabel?: string; // New field for the source/origin of the entry
+  originLabel?: string;
+  episodes?: number;
+  episodeProgress?: number;
+  startDate?: string;
+  finishDate?: string;
+  totalRewatches?: number;
+  notes?: string;
 }
 
 export const BOOKMARKS_STORAGE_KEY = 'mangavel:bookmarks';

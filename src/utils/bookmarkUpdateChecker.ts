@@ -110,9 +110,17 @@ export const checkBookmarksForUpdates = async (
 
   // Process bookmarks one-by-one with sequential fetches to avoid hammering the API
   for (const bookmark of animeBookmarks) {
+    const trackerKey = String(bookmark.malId);
+    const record = updatedTracker[trackerKey];
+    const lastKnown = record?.lastKnownEpisode ?? 0;
+
+    // Prevent API spam: skip if checked within the last hour
+    if (record && Date.now() - record.lastChecked < 3600000) {
+      continue;
+    }
+
     try {
       // Fetch fresh anime info from /api/info/{malId}
-      // fetchAnimeInfo accepts a number or string and returns AnimeResult
       const info = await fetchAnimeInfo(bookmark.malId);
       console.log(`[Notif Debug] Checking "${bookmark.title}" (Status: ${info.status}, Next Ep: ${info.nextAiringEpisode?.episode || 'N/A'})`);
 
@@ -127,11 +135,6 @@ export const checkBookmarksForUpdates = async (
       const nextEp = info.nextAiringEpisode?.episode;
       if (typeof nextEp !== 'number' || nextEp < 2) continue;
       const latestAiredEp = nextEp - 1;
-
-      // Get what we last tracked for this malId
-      const trackerKey = String(bookmark.malId);
-      const record = updatedTracker[trackerKey];
-      const lastKnown = record?.lastKnownEpisode ?? 0;
 
       // If the latest aired episode is higher than what we last notified for,
       // a new episode has aired — create a notification.
@@ -174,8 +177,18 @@ export const checkBookmarksForUpdates = async (
   
   if (follows.length > 0) {
     for (const follow of follows) {
+      const trackerKey = `follow_${follow.malId}`;
+      const record = updatedTracker[trackerKey];
+      
+      // Prevent API spam: skip if checked within the last hour
+      if (record && Date.now() - record.lastChecked < 3600000) {
+        remainingFollows.push(follow);
+        continue;
+      }
+
       try {
         const info = await fetchAnimeInfo(follow.malId);
+        updatedTracker[trackerKey] = { malId: follow.malId, lastKnownEpisode: 0, lastChecked: Date.now() };
         
         // If it's no longer 'NOT_YET_RELEASED' (e.g. RELEASING or FINISHED)
         // and we have successfully retrieved a status.
@@ -191,6 +204,7 @@ export const checkBookmarksForUpdates = async (
           remainingFollows.push(follow);
         }
       } catch {
+        updatedTracker[trackerKey] = { malId: follow.malId, lastKnownEpisode: 0, lastChecked: Date.now() };
         remainingFollows.push(follow); // keep it if fetch fails
       }
     }

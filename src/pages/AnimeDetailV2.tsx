@@ -1,4 +1,4 @@
-/* --- START OF FILE AnimeDetail.tsx --- */
+/* --- START OF FILE AnimeDetailV2.tsx --- */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import CommentSection from '../components/shared/CommentSection';
@@ -87,42 +87,43 @@ const DESIGN_STYLES = `
 
   .hover-lift {
     transition:
-      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-      box-shadow 0.4s ease,
-      border-color 0.3s ease,
-      background 0.3s ease,
-      color 0.3s ease;
+      border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      background 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.18s ease,
+      color 0.18s ease,
+      transform 0.1s ease;
   }
   .hover-lift:hover {
-    transform: translateY(-6px) scale(1.01);
-    box-shadow: 0 20px 40px -12px rgba(0,0,0,0.5);
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--aw-accent) 20%, transparent);
   }
   .hover-lift:active {
-    transform: translateY(-2px) scale(0.98);
+    transform: scale(0.97);
     transition-duration: 0.1s;
   }
 
   .press-squish {
-    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .press-squish:active {
-    transform: scale(0.93);
+    transform: scale(0.95);
   }
 
-  /* Media Card Hover Styles */
+  /* Media Card Hover Styles — stationary glow */
   .aw-media-card {
-    transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     transform-origin: center;
     will-change: transform;
   }
   .aw-media-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 0 20px -6px color-mix(in srgb, var(--aw-accent) 18%, transparent);
   }
   .aw-media-card:active {
     transform: scale(0.97);
-    transition: all 0.12s ease;
+    transition: all 0.1s ease;
   }
 
   .aw-btn-primary,
@@ -132,53 +133,38 @@ const DESIGN_STYLES = `
     position: relative;
     z-index: 1;
     transition:
-      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
-      filter 0.3s ease,
-      letter-spacing 0.3s ease,
-      border-color 0.3s ease,
-      background 0.3s ease,
-      box-shadow 0.3s ease,
-      color 0.3s ease,
-      border-radius 0.35s ease;
+      border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      background 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.18s ease,
+      color 0.18s ease,
+      transform 0.1s ease;
   }
   .aw-btn-primary:hover {
-    transform: scale(1.04);
-    filter: brightness(1.1);
-    letter-spacing: 0.08em;
+    filter: brightness(1.08);
+    box-shadow: 0 0 20px -4px color-mix(in srgb, var(--aw-accent) 40%, transparent);
     z-index: 10;
   }
   .aw-btn-primary svg,
   .aw-btn-ghost svg,
   .bookmark-btn svg {
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .aw-btn-primary:hover svg {
-    transform: scale(1.2) translateX(2px) rotate(10deg);
+    transition: color 0.18s ease;
   }
   .aw-btn-ghost:hover {
-    background: color-mix(in srgb, var(--aw-accent), transparent 85%) !important;
-    border-color: var(--aw-accent) !important;
+    background: color-mix(in srgb, var(--aw-accent), transparent 88%) !important;
+    border-color: color-mix(in srgb, var(--aw-accent), transparent 45%) !important;
     color: var(--aw-accent) !important;
-    transform: scale(1.04);
-    letter-spacing: 0.08em;
-    box-shadow: 0 10px 25px -10px rgba(0,0,0,0.5);
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--aw-accent) 30%, transparent);
     z-index: 10;
   }
-  .aw-btn-ghost:hover svg {
-    transform: scale(1.2) rotate(-10deg);
-  }
   .subscribe-btn {
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  .subscribe-btn:hover {
-    transform: scale(1.04);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .subscribe-btn.subscribed {
     border-color: var(--aw-accent);
     color: var(--aw-accent);
   }
   .subscribe-btn.subscribed:hover {
-    background: color-mix(in srgb, var(--aw-accent), transparent 85%);
+    background: color-mix(in srgb, var(--aw-accent), transparent 88%);
   }
   @keyframes subscribe-pulse {
     0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--aw-accent), transparent 50%); }
@@ -189,24 +175,19 @@ const DESIGN_STYLES = `
     animation: subscribe-pulse 0.6s ease-out;
   }
   .bookmark-btn:hover {
-    background: color-mix(in srgb, var(--aw-accent), transparent 85%) !important;
-    border-color: var(--aw-accent) !important;
+    background: color-mix(in srgb, var(--aw-accent), transparent 88%) !important;
+    border-color: color-mix(in srgb, var(--aw-accent), transparent 45%) !important;
     color: var(--aw-accent) !important;
-    transform: scale(1.1) rotate(5deg);
-    border-radius: 18px !important;
-    box-shadow: 0 10px 25px -10px rgba(0,0,0,0.5);
-  }
-  .bookmark-btn:hover svg {
-    transform: scale(1.25) rotate(-15deg);
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--aw-accent) 30%, transparent);
   }
 
-  /* Episode Control Button Styles - Static Premium Glow */
+  /* Episode Control Button Styles — Stationary Glass Glow */
   .aw-control-btn {
     transition: 
-      background 0.3s ease,
-      border-color 0.3s ease,
-      box-shadow 0.3s ease,
-      color 0.3s ease,
+      background 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.18s ease,
+      color 0.18s ease,
       transform 0.1s ease;
     transform-origin: center;
     position: relative;
@@ -214,57 +195,71 @@ const DESIGN_STYLES = `
     will-change: transform;
   }
   .aw-control-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--aw-accent), transparent 95%) !important;
-    border-color: var(--aw-accent) !important;
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.95);
+    background: color-mix(in srgb, var(--aw-accent), transparent 92%) !important;
+    border-color: color-mix(in srgb, var(--aw-accent), transparent 55%) !important;
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--aw-accent) 25%, transparent);
     color: white !important;
   }
   .aw-control-btn:hover svg {
     color: var(--aw-accent);
   }
   .aw-control-btn:active:not(:disabled) {
-    transform: scale(0.94);
-    background: color-mix(in srgb, var(--aw-accent), transparent 90%) !important;
+    transform: scale(0.96);
     transition-duration: 0.1s;
   }
   .aw-control-btn.is-active {
     background: color-mix(in srgb, var(--aw-accent), transparent 85%) !important;
-    border-color: var(--aw-accent) !important;
+    border-color: color-mix(in srgb, var(--aw-accent), transparent 55%) !important;
     color: var(--aw-accent) !important;
-    box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 0 14px -4px color-mix(in srgb, var(--aw-accent) 40%, transparent);
   }
   .aw-control-btn.is-active:hover {
-    background: color-mix(in srgb, var(--aw-accent), transparent 75%) !important;
-    box-shadow: 0 12px 35px -10px rgba(0, 0, 0, 0.95);
+    background: color-mix(in srgb, var(--aw-accent), transparent 78%) !important;
+    box-shadow: 0 0 20px -4px color-mix(in srgb, var(--aw-accent) 50%, transparent);
   }
   .aw-control-btn svg {
-    transition: color 0.3s ease;
+    transition: color 0.18s ease;
   }
 
+  /* Episode card — stationary left-bar reveal */
   .episode-card {
-    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     transform-origin: left center;
+    position: relative;
+  }
+  .episode-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    bottom: 50%;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--aw-accent);
+    opacity: 0;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .episode-card:hover::before {
+    top: 12px;
+    bottom: 12px;
+    opacity: 0.5;
   }
   .episode-card:hover {
-    transform: translateX(8px) translateY(-2px);
-    background: color-mix(in srgb, var(--aw-accent), transparent 92%) !important;
-    border-color: var(--aw-accent) !important;
-    box-shadow: 0 12px 30px -8px rgba(0,0,0,0.4);
+    background: rgba(255, 255, 255, 0.03) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
   }
   .episode-card:active {
-    transform: translateX(4px) scale(0.99);
+    transform: scale(0.99);
     transition-duration: 0.1s;
   }
   .episode-card .ep-number,
   .episode-card .ep-thumb {
-    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .episode-card:hover .ep-number {
-    transform: scale(1.2);
     color: var(--aw-accent);
   }
   .episode-card:hover .ep-thumb {
-    transform: scale(1.08);
     opacity: 1;
   }
 
@@ -295,20 +290,23 @@ const DESIGN_STYLES = `
     letter-spacing: 0.12em;
     text-transform: uppercase;
     backdrop-filter: blur(14px);
-    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
   button.aw-fact-chip {
     cursor: pointer;
   }
   .aw-fact-chip:hover {
     color: white;
-    border-color: color-mix(in srgb, var(--aw-accent), transparent 35%);
+    border-color: color-mix(in srgb, var(--aw-accent), transparent 45%);
     background: color-mix(in srgb, var(--aw-accent), transparent 88%);
-    transform: translateY(-2px);
+    box-shadow: 0 0 12px -3px color-mix(in srgb, var(--aw-accent) 20%, transparent);
+  }
+  .aw-fact-chip:active {
+    transform: scale(0.96);
   }
   .aw-fact-chip svg {
     color: var(--aw-accent);
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: color 0.18s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   .aw-fact-chip:hover svg {
     transform: scale(1.16) rotate(-6deg);
@@ -579,14 +577,14 @@ const DESIGN_STYLES = `
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.02 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
   exit: { opacity: 0, transition: { staggerChildren: 0.03, staggerDirection: -1 as const } }
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 30, scale: 0.96 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring' as const, damping: 20, stiffness: 200 } },
-  exit: { opacity: 0, y: -20, scale: 0.96, transition: { duration: 0.15, ease: "easeIn" } }
+  hidden: { opacity: 0, y: 20, scale: 0.98, filter: 'blur(4px)' },
+  visible: { opacity: 1, y: 0, scale: 1, filter: 'blur(0px)', transition: { type: 'spring' as const, stiffness: 350, damping: 25 } },
+  exit: { opacity: 0, y: -10, scale: 0.98, transition: { duration: 0.15, ease: "easeIn" } }
 };
 
 const bookmarkModalFieldVariants: Variants = {
@@ -799,7 +797,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ title, image, type, episodes, sco
         </h3>
 
         {/* Metadata Pills */}
-        <div className="flex flex-wrap items-center gap-[5px] transition-all duration-150 group-hover:-translate-y-[1px] opacity-80 group-hover:opacity-100">
+        <div className="flex flex-wrap items-center gap-[5px] transition-all duration-150 opacity-80 group-hover:opacity-100">
           {!!type && (
             <span className="rounded bg-[#202022] px-[5px] py-[3px] text-[10px] font-bold text-[#b5b5bd] leading-none tracking-wide group-hover:text-white transition-colors">
               {type}
@@ -1082,7 +1080,7 @@ const removeTrackingMeta = (id?: string | null) => {
 // ─────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────
-const AnimeDetail: React.FC = () => {
+const AnimeDetailV2: React.FC = () => {
   const { user } = useAuth();
   const { animeId: urlSlug } = useParams<{ animeId: string }>();
   const navigate = useNavigate();
@@ -1203,7 +1201,7 @@ const AnimeDetail: React.FC = () => {
   }, [data, resolvedSlug]);
 
   useEffect(() => {
-    const id = 'aw-design-styles-anime-detail';
+    const id = 'aw-design-styles-anime-detail-v2';
     if (!document.getElementById(id)) {
       const tag = document.createElement('style'); tag.id = id; tag.textContent = DESIGN_STYLES; document.head.appendChild(tag);
     }
@@ -1855,11 +1853,11 @@ const AnimeDetail: React.FC = () => {
                           {episode.number ? String(episode.number).padStart(2, '0') : '-'}
                         </div>
                         <div className="relative h-[56px] w-[100px] shrink-0 overflow-hidden rounded-[10px] bg-[var(--aw-s2)] border border-white/[0.04]">
-                          <img
-                            src={episode.image || data?.coverImage?.large || 'https://via.placeholder.com/96x56/181818/3f3f46?text=No+Image'}
-                            alt={`Episode ${episode.number}`}
-                            className="ep-thumb h-full w-full object-cover opacity-85 group-hover:scale-105 group-hover:opacity-100 transition-all duration-300"
-                            onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/96x56/181818/3f3f46?text=No+Image'; }}
+                          <img 
+                            src={episode.image || data?.coverImage?.large || 'https://via.placeholder.com/96x56/181818/3f3f46?text=No+Image'} 
+                            alt={`Episode ${episode.number}`} 
+                            className="ep-thumb h-full w-full object-cover opacity-85 group-hover:scale-105 group-hover:opacity-100 transition-all duration-300" 
+                            onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/96x56/181818/3f3f46?text=No+Image'; }} 
                           />
                           {episode.filler && (
                             <div className="absolute top-1 left-1 rounded-[4px] bg-[var(--aw-accent)] text-[#04110d] px-1 py-0.2 text-[6px] font-bold uppercase tracking-wider" style={{ fontFamily: 'var(--aw-font-display)' }}>
@@ -1935,7 +1933,7 @@ const AnimeDetail: React.FC = () => {
       </div>
 
       {/* ── DESKTOP LAYOUT ── */}
-      <motion.div initial="hidden" animate="visible" variants={containerVariants} className="relative z-10 mx-auto w-full max-w-[1460px] px-4 pt-4 hidden md:block">
+      <motion.div initial="hidden" animate="visible" variants={containerVariants} className="relative z-10 mx-auto w-full max-w-[1460px] px-4 pt-4 md:pt-8 hidden md:block">
 
         <motion.button variants={itemVariants} onClick={() => navigate(-1)} className="group flex items-center gap-2 text-zinc-400 hover:text-white transition-colors mb-4 md:mb-6 text-sm font-medium w-fit relative z-50">
           <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" /> Back
@@ -2247,7 +2245,7 @@ const AnimeDetail: React.FC = () => {
                             <div
                               key={episode.id}
                               onClick={() => provider && navigate(getEpisodeHref(resolvedSlug, provider, category, episode.id))}
-                              className="episode-card animate-fade-up group flex items-center gap-4 md:gap-6 p-3.5 md:p-4 rounded-[20px] cursor-pointer border border-transparent bg-transparent hover:bg-white/[0.02] hover:border-white/[0.04] hover:shadow-[0_12px_32px_rgba(0,0,0,0.25)] hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-300 mb-2"
+                              className="episode-card animate-fade-up group flex items-center gap-4 md:gap-6 p-3.5 md:p-4 rounded-[20px] cursor-pointer border border-transparent bg-transparent hover:bg-white/[0.03] hover:border-white/[0.06] active:scale-[0.99] transition-all duration-200 mb-2"
                               style={{ animationDelay: `${(index % 20) * 0.03}s` }}
                             >
                               <div className="ep-number flex h-[56px] md:h-[80px] w-8 md:w-12 shrink-0 items-center justify-center text-lg md:text-2xl font-light text-zinc-500 group-hover:text-[var(--aw-accent)] transition-colors duration-300" style={{ fontFamily: 'var(--aw-font-body)' }}>
@@ -2330,7 +2328,7 @@ const AnimeDetail: React.FC = () => {
                     <motion.div initial={{ height: 0, opacity: 0, overflow: 'hidden' }} animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }} exit={{ height: 0, opacity: 0, overflow: 'hidden' }}>
                       <div className="grid grid-cols-2 gap-3 pb-2">
 
-                        <div className="group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-lg hover:shadow-[var(--aw-accent)]/10 hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
+                        <div className="group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
                           <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 text-zinc-400 group-hover/stat:text-zinc-300 transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
                             <TrendingUp size={12} className="text-[var(--aw-accent)] shrink-0 transition-transform group-hover/stat:scale-110" />
                             Popular
@@ -2340,7 +2338,7 @@ const AnimeDetail: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-lg hover:shadow-[var(--aw-accent)]/10 hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
+                        <div className="group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
                           <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 text-zinc-400 group-hover/stat:text-zinc-300 transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
                             <Users size={12} className="text-[var(--aw-accent)] shrink-0 transition-transform group-hover/stat:scale-110" />
                             Format
@@ -2350,7 +2348,7 @@ const AnimeDetail: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="col-span-2 group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-lg hover:shadow-[var(--aw-accent)]/10 hover:-translate-y-1 hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
+                        <div className="col-span-2 group/stat flex flex-col gap-1.5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-4 transition-all duration-300 shadow-sm hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)] min-w-0">
                           <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 text-zinc-400 group-hover/stat:text-zinc-300 transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
                             <Heart size={12} className="text-[var(--aw-accent)] shrink-0 transition-transform group-hover/stat:scale-110" />
                             Favourites
@@ -2360,7 +2358,7 @@ const AnimeDetail: React.FC = () => {
                           </span>
                         </div>
 
-                        <div className="group col-span-2 flex flex-col rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--aw-accent)]/10 hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)]">
+                        <div className="group col-span-2 flex flex-col rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_95%)]">
                           <div className="space-y-5">
                             <div className="flex items-start gap-4">
                               <Calendar size={14} className="flex-shrink-0 mt-0.5 text-[var(--aw-accent)] transition-transform group-hover:scale-110 group-hover:-rotate-3" />
@@ -2395,8 +2393,8 @@ const AnimeDetail: React.FC = () => {
                               </div>
                             )}
                             <div className="mt-2 flex gap-3 pt-5 border-t border-[color-mix(in_srgb,var(--aw-border),transparent_50%)] transition-colors">
-                              {data?.id && <a href={`https://anilist.co/anime/${data.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[12px] text-[10px] font-bold uppercase tracking-widest border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_50%)] text-zinc-300 hover:text-white hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_60%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_80%)] hover:-translate-y-0.5 hover:shadow-md active:scale-95 transition-all duration-200" style={{ fontFamily: 'var(--aw-font-display)' }}>AniList <ExternalLink size={10} /></a>}
-                              {data?.idMal && <a href={`https://myanimelist.net/anime/${data.idMal}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[12px] text-[10px] font-bold uppercase tracking-widest border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_50%)] text-zinc-300 hover:text-white hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_60%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_80%)] hover:-translate-y-0.5 hover:shadow-md active:scale-95 transition-all duration-200" style={{ fontFamily: 'var(--aw-font-display)' }}>MAL <ExternalLink size={10} /></a>}
+                              {data?.id && <a href={`https://anilist.co/anime/${data.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[12px] text-[10px] font-bold uppercase tracking-widest border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_50%)] text-zinc-300 hover:text-white hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_60%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_80%)] hover:shadow-[0_0_12px_-3px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] active:scale-95 transition-all duration-200" style={{ fontFamily: 'var(--aw-font-display)' }}>AniList <ExternalLink size={10} /></a>}
+                              {data?.idMal && <a href={`https://myanimelist.net/anime/${data.idMal}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[12px] text-[10px] font-bold uppercase tracking-widest border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_50%)] text-zinc-300 hover:text-white hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_60%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_80%)] hover:shadow-[0_0_12px_-3px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] active:scale-95 transition-all duration-200" style={{ fontFamily: 'var(--aw-font-display)' }}>MAL <ExternalLink size={10} /></a>}
                             </div>
                           </div>
                         </div>
@@ -2420,7 +2418,7 @@ const AnimeDetail: React.FC = () => {
                             ) : (
                               <div className="space-y-3">
                                 {reviews.slice(0, 5).map((review) => (
-                                  <a key={review.id} href={review.siteUrl} target="_blank" rel="noopener noreferrer" className="group/review block p-5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md overflow-hidden transition-all duration-150 hover:-translate-y-1 active:scale-[0.98] shadow-sm hover:shadow-lg hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_90%)]">
+                                  <a key={review.id} href={review.siteUrl} target="_blank" rel="noopener noreferrer" className="group/review block p-5 rounded-[16px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md overflow-hidden transition-all duration-150 active:scale-[0.98] shadow-sm hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_50%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_92%)]">
                                     <div className="flex items-center gap-3 mb-3">
                                       <img src={review.user.avatar.medium} alt={review.user.name} className="w-7 h-7 rounded-full object-cover" />
                                       <span className="text-[12px] font-bold text-white tracking-wide" style={{ fontFamily: 'var(--aw-font-display)' }}>{review.user.name}</span>
@@ -2449,7 +2447,7 @@ const AnimeDetail: React.FC = () => {
                         <motion.div initial={{ height: 0, opacity: 0, overflow: 'hidden' }} animate={{ height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } }} exit={{ height: 0, opacity: 0, overflow: 'hidden' }}>
                           <div className="space-y-3 pb-2">
                             {streamingLinks.map((link: any, idx: number) => (
-                              <a key={`${link.site}-${idx}`} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 rounded-[14px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_40%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_90%)] hover:-translate-y-1 active:scale-[0.98] transition-all duration-150 group/link shadow-sm hover:shadow-lg">
+                              <a key={`${link.site}-${idx}`} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 rounded-[14px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_70%)] backdrop-blur-md hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_40%)] hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_90%)] active:scale-[0.98] transition-all duration-200 group/link shadow-sm hover:shadow-[0_0_14px_-4px_color-mix(in_srgb,var(--aw-accent)_20%,transparent)]">
                                 <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5">{link.site.toLowerCase().includes('youtube') ? <Youtube size={16} className="text-white group-hover/link:text-[var(--aw-accent)] transition-colors duration-150" /> : <ExternalLink size={14} className="text-white group-hover/link:text-[var(--aw-accent)] transition-colors duration-150" />}</div>
                                 <div className="flex flex-col"><span className="text-[11px] font-bold text-white tracking-wide" style={{ fontFamily: 'var(--aw-font-display)' }}>{link.site}</span> <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 group-hover/link:text-[var(--aw-accent)] transition-colors mt-0.5">Watch Now</span></div>
                               </a>
@@ -2479,342 +2477,342 @@ const AnimeDetail: React.FC = () => {
               onClick={() => setIsBookmarkModalOpen(false)}
             />
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 pointer-events-none">
-              <motion.div
-                className="aw-material-modal relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[672px] flex-col overflow-hidden rounded-[24px] pointer-events-auto"
-                style={{ fontFamily: 'var(--aw-font-body)', background: 'var(--app-bg)' }}
-                initial={{ y: 24, scale: 0.93, opacity: 0 }}
-                animate={{ y: 0, scale: 1, opacity: 1 }}
-                exit={{ y: 16, scale: 0.94, opacity: 0 }}
-                transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.9 }}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="aw-material-modal-header relative h-[218px] flex-shrink-0 overflow-hidden rounded-t-[24px] border-b border-white/[0.08] sm:h-[224px]">
-                  <motion.img
-                    src={data?.bannerImage || data?.coverImage?.extraLarge || data?.coverImage?.large}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover object-center"
-                    initial={{ scale: 1.06, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 0.62 }}
-                    exit={{ scale: 1.03, opacity: 0 }}
-                    transition={{ duration: 0.38, ease: 'easeOut' }}
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        'radial-gradient(circle at 82% 18%, rgba(255,255,255,0.12), transparent 28%), linear-gradient(90deg, rgba(4,4,7,0.96) 0%, rgba(4,4,7,0.82) 37%, rgba(4,4,7,0.32) 70%, rgba(4,4,7,0.18) 100%), linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.42) 45%, rgba(8,8,12,0.12) 100%)'
-                    }}
-                  />
-                  <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                  <motion.button
-                    type="button"
-                    onClick={() => setIsBookmarkModalOpen(false)}
-                    whileHover={{ scale: 1.1, rotate: 90, backgroundColor: 'rgba(255,255,255,0.1)' }}
-                    whileTap={{ scale: 0.9 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                    className="absolute right-4 top-4 z-50 flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 outline-none transition-colors hover:text-white"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    aria-label="Close list editor"
-                  >
-                    <X size={16} strokeWidth={2.5} />
-                  </motion.button>
-                  <div className="absolute inset-x-5 bottom-6 flex items-end gap-5 sm:inset-x-6">
-                    <motion.div
-                      className="relative hidden h-[142px] w-[98px] flex-shrink-0 overflow-hidden rounded-[18px] border border-white/[0.14] bg-white/[0.08] p-1 shadow-[0_22px_46px_-18px_rgba(0,0,0,0.9)] sm:block"
-                      initial={{ opacity: 0, y: 12, scale: 0.94 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                      transition={{ type: 'spring', damping: 24, stiffness: 280, delay: 0.04 }}
-                    >
-                      <img
-                        src={data?.coverImage?.large || data?.coverImage?.extraLarge}
-                        alt={displayTitle}
-                        className="h-full w-full rounded-[14px] object-cover"
-                      />
-                      <div className="pointer-events-none absolute inset-0 rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />
-                    </motion.div>
-                    <motion.div
-                      className="flex min-h-[120px] min-w-0 flex-1 flex-col items-start justify-center pb-0.5 text-left sm:pb-1"
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
-                    >
-                      {animeLogo ? (
-                        <motion.img
-                          src={animeLogo}
-                          alt={displayTitle}
-                          className="max-h-[76px] max-w-[430px] object-contain object-left drop-shadow-[0_8px_24px_rgba(0,0,0,0.95)] sm:max-h-[92px]"
-                          draggable={false}
-                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          transition={{ type: 'spring', damping: 24, stiffness: 260, delay: 0.08 }}
-                        />
-                      ) : (
-                        <motion.div
-                          className="h-[76px] w-[280px] max-w-full overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.035]"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        >
-                          <motion.div
-                            className="h-full w-1/2 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"
-                            animate={{ x: ['-120%', '260%'] }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                          />
-                        </motion.div>
-                      )}
-
-                    </motion.div>
-                  </div>
-                </div>
-
-                <motion.div
-                  className="grid flex-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2 lg:grid-cols-3 aw-scrollbar"
-                  style={{ scrollbarGutter: 'stable' }}
-                  variants={bookmarkModalFormVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
+            <motion.div
+              className="aw-material-modal relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[672px] flex-col overflow-hidden rounded-[24px] pointer-events-auto"
+              style={{ fontFamily: 'var(--aw-font-body)', background: 'var(--app-bg)' }}
+              initial={{ y: 24, scale: 0.93, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 16, scale: 0.94, opacity: 0 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320, mass: 0.9 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="aw-material-modal-header relative h-[218px] flex-shrink-0 overflow-hidden rounded-t-[24px] border-b border-white/[0.08] sm:h-[224px]">
+                <motion.img
+                  src={data?.bannerImage || data?.coverImage?.extraLarge || data?.coverImage?.large}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  initial={{ scale: 1.06, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 0.62 }}
+                  exit={{ scale: 1.03, opacity: 0 }}
+                  transition={{ duration: 0.38, ease: 'easeOut' }}
+                />
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      'radial-gradient(circle at 82% 18%, rgba(255,255,255,0.12), transparent 28%), linear-gradient(90deg, rgba(4,4,7,0.96) 0%, rgba(4,4,7,0.82) 37%, rgba(4,4,7,0.32) 70%, rgba(4,4,7,0.18) 100%), linear-gradient(0deg, rgba(8,8,12,0.98) 0%, rgba(8,8,12,0.42) 45%, rgba(8,8,12,0.12) 100%)'
+                  }}
+                />
+                <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                <motion.button
+                  type="button"
+                  onClick={() => setIsBookmarkModalOpen(false)}
+                  whileHover={{ scale: 1.1, rotate: 90, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                  className="absolute right-4 top-4 z-50 flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 outline-none transition-colors hover:text-white"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  aria-label="Close list editor"
                 >
-                  <motion.label variants={bookmarkModalFieldVariants} className="relative z-30 flex flex-col gap-2">
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Activity size={13} /> Status</span>
-                    <motion.button
-                      type="button"
-                      onClick={() => {
-                        setBookmarkDateMenu(null);
-                        setIsBookmarkStatusMenuOpen(open => !open);
-                      }}
-                      whileHover={{ y: -1, borderColor: 'rgba(255,255,255,0.18)' }}
-                      whileTap={{ scale: 0.985 }}
-                      className="aw-material-control relative flex h-11 items-center justify-between rounded-[14px] px-3.5 text-left text-sm font-black text-white outline-none"
-                    >
-                      <span>{bookmarkStatusOptions.find(option => option.value === bookmarkForm.status)?.label || 'Watching'}</span>
-                      <motion.span animate={{ rotate: isBookmarkStatusMenuOpen ? 180 : 0 }} transition={{ type: 'spring', stiffness: 360, damping: 24 }}>
-                        <ChevronDown size={16} className="text-white/65" />
-                      </motion.span>
-                    </motion.button>
-                    <AnimatePresence>
-                      {isBookmarkStatusMenuOpen && (
-                        <motion.div
-                          className="aw-material-menu absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[16px] p-1.5"
-                          initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                          transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-                        >
-                          {bookmarkStatusOptions.map((option) => {
-                            const active = bookmarkForm.status === option.value;
-                            return (
-                              <motion.button
-                                key={option.value}
-                                type="button"
-                                onClick={() => {
-                                  setBookmarkForm(prev => ({ ...prev, status: option.value }));
-                                  setIsBookmarkStatusMenuOpen(false);
-                                }}
-                                whileHover={{ x: 3, backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255,255,255,0.065)' }}
-                                whileTap={{ scale: 0.98 }}
-                                className={`flex h-9 w-full items-center justify-between rounded-[11px] px-3 text-[13px] font-bold transition-colors ${active ? 'text-white' : 'text-zinc-300'}`}
-                                style={{ background: active ? 'var(--app-accent-muted)' : 'transparent' }}
-                              >
-                                <span>{option.label}</span>
-                                {active && <Check size={14} className="text-[var(--aw-accent)]" strokeWidth={3} />}
-                              </motion.button>
-                            );
-                          })}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Star size={13} className="text-yellow-300" /> Score</span>
-                    <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={bookmarkForm.score}
-                        onChange={(e) => setBookmarkForm(prev => ({ ...prev, score: e.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <span className="text-xs font-black text-zinc-500">/ 10</span>
-                    </motion.div>
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Play size={13} className="text-[var(--aw-accent)]" /> Episode Progress</span>
-                    <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
-                      <input
-                        type="number"
-                        min="0"
-                        max={data?.episodes || 999}
-                        value={bookmarkForm.episodeProgress}
-                        onChange={(e) => setBookmarkForm(prev => ({ ...prev, episodeProgress: e.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                      <span className="text-xs font-black text-zinc-500">/ {data?.episodes || 999}</span>
-                    </motion.div>
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className={`relative flex flex-col gap-2 ${bookmarkDateMenu === 'start' ? 'z-40' : 'z-10'}`}>
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Calendar size={13} /> Start Date</span>
-                    <BookmarkDateField
-                      value={bookmarkForm.startDate}
-                      isOpen={bookmarkDateMenu === 'start'}
-                      visibleMonth={bookmarkCalendarMonth}
-                      setVisibleMonth={setBookmarkCalendarMonth}
-                      onChange={(value) => setBookmarkForm(prev => ({ ...prev, startDate: value }))}
-                      onToggle={() => {
-                        setIsBookmarkStatusMenuOpen(false);
-                        setBookmarkDateMenu(current => current === 'start' ? null : 'start');
-                      }}
-                      onClose={() => setBookmarkDateMenu(null)}
-                    />
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className={`relative flex flex-col gap-2 ${bookmarkDateMenu === 'finish' ? 'z-40' : 'z-10'}`}>
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><CalendarDays size={13} /> Finish Date</span>
-                    <BookmarkDateField
-                      value={bookmarkForm.finishDate}
-                      isOpen={bookmarkDateMenu === 'finish'}
-                      visibleMonth={bookmarkCalendarMonth}
-                      setVisibleMonth={setBookmarkCalendarMonth}
-                      onChange={(value) => setBookmarkForm(prev => ({ ...prev, finishDate: value }))}
-                      onToggle={() => {
-                        setIsBookmarkStatusMenuOpen(false);
-                        setBookmarkDateMenu(current => current === 'finish' ? null : 'finish');
-                      }}
-                      onClose={() => setBookmarkDateMenu(null)}
-                    />
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Clock size={13} /> Total Rewatches</span>
-                    <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
-                      <input
-                        type="number"
-                        min="0"
-                        value={bookmarkForm.totalRewatches}
-                        onChange={(e) => setBookmarkForm(prev => ({ ...prev, totalRewatches: e.target.value }))}
-                        className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                      />
-                    </motion.div>
-                  </motion.label>
-
-                  <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
-                    <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Info size={13} /> Notes</span>
-                    <motion.div className="aw-material-control rounded-[14px] focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.995 }}>
-                      <textarea
-                        value={bookmarkForm.notes}
-                        onChange={(e) => setBookmarkForm(prev => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Share your thoughts..."
-                        className="min-h-[72px] w-full resize-none bg-transparent px-3.5 py-3 text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
-                      />
-                    </motion.div>
-                  </motion.label>
-
+                  <X size={16} strokeWidth={2.5} />
+                </motion.button>
+                <div className="absolute inset-x-5 bottom-6 flex items-end gap-5 sm:inset-x-6">
                   <motion.div
-                    variants={bookmarkModalFieldVariants}
-                    className="aw-material-control relative overflow-hidden rounded-[16px] p-4 sm:col-span-2 lg:col-span-3"
-                    whileHover={{ y: -1 }}
+                    className="relative hidden h-[142px] w-[98px] flex-shrink-0 overflow-hidden rounded-[18px] border border-white/[0.14] bg-white/[0.08] p-1 shadow-[0_22px_46px_-18px_rgba(0,0,0,0.9)] sm:block"
+                    initial={{ opacity: 0, y: 12, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ type: 'spring', damping: 24, stiffness: 280, delay: 0.04 }}
                   >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400">
-                        <ExternalLink size={13} /> Update Targets
-                      </div>
-                      <span
-                        className="rounded-full border bg-[var(--aw-accent)]/10 px-2.5 py-1 text-[10px] font-black uppercase text-[var(--aw-accent)]"
-                        style={{ borderColor: 'color-mix(in srgb, var(--aw-accent) 32%, transparent)' }}
-                      >
-                        {activeBookmarkTargetCount} Active
-                      </span>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      {[
-                        { id: 'anikage', label: 'Anikage', active: bookmarkUpdateTargets.anikage, color: 'var(--aw-accent)' },
-                        { id: 'anilist', label: 'AniList', active: bookmarkUpdateTargets.anilist, color: '#38bdf8' },
-                        { id: 'myanimelist', label: 'MyAnimeList', active: bookmarkUpdateTargets.myanimelist, color: '#9ca3af' },
-                      ].map((target) => (
-                        <motion.button
-                          key={target.label}
-                          type="button"
-                          onClick={() => setBookmarkUpdateTargets(prev => ({ ...prev, [target.id]: !prev[target.id as keyof typeof prev] }))}
-                          className={`aw-material-control flex h-10 items-center justify-between rounded-[12px] px-3 text-xs font-bold outline-none ${target.active ? 'text-white/90' : 'text-zinc-500'}`}
-                          whileHover={{ y: -1, scale: 1.01 }}
-                          whileTap={{ scale: 0.985 }}
-                          animate={{ opacity: target.active ? 1 : 0.7 }}
-                        >
-                          <span className="flex items-center gap-2">
-                            <motion.span
-                              className="flex h-5 w-5 items-center justify-center rounded-[7px] border transition-colors duration-200"
-                              style={{
-                                background: target.active ? `color-mix(in srgb, ${target.color} 18%, transparent)` : 'rgba(255,255,255,0.035)',
-                                borderColor: target.active ? `color-mix(in srgb, ${target.color} 42%, transparent)` : 'rgba(255,255,255,0.08)',
-                                color: target.active ? target.color : 'rgba(255,255,255,0.26)',
-                              }}
-                            >
-                              <AnimatePresence mode="wait" initial={false}>
-                                {target.active ? (
-                                  <motion.span key="checked" initial={{ scale: 0.55, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.55, opacity: 0, rotate: 45 }} transition={{ type: 'spring', stiffness: 420, damping: 24 }}>
-                                    <Check size={13} strokeWidth={3} />
-                                  </motion.span>
-                                ) : (
-                                  <motion.span key="unchecked" initial={{ scale: 0.55, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.55, opacity: 0 }} transition={{ duration: 0.12 }}>
-                                    <Minus size={12} strokeWidth={3} />
-                                  </motion.span>
-                                )}
-                              </AnimatePresence>
-                            </motion.span>
-                            {target.label}
-                          </span>
-                        </motion.button>
-                      ))}
-                    </div>
+                    <img
+                      src={data?.coverImage?.large || data?.coverImage?.extraLarge}
+                      alt={displayTitle}
+                      className="h-full w-full rounded-[14px] object-cover"
+                    />
+                    <div className="pointer-events-none absolute inset-0 rounded-[18px] shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" />
                   </motion.div>
-                </motion.div>
+                  <motion.div
+                    className="flex min-h-[120px] min-w-0 flex-1 flex-col items-start justify-center pb-0.5 text-left sm:pb-1"
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -8 }}
+                    transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
+                  >
+                    {animeLogo ? (
+                      <motion.img
+                        src={animeLogo}
+                        alt={displayTitle}
+                        className="max-h-[76px] max-w-[430px] object-contain object-left drop-shadow-[0_8px_24px_rgba(0,0,0,0.95)] sm:max-h-[92px]"
+                        draggable={false}
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ type: 'spring', damping: 24, stiffness: 260, delay: 0.08 }}
+                      />
+                    ) : (
+                      <motion.div
+                        className="h-[76px] w-[280px] max-w-full overflow-hidden rounded-[18px] border border-white/[0.08] bg-white/[0.035]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <motion.div
+                          className="h-full w-1/2 bg-gradient-to-r from-transparent via-white/[0.08] to-transparent"
+                          animate={{ x: ['-120%', '260%'] }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                      </motion.div>
+                    )}
+                    
+                  </motion.div>
+                </div>
+              </div>
 
-                <motion.div
-                  className="aw-material-modal-header flex flex-shrink-0 items-center justify-between border-t border-white/[0.08] p-6"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.22, ease: 'easeOut', delay: 0.12 }}
-                >
+              <motion.div
+                className="grid flex-1 gap-4 overflow-y-auto p-6 sm:grid-cols-2 lg:grid-cols-3 aw-scrollbar"
+                style={{ scrollbarGutter: 'stable' }}
+                variants={bookmarkModalFormVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <motion.label variants={bookmarkModalFieldVariants} className="relative z-30 flex flex-col gap-2">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Activity size={13} /> Status</span>
                   <motion.button
                     type="button"
-                    onClick={handleBookmarkDelete}
-                    disabled={!bookmarked || isSavingBookmark}
-                    whileHover={!bookmarked || isSavingBookmark ? undefined : { scale: 1.02, backgroundColor: 'rgba(239,68,68,0.18)' }}
-                    whileTap={!bookmarked || isSavingBookmark ? undefined : { scale: 0.97 }}
-                    className="flex h-10 items-center gap-2 rounded-[12px] border border-red-500/25 bg-red-500/10 px-4 text-sm font-black text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    onClick={() => {
+                      setBookmarkDateMenu(null);
+                      setIsBookmarkStatusMenuOpen(open => !open);
+                    }}
+                    whileHover={{ y: -1, borderColor: 'rgba(255,255,255,0.18)' }}
+                    whileTap={{ scale: 0.985 }}
+                    className="aw-material-control relative flex h-11 items-center justify-between rounded-[14px] px-3.5 text-left text-sm font-black text-white outline-none"
                   >
-                    <Trash2 size={15} /> Delete
+                    <span>{bookmarkStatusOptions.find(option => option.value === bookmarkForm.status)?.label || 'Watching'}</span>
+                    <motion.span animate={{ rotate: isBookmarkStatusMenuOpen ? 180 : 0 }} transition={{ type: 'spring', stiffness: 360, damping: 24 }}>
+                      <ChevronDown size={16} className="text-white/65" />
+                    </motion.span>
                   </motion.button>
-                  <div className="flex items-center gap-3">
-                    <motion.button
-                      type="button"
-                      onClick={() => setIsBookmarkModalOpen(false)}
-                      whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.1)' }}
-                      whileTap={{ scale: 0.97 }}
-                      className="h-10 rounded-[12px] border border-white/[0.08] bg-white/[0.06] px-4 text-sm font-black text-zinc-200 transition-colors hover:bg-white/[0.1]"
+                  <AnimatePresence>
+                    {isBookmarkStatusMenuOpen && (
+                      <motion.div
+                        className="aw-material-menu absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[16px] p-1.5"
+                        initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                        transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                      >
+                        {bookmarkStatusOptions.map((option) => {
+                          const active = bookmarkForm.status === option.value;
+                          return (
+                            <motion.button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setBookmarkForm(prev => ({ ...prev, status: option.value }));
+                                setIsBookmarkStatusMenuOpen(false);
+                              }}
+                              whileHover={{ x: 3, backgroundColor: active ? 'var(--app-accent-muted)' : 'rgba(255,255,255,0.065)' }}
+                              whileTap={{ scale: 0.98 }}
+                              className={`flex h-9 w-full items-center justify-between rounded-[11px] px-3 text-[13px] font-bold transition-colors ${active ? 'text-white' : 'text-zinc-300'}`}
+                              style={{ background: active ? 'var(--app-accent-muted)' : 'transparent' }}
+                            >
+                              <span>{option.label}</span>
+                              {active && <Check size={14} className="text-[var(--aw-accent)]" strokeWidth={3} />}
+                            </motion.button>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Star size={13} className="text-yellow-300" /> Score</span>
+                  <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={bookmarkForm.score}
+                      onChange={(e) => setBookmarkForm(prev => ({ ...prev, score: e.target.value }))}
+                      className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs font-black text-zinc-500">/ 10</span>
+                  </motion.div>
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Play size={13} className="text-[var(--aw-accent)]" /> Episode Progress</span>
+                  <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max={data?.episodes || 999}
+                      value={bookmarkForm.episodeProgress}
+                      onChange={(e) => setBookmarkForm(prev => ({ ...prev, episodeProgress: e.target.value }))}
+                      className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs font-black text-zinc-500">/ {data?.episodes || 999}</span>
+                  </motion.div>
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className={`relative flex flex-col gap-2 ${bookmarkDateMenu === 'start' ? 'z-40' : 'z-10'}`}>
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Calendar size={13} /> Start Date</span>
+                  <BookmarkDateField
+                    value={bookmarkForm.startDate}
+                    isOpen={bookmarkDateMenu === 'start'}
+                    visibleMonth={bookmarkCalendarMonth}
+                    setVisibleMonth={setBookmarkCalendarMonth}
+                    onChange={(value) => setBookmarkForm(prev => ({ ...prev, startDate: value }))}
+                    onToggle={() => {
+                      setIsBookmarkStatusMenuOpen(false);
+                      setBookmarkDateMenu(current => current === 'start' ? null : 'start');
+                    }}
+                    onClose={() => setBookmarkDateMenu(null)}
+                  />
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className={`relative flex flex-col gap-2 ${bookmarkDateMenu === 'finish' ? 'z-40' : 'z-10'}`}>
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><CalendarDays size={13} /> Finish Date</span>
+                  <BookmarkDateField
+                    value={bookmarkForm.finishDate}
+                    isOpen={bookmarkDateMenu === 'finish'}
+                    visibleMonth={bookmarkCalendarMonth}
+                    setVisibleMonth={setBookmarkCalendarMonth}
+                    onChange={(value) => setBookmarkForm(prev => ({ ...prev, finishDate: value }))}
+                    onToggle={() => {
+                      setIsBookmarkStatusMenuOpen(false);
+                      setBookmarkDateMenu(current => current === 'finish' ? null : 'finish');
+                    }}
+                    onClose={() => setBookmarkDateMenu(null)}
+                  />
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Clock size={13} /> Total Rewatches</span>
+                  <motion.div className="aw-material-control flex h-11 items-center rounded-[14px] px-3.5 focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      value={bookmarkForm.totalRewatches}
+                      onChange={(e) => setBookmarkForm(prev => ({ ...prev, totalRewatches: e.target.value }))}
+                      className="min-w-0 flex-1 bg-transparent text-sm font-bold text-white outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </motion.div>
+                </motion.label>
+
+                <motion.label variants={bookmarkModalFieldVariants} className="flex flex-col gap-2 sm:col-span-2 lg:col-span-3">
+                  <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400"><Info size={13} /> Notes</span>
+                  <motion.div className="aw-material-control rounded-[14px] focus-within:border-[var(--aw-accent)]" whileHover={{ y: -1 }} whileTap={{ scale: 0.995 }}>
+                    <textarea
+                      value={bookmarkForm.notes}
+                      onChange={(e) => setBookmarkForm(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Share your thoughts..."
+                      className="min-h-[72px] w-full resize-none bg-transparent px-3.5 py-3 text-sm font-semibold text-white outline-none placeholder:text-zinc-600"
+                    />
+                  </motion.div>
+                </motion.label>
+
+                <motion.div
+                  variants={bookmarkModalFieldVariants}
+                  className="aw-material-control relative overflow-hidden rounded-[16px] p-4 sm:col-span-2 lg:col-span-3"
+                  whileHover={{ y: -1 }}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-400">
+                      <ExternalLink size={13} /> Update Targets
+                    </div>
+                    <span
+                      className="rounded-full border bg-[var(--aw-accent)]/10 px-2.5 py-1 text-[10px] font-black uppercase text-[var(--aw-accent)]"
+                      style={{ borderColor: 'color-mix(in srgb, var(--aw-accent) 32%, transparent)' }}
                     >
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      type="button"
-                      onClick={handleBookmarkSave}
-                      disabled={isSavingBookmark}
-                      whileHover={isSavingBookmark ? undefined : { scale: 1.02 }}
-                      whileTap={isSavingBookmark ? undefined : { scale: 0.97 }}
-                      className="flex h-10 items-center gap-2 rounded-[12px] bg-[var(--aw-accent)] px-5 text-sm font-black text-black shadow-[0_10px_28px_-18px_var(--aw-accent)] transition-colors disabled:opacity-60"
-                    >
-                      {isSavingBookmark ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                      Save
-                    </motion.button>
+                      {activeBookmarkTargetCount} Active
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {[
+                      { id: 'anikage', label: 'Anikage', active: bookmarkUpdateTargets.anikage, color: 'var(--aw-accent)' },
+                      { id: 'anilist', label: 'AniList', active: bookmarkUpdateTargets.anilist, color: '#38bdf8' },
+                      { id: 'myanimelist', label: 'MyAnimeList', active: bookmarkUpdateTargets.myanimelist, color: '#9ca3af' },
+                    ].map((target) => (
+                      <motion.button
+                        key={target.label}
+                        type="button"
+                        onClick={() => setBookmarkUpdateTargets(prev => ({ ...prev, [target.id]: !prev[target.id as keyof typeof prev] }))}
+                        className={`aw-material-control flex h-10 items-center justify-between rounded-[12px] px-3 text-xs font-bold outline-none ${target.active ? 'text-white/90' : 'text-zinc-500'}`}
+                        whileHover={{ y: -1, scale: 1.01 }}
+                        whileTap={{ scale: 0.985 }}
+                        animate={{ opacity: target.active ? 1 : 0.7 }}
+                      >
+                        <span className="flex items-center gap-2">
+                          <motion.span
+                            className="flex h-5 w-5 items-center justify-center rounded-[7px] border transition-colors duration-200"
+                            style={{
+                              background: target.active ? `color-mix(in srgb, ${target.color} 18%, transparent)` : 'rgba(255,255,255,0.035)',
+                              borderColor: target.active ? `color-mix(in srgb, ${target.color} 42%, transparent)` : 'rgba(255,255,255,0.08)',
+                              color: target.active ? target.color : 'rgba(255,255,255,0.26)',
+                            }}
+                          >
+                            <AnimatePresence mode="wait" initial={false}>
+                              {target.active ? (
+                                <motion.span key="checked" initial={{ scale: 0.55, opacity: 0, rotate: -45 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.55, opacity: 0, rotate: 45 }} transition={{ type: 'spring', stiffness: 420, damping: 24 }}>
+                                  <Check size={13} strokeWidth={3} />
+                                </motion.span>
+                              ) : (
+                                <motion.span key="unchecked" initial={{ scale: 0.55, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.55, opacity: 0 }} transition={{ duration: 0.12 }}>
+                                  <Minus size={12} strokeWidth={3} />
+                                </motion.span>
+                              )}
+                            </AnimatePresence>
+                          </motion.span>
+                          {target.label}
+                        </span>
+                      </motion.button>
+                    ))}
                   </div>
                 </motion.div>
               </motion.div>
+
+              <motion.div
+                className="aw-material-modal-header flex flex-shrink-0 items-center justify-between border-t border-white/[0.08] p-6"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.22, ease: 'easeOut', delay: 0.12 }}
+              >
+                <motion.button
+                  type="button"
+                  onClick={handleBookmarkDelete}
+                  disabled={!bookmarked || isSavingBookmark}
+                  whileHover={!bookmarked || isSavingBookmark ? undefined : { scale: 1.02, backgroundColor: 'rgba(239,68,68,0.18)' }}
+                  whileTap={!bookmarked || isSavingBookmark ? undefined : { scale: 0.97 }}
+                  className="flex h-10 items-center gap-2 rounded-[12px] border border-red-500/25 bg-red-500/10 px-4 text-sm font-black text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <Trash2 size={15} /> Delete
+                </motion.button>
+                <div className="flex items-center gap-3">
+                  <motion.button
+                    type="button"
+                    onClick={() => setIsBookmarkModalOpen(false)}
+                    whileHover={{ scale: 1.02, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    whileTap={{ scale: 0.97 }}
+                    className="h-10 rounded-[12px] border border-white/[0.08] bg-white/[0.06] px-4 text-sm font-black text-zinc-200 transition-colors hover:bg-white/[0.1]"
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={handleBookmarkSave}
+                    disabled={isSavingBookmark}
+                    whileHover={isSavingBookmark ? undefined : { scale: 1.02 }}
+                    whileTap={isSavingBookmark ? undefined : { scale: 0.97 }}
+                    className="flex h-10 items-center gap-2 rounded-[12px] bg-[var(--aw-accent)] px-5 text-sm font-black text-black shadow-[0_10px_28px_-18px_var(--aw-accent)] transition-colors disabled:opacity-60"
+                  >
+                    {isSavingBookmark ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                    Save
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
             </div>
           </>
         )}
@@ -2903,5 +2901,5 @@ const AnimeDetail: React.FC = () => {
   );
 };
 
-export default AnimeDetail;
-/* --- END OF FILE AnimeDetail.tsx --- */
+export default AnimeDetailV2;
+/* --- END OF FILE AnimeDetailV2.tsx --- */

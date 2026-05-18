@@ -5,13 +5,10 @@ export const THEME_OPTIONS = [
   { key: 'emerald', label: 'Emerald', color: '#10b981' },
   { key: 'ocean', label: 'Ocean', color: '#7dd3fc' },
   { key: 'ember', label: 'Ember', color: '#eeac76' },
-  { key: 'sakura', label: 'Sakura', color: '#f472b6' },
-  { key: 'midnight', label: 'Midnight', color: '#c084fc' },
-  { key: 'forest', label: 'Forest', color: '#4ade80' },
-  { key: 'crimson', label: 'Crimson', color: '#f87171' }
+  { key: 'sakura', label: 'Sakura', color: '#f472b6' }
 ] as const;
 
-export type ThemeKey = (typeof THEME_OPTIONS)[number]['key'] | (string & {});
+export type ThemeKey = (typeof THEME_OPTIONS)[number]['key'] | 'dynamic' | (string & {});
 
 export const PATTERN_OPTIONS = [
   { key: 'noise', label: 'Noise' },
@@ -24,6 +21,7 @@ export type PatternKey = (typeof PATTERN_OPTIONS)[number]['key'];
 
 const isThemeKey = (value: string | null): value is ThemeKey => {
   if (!value) return false;
+  if (value === 'dynamic') return true;
   if (THEME_OPTIONS.some((theme) => theme.key === value)) return true;
   return value.startsWith('#');
 };

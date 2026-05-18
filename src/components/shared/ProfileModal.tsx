@@ -1,17 +1,19 @@
-/* --- START OF FILE ProfileModal.tsx --- */
-
+/* --- START OF UPDATED FILE --- */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   X, User, Bookmark, Activity as ActivityIcon, Users,
   Award, ExternalLink, Calendar, MessageSquare, MessageSquareReply, Check, Loader2, ChevronRight,
-  Crown, Terminal, BadgeCheck, Gem, Flame, UserPlus, UserMinus, Shield, Play
+  Crown, Terminal, BadgeCheck, Gem, Flame, UserPlus, UserMinus, Shield, Play,
+  Search, Filter, ChevronDown, LayoutGrid, ListVideo, PlayCircle, CheckCircle2, PauseCircle, XCircle, Info, Lock,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { supabaseUrl, supabaseAnonKey, supabase } from '../../lib/supabase';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { fetchAnimeEpisodes } from '../../utils/animeApi';
+import { fetchAnimeEpisodes, fetchAnimeInfo } from '../../utils/animeApi';
+import { canViewVisibility, fetchFriendshipStatus, fetchWatchActivity, getVisibility } from '../../utils/social';
 
 const APP_FONT = '"Onest", ui-sans-serif, system-ui, -apple-system, sans-serif';
 const DISPLAY_FONT = '"Syne", sans-serif';
@@ -30,10 +32,10 @@ const fadeUpItem: Variants = {
 
 // ─── Constants & Mock Data ────────────────────────────────────────────────────
 const TABS = [
-  { id: 'overview', label: 'Overview', icon: User, desc: 'At a glance' },
+  { id: 'overview', label: 'Overview', icon: Info, desc: 'At a glance' },
+  { id: 'friends', label: 'Friends', icon: Users, desc: 'Connections and requests' },
   { id: 'activity', label: 'Activity', icon: ActivityIcon, desc: 'Recent interactions' },
   { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark, desc: 'Saved content' },
-  { id: 'friends', label: 'Friends', icon: Users, desc: 'Network and requests' },
   { id: 'badges', label: 'Badges', icon: Award, desc: 'Earned achievements' },
 ] as const;
 
@@ -49,8 +51,8 @@ const MOCK_BADGES = [
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface ProfileModalProps { open?: boolean; onClose?: () => void; userId?: string; }
-interface CommentItem { id: string; content: string; created_at: string; page_type: string; page_id: string; likes_count: number; type: 'comment' | 'reply' | 'watch'; href?: string; anime_cover?: string; episode_image?: string; episode_title?: string; anime_title?: string; episode_number?: number; }
-interface BookmarkItem { mal_id: string; title: string; cover: string; type: string; status: string; }
+interface CommentItem { id: string; content: string; created_at: string; page_type: string; page_id: string; likes_count: number; type: 'comment' | 'reply' | 'watch'; href?: string; anime_cover?: string; episode_image?: string; episode_title?: string; anime_title?: string; episode_number?: number; progress_time?: number | null; duration?: number | null; }
+interface BookmarkItem { id: string; title: string; cover: string; type: string; status: string; episodes?: number; }
 interface FriendItem { id: string; display_name: string; avatar_url: string; role?: string | string[]; friendship_date?: string; }
 type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted';
 
@@ -96,7 +98,6 @@ const SectionLabel: React.FC<{ children: React.ReactNode; rightAction?: React.Re
   </motion.div>
 );
 
-// ─── Default Avatar Fallback Component ───
 const AvatarImg = ({ src, alt, className }: { src?: string; alt?: string; className?: string }) => {
   const [error, setError] = useState(false);
   if (!src || error) {
@@ -109,7 +110,6 @@ const AvatarImg = ({ src, alt, className }: { src?: string; alt?: string; classN
   return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
 };
 
-// ─── Role Badges (Icon + Tooltip) ───
 const renderRoleTag = (rawRole: any) => {
   if (!rawRole) return null;
   let rolesArray: string[] = [];
@@ -118,7 +118,6 @@ const renderRoleTag = (rawRole: any) => {
   const cleanRoles = rolesArray.map(r => r.replace(/['"]/g, '').trim()).filter(r => r && r.toLowerCase() !== 'member');
   if (cleanRoles.length === 0) return null;
 
-  // Consistent Theme Variables
   const bgColor = 'color-mix(in srgb, var(--app-bg, #09090b) 80%, transparent)';
   const borderColor = 'rgba(255, 255, 255, 0.12)';
 
@@ -145,36 +144,16 @@ const renderRoleTag = (rawRole: any) => {
             >
               <Icon size={13} strokeWidth={2.5} />
             </motion.div>
-
-            {/* Seamless Themed Tooltip */}
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 opacity-0 group-hover/role:opacity-100 transition-all duration-300 pointer-events-none flex flex-col items-center translate-y-1 group-hover/role:translate-y-0 z-50">
-
               <div
                 className="relative px-3 py-1.5 rounded-[8px] border text-[11.5px] font-bold text-white whitespace-nowrap backdrop-blur-md"
-                style={{
-                  fontFamily: APP_FONT,
-                  backgroundColor: bgColor,
-                  borderColor: borderColor
-                }}
+                style={{ fontFamily: APP_FONT, backgroundColor: bgColor, borderColor: borderColor }}
               >
-                {/* The Eraser - Hides the bottom border line where the triangle connects */}
-                <div
-                  className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-3 h-[1.5px] z-20"
-                  style={{ backgroundColor: bgColor }}
-                />
+                <div className="absolute -bottom-[1px] left-1/2 -translate-x-1/2 w-3 h-[1.5px] z-20" style={{ backgroundColor: bgColor }} />
                 {titleCasedRole}
               </div>
-
-              {/* Triangle (pointing down) */}
-              <div
-                className="w-2.5 h-2.5 rotate-45 border-r border-b -mt-[6px] backdrop-blur-md"
-                style={{
-                  backgroundColor: bgColor,
-                  borderColor: borderColor
-                }}
-              />
+              <div className="w-2.5 h-2.5 rotate-45 border-r border-b -mt-[6px] backdrop-blur-md" style={{ backgroundColor: bgColor, borderColor: borderColor }} />
             </div>
-
           </div>
         );
       })}
@@ -194,18 +173,24 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [activityFilter, setActivityFilter] = useState<'all' | 'watch' | 'comments'>('all');
-  const [comments, setComments] = useState<CommentItem[]>([]);
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
 
+  // Bookmarks State
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
+  const [bookmarkSearch, setBookmarkSearch] = useState('');
+  const [bookmarkFilter, setBookmarkFilter] = useState('all');
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [pendingRequests, setPendingRequests] = useState<FriendItem[]>([]);
+  const [monthlyGenres, setMonthlyGenres] = useState<string[]>([]);
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>('none');
   const [isProcessingFriend, setIsProcessingFriend] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const hasFetchedFor = useRef<string | null>(null);
 
-  // Track Original Document Title
   const originalTitleRef = useRef<string>(document.title);
 
   useEffect(() => { if (open !== undefined) setInternalOpen(open); }, [open]);
@@ -258,30 +243,31 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     try {
       const headers = { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}` };
 
-      // We explicitly fetch the profile data directly from the DB rather than local context
       const pRes = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${uid}&select=*`, { headers });
       const pList = pRes.ok ? await pRes.json() : [];
       const profileData = pList[0] || null;
-      setActiveProfile(profileData);
 
-      // Update Document Title Dynamically 
       if (profileData?.display_name) {
         document.title = `${profileData.display_name}'s Profile`;
       }
 
-      const [cRes, rRes, bRes, wRes] = await Promise.all([
+      const viewerStatus = await fetchFriendshipStatus(user?.id, uid);
+      setActiveProfile(profileData);
+      setFriendshipStatus(viewerStatus);
+      const canViewActivity = canViewVisibility(uid, user?.id, viewerStatus, getVisibility(profileData, 'activity_visibility'));
+
+      const [cRes, rRes, bRes, watchRows] = await Promise.all([
         fetch(`${supabaseUrl}/rest/v1/comments?user_id=eq.${uid}&parent_id=is.null&select=id,content,created_at,page_type,page_id,likes_count&order=created_at.desc`, { headers }),
         fetch(`${supabaseUrl}/rest/v1/comments?user_id=eq.${uid}&parent_id=not.is.null&select=id,content,created_at,page_type,page_id,likes_count&order=created_at.desc`, { headers }),
-        fetch(`${supabaseUrl}/rest/v1/anime_bookmarks?user_id=eq.${uid}&select=mal_id,title,cover,type,status&order=created_at.desc`, { headers }),
-        fetch(`${supabaseUrl}/rest/v1/anime_watch_history?user_id=eq.${uid}&select=*&order=updated_at.desc&limit=10`, { headers }),
+        fetch(`${supabaseUrl}/rest/v1/anime_bookmarks?user_id=eq.${uid}&select=*&order=created_at.desc`, { headers }),
+        fetchWatchActivity(uid, 30, { dedupeEpisodes: true }),
       ]);
 
-      const cList = cRes.ok ? await cRes.json() : [];
-      const rList = rRes.ok ? await rRes.json() : [];
-      const bList = bRes.ok ? await bRes.json() : [];
-      const wList = wRes.ok ? await wRes.json() : [];
+      const cList = canViewActivity && cRes.ok ? await cRes.json() : [];
+      const rList = canViewActivity && rRes.ok ? await rRes.json() : [];
+      const bList = canViewActivity && bRes.ok ? await bRes.json() : [];
+      const wList = canViewActivity ? watchRows : [];
 
-      // Fetch episode thumbnails from the API for each unique anime in watch history
       const thumbMap: Record<string, Record<number, string>> = {};
       if (wList.length > 0) {
         const uniqueAnimeIds = [...new Set(wList.map((w: any) => String(w.anime_id)))] as string[];
@@ -305,9 +291,9 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
         ...wList.map((w: any) => {
           const epThumb = thumbMap[String(w.anime_id)]?.[w.episode_number];
           return {
-            id: `watch-${w.anime_id}-${w.episode_id}`,
+            id: w.id || `watch-${w.anime_id}-${w.episode_id}`,
             content: `Watched Episode ${w.episode_number} of ${w.anime_title}`,
-            created_at: w.updated_at,
+            created_at: w.created_at,
             page_type: 'anime',
             page_id: w.anime_id,
             likes_count: 0,
@@ -318,13 +304,25 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
             episode_title: w.episode_title,
             anime_title: w.anime_title,
             episode_number: w.episode_number,
+            progress_time: w.progress_time,
+            duration: w.duration,
           };
         })
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      setComments(combinedActivity); setBookmarks(bList);
+      setComments(combinedActivity);
 
-      let fetchedFriends: FriendItem[] = []; let fetchedPending: FriendItem[] = []; let relStatus: FriendshipStatus = 'none';
+      const mappedBookmarks = bList.map((b: any) => ({
+        id: String(b.mal_id || b.anime_id || b.id || ''),
+        title: b.title || b.anime_title || 'Unknown',
+        cover: b.cover || b.anime_cover || b.image_url || '',
+        type: b.type || 'TV',
+        status: b.status || 'uncategorized',
+        episodes: b.episodes || null
+      })).filter((b: any) => b.id !== '');
+      setBookmarks(mappedBookmarks);
+
+      let fetchedFriends: FriendItem[] = []; let fetchedPending: FriendItem[] = []; let relStatus: FriendshipStatus = viewerStatus;
       const { data: fData } = await supabase.from('friendships').select('user_id, friend_id, created_at').eq('status', 'accepted').or(`user_id.eq.${uid},friend_id.eq.${uid}`);
       if (fData && fData.length > 0) {
         const friendIds = fData.map(f => f.user_id === uid ? f.friend_id : f.user_id);
@@ -357,6 +355,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
   useEffect(() => {
     if (internalOpen && hasFetchedFor.current !== activeUserId) {
       setActiveTab('overview');
+      setBookmarkSearch('');
+      setBookmarkFilter('all');
       originalTitleRef.current = document.title;
       fetchData();
       hasFetchedFor.current = activeUserId;
@@ -371,7 +371,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);
   }, [internalOpen]);
 
-  // ─── Friendship & Request Logic ───
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleToggleFriend = async () => {
     if (!user || !activeProfile?.id || isProcessingFriend) return;
     setIsProcessingFriend(true);
@@ -409,18 +418,138 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
     }
   };
 
+  const filterOptions = useMemo(() => {
+    const counts: Record<string, number> = { all: bookmarks.length };
+    bookmarks.forEach(b => {
+      const s = b.status?.toLowerCase() || 'uncategorized';
+      counts[s] = (counts[s] || 0) + 1;
+    });
+
+    const formatName = (status: string) => {
+      if (status === 'all') return 'All';
+      if (status === 'uncategorized' || status === 'plan_to_watch') return 'To Watch';
+      return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    };
+
+    return Object.entries(counts).map(([key, count]) => ({
+      id: key,
+      label: formatName(key),
+      count
+    })).sort((a, b) => {
+      const order = ['all', 'uncategorized', 'plan_to_watch', 'watching', 'releasing', 'completed', 'finished', 'on_hold', 'dropped'];
+      const getIdx = (id: string) => order.indexOf(id) !== -1 ? order.indexOf(id) : 99;
+      return getIdx(a.id) - getIdx(b.id);
+    });
+  }, [bookmarks]);
+
+  const filteredBookmarks = useMemo(() => {
+    return bookmarks.filter(b => {
+      const matchesSearch = b.title.toLowerCase().includes(bookmarkSearch.toLowerCase());
+      const status = b.status?.toLowerCase() || 'uncategorized';
+      const matchesFilter = bookmarkFilter === 'all' || status === bookmarkFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [bookmarks, bookmarkSearch, bookmarkFilter]);
+
+  const monthlyWatchActivity = useMemo(() => {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    return comments.filter((item) =>
+      item.type === 'watch' && new Date(item.created_at).getTime() >= startOfMonth.getTime()
+    );
+  }, [comments]);
+
+  useEffect(() => {
+    if (!internalOpen || monthlyWatchActivity.length === 0) {
+      setMonthlyGenres([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadGenres = async () => {
+      const uniqueIds = Array.from(new Set(monthlyWatchActivity.map(item => String(item.page_id)))).slice(0, 8);
+      const genreCounts = new Map<string, number>();
+
+      await Promise.all(uniqueIds.map(async (id) => {
+        try {
+          const info = await fetchAnimeInfo(id);
+          (info.genres || []).forEach((genre) => genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1));
+        } catch {
+        }
+      }));
+
+      if (!cancelled) {
+        setMonthlyGenres(
+          [...genreCounts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([genre]) => genre)
+        );
+      }
+    };
+
+    loadGenres();
+    return () => { cancelled = true; };
+  }, [internalOpen, monthlyWatchActivity]);
+
+  const monthlyRecap = useMemo(() => {
+    const showCounts = new Map<string, { title: string; count: number }>();
+    const dayCounts = new Map<string, number>();
+    let watchedSeconds = 0;
+
+    monthlyWatchActivity.forEach((event) => {
+      const showId = String(event.page_id || event.anime_title || event.id);
+      const show = showCounts.get(showId) || { title: event.anime_title || 'Unknown anime', count: 0 };
+      show.count += 1;
+      showCounts.set(showId, show);
+
+      const day = new Date(event.created_at).toLocaleDateString(undefined, { weekday: 'long' });
+      dayCounts.set(day, (dayCounts.get(day) || 0) + 1);
+      watchedSeconds += event.duration || event.progress_time || 0;
+    });
+
+    const favoriteShow = [...showCounts.values()].sort((a, b) => b.count - a.count)[0]?.title || 'None yet';
+    const mostWatchedDay = [...dayCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 'None yet';
+    const hoursWatched = watchedSeconds > 0 ? Math.round((watchedSeconds / 3600) * 10) / 10 : 0;
+
+    return {
+      episodesWatched: monthlyWatchActivity.length,
+      hoursWatched,
+      topGenres: monthlyGenres.length > 0 ? monthlyGenres.join(', ') : 'Still learning',
+      mostWatchedDay,
+      favoriteShow,
+    };
+  }, [monthlyGenres, monthlyWatchActivity]);
+
+  // NEW: Calculate data for the background chart
+  const monthlyActivityChartData = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const data = new Array(daysInMonth).fill(0);
+    
+    monthlyWatchActivity.forEach(item => {
+      const day = new Date(item.created_at).getDate();
+      data[day - 1] += 1;
+    });
+    
+    return data;
+  }, [monthlyWatchActivity]);
+
+
   const activeTabMeta = TABS.find(t => t.id === activeTab)!;
   const displayName = activeProfile?.display_name || 'Anonymous User';
   const avatarUrl = activeProfile?.avatar_url;
 
-  // ─── True Status Logic from Explicit DB Columns ───
   const lastActiveTime = activeProfile?.last_active_at ? new Date(activeProfile.last_active_at).getTime() : 0;
-  const isOnline = (Date.now() - lastActiveTime < 15 * 60 * 1000) && activeProfile?.status_state && activeProfile.status_state !== 'offline';
+  const canViewWatchingStatus = canViewVisibility(activeProfile?.id, user?.id, friendshipStatus, getVisibility(activeProfile, 'watching_status_visibility'));
+  const isOnline = canViewWatchingStatus && (Date.now() - lastActiveTime < 15 * 60 * 1000) && activeProfile?.status_state && activeProfile.status_state !== 'offline';
   const statusState = activeProfile?.status_state;
   const statusText = activeProfile?.status_text;
 
-  // Fallback to latest watch activity if offline
-  const latestWatch = comments.find(c => c.type === 'watch');
+  const latestWatch = canViewVisibility(activeProfile?.id, user?.id, friendshipStatus, getVisibility(activeProfile, 'activity_visibility')) ? comments.find(c => c.type === 'watch') : undefined;
+  const canViewProfile = canViewVisibility(activeProfile?.id, user?.id, friendshipStatus, getVisibility(activeProfile, 'profile_visibility'));
 
   const modalStyles = {
     fontFamily: APP_FONT,
@@ -446,7 +575,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative flex w-full max-w-[800px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
+              className="aw-material-modal relative flex w-full max-w-[800px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
               style={modalStyles}
               onClick={e => e.stopPropagation()}
             >
@@ -456,7 +585,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                 className="relative flex flex-col w-[240px] flex-shrink-0"
                 style={{ background: 'rgba(255,255,255,0.015)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
               >
-                {/* Clean, Sleek Profile Banner Block */}
                 <div
                   className="absolute top-0 left-0 right-0 h-[100px] pointer-events-none rounded-tl-[20px] overflow-hidden z-0"
                   style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
@@ -469,9 +597,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                   />
                 </div>
 
-                {/* Profile Identity Block */}
                 <div className="relative z-10 px-6 pt-[58px] pb-5 flex flex-col">
-                  {/* Avatar with thick cutout border matching modal background */}
                   <div className="relative z-20 mb-3.5 w-[84px] h-[84px] flex-shrink-0">
                     <div
                       className="w-full h-full rounded-full shadow-2xl flex items-center justify-center relative z-10"
@@ -479,14 +605,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                     >
                       <AvatarImg src={avatarUrl} alt={displayName} className="w-full h-full object-cover rounded-full" />
                     </div>
-                    {/* The Big Avatar Status Dot */}
                     <div
-                      className={`absolute bottom-0 right-0 w-[22px] h-[22px] rounded-full border-[4px] z-30 transition-colors duration-500 ${isOnline ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-zinc-600'}`}
+                      className={`absolute bottom-0 right-0 w-[22px] h-[22px] rounded-full border-[4px] z-30 transition-colors duration-500 ${isOnline ? 'bg-emerald-500' : 'bg-zinc-600'}`}
                       style={{ borderColor: 'var(--app-bg)' }}
                     />
                   </div>
 
-                  {/* Name and Badges inline container */}
                   <div className="relative z-30 flex items-center gap-2 max-w-full">
                     <h2 className="text-[19px] text-white leading-tight truncate font-bold" style={{ fontFamily: DISPLAY_FONT, letterSpacing: '-0.02em' }}>
                       {displayName}
@@ -494,18 +618,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                     {renderRoleTag(activeProfile?.role)}
                   </div>
 
-                  {/* True Status Text under Name */}
-                  <div className="relative z-30 mt-1 flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-zinc-600'}`} />
-                    <span className={`text-[11px] font-semibold tracking-wide truncate ${isOnline ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                      {isOnline
-                        ? (statusState === 'watching' ? `Watching: ${statusText}` : statusText || 'Online')
-                        : (latestWatch ? `Seen ${timeAgo(latestWatch.created_at)}` : 'Offline')}
-                    </span>
-                  </div>
                 </div>
 
-                {/* Navigation */}
                 <nav className="relative z-10 flex-1 flex flex-col gap-1.5 px-3">
                   {TABS.map(tab => {
                     const active = activeTab === tab.id;
@@ -525,7 +639,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                         transition={{ duration: 0.2 }}
                         className="relative flex items-center gap-3 px-3 py-2.5 rounded-[12px] text-[13.5px] font-medium text-left"
                       >
-                        <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : '' }}>
+                        <motion.div animate={{ scale: active ? 1.1 : 1, color: active ? 'var(--app-accent)' : undefined }}>
                           <tab.icon size={16} strokeWidth={active ? 2.5 : 2} style={{ flexShrink: 0 }} />
                         </motion.div>
                         <span className="leading-none">{tab.label}</span>
@@ -534,7 +648,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                   })}
                 </nav>
 
-                {/* Footer Actions */}
                 <div className="relative z-10 px-3 pt-5 mt-2 pb-6 flex flex-col gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   {user && activeProfile?.id && user.id !== activeProfile.id && (
                     <motion.button
@@ -580,7 +693,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                 </div>
               </aside>
 
-              {/* ── Content ── */}
               <div className="flex flex-col flex-1 min-w-0 bg-white/[0.01]">
                 <div
                   className="flex items-center justify-between px-8 py-6 flex-shrink-0"
@@ -619,6 +731,36 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                         <Loader2 size={22} className="animate-spin text-zinc-500" />
                         <p className="text-[13px] text-zinc-500 font-medium">Loading profile...</p>
                       </motion.div>
+                    ) : !canViewProfile ? (
+                      <motion.div
+                        key="private-profile"
+                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+                        className="flex min-h-[420px] flex-col items-center justify-center text-center"
+                      >
+                        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full border border-[var(--app-accent)] bg-[var(--app-accent)]/10 text-[var(--app-accent)]">
+                          <Lock size={26} strokeWidth={2.5} />
+                        </div>
+                        <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--app-accent)]">Profile Private</p>
+                        <h3 className="mt-2 text-[20px] font-bold text-white" style={{ fontFamily: DISPLAY_FONT }}>
+                          {displayName} has a private profile
+                        </h3>
+                        <p className="mt-3 max-w-sm text-[13.5px] leading-relaxed text-zinc-400">
+                          Become friends to view their activity, bookmarks, badges, and network.
+                        </p>
+                        {user && activeProfile?.id && user.id !== activeProfile.id && (
+                          <motion.button
+                            onClick={handleToggleFriend}
+                            disabled={isProcessingFriend}
+                            whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.96 }}
+                            className="mt-6 flex h-10 items-center justify-center gap-2 rounded-[12px] border border-white/10 bg-white/[0.05] px-5 text-[13px] font-bold text-white transition-colors hover:border-[var(--app-accent)]/40 hover:bg-[var(--app-accent-muted)] hover:text-[var(--app-accent)] disabled:opacity-60"
+                          >
+                            {isProcessingFriend ? <Loader2 size={15} className="animate-spin" />
+                              : friendshipStatus === 'pending_sent' ? <><UserMinus size={15} /> Cancel Request</>
+                                : friendshipStatus === 'pending_received' ? <><Check size={15} /> Accept Request</>
+                                  : <><UserPlus size={15} /> Add Friend</>}
+                          </motion.button>
+                        )}
+                      </motion.div>
                     ) : (
                       <motion.div
                         key={activeTab}
@@ -628,46 +770,87 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                         {/* ── OVERVIEW ── */}
                         {activeTab === 'overview' && (
                           <>
-                            {/* Discord-style Rich Presence Activity */}
-                            {(() => {
-                              // Always use latest watch for the card, regardless of if they are currently watching or just browsing
-                              if (latestWatch) {
-                                const epNum = latestWatch.episode_number || latestWatch.content.match(/Episode (\d+)/)?.[1] || '?';
-                                const thumbSrc = latestWatch.episode_image || latestWatch.anime_cover;
-                                const isCurrentlyWatching = isOnline && statusState === 'watching';
+                            {latestWatch && (() => {
+                              const epNum = latestWatch.episode_number || latestWatch.content.match(/Episode (\d+)/)?.[1] || '?';
+                              const thumbSrc = latestWatch.episode_image || latestWatch.anime_cover;
+                              const isCurrentlyWatching = isOnline && statusState === 'watching';
 
-                                return (
-                                  <div className="mb-2">
-                                    <SectionLabel>{isCurrentlyWatching ? 'Currently Watching' : 'Last Watched'}</SectionLabel>
-                                    <SectionCard
-                                      className={`overflow-hidden cursor-pointer group ${!isCurrentlyWatching ? 'opacity-50 grayscale-[30%]' : ''}`}
-                                      onClick={() => latestWatch.href && navigate(latestWatch.href)}
-                                    >
-                                      <div className="flex items-center gap-4 p-3.5 transition-colors duration-300 group-hover:bg-white/[0.04]">
-                                        <div className="relative w-[80px] h-[46px] rounded-lg overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
-                                          <img src={thumbSrc} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                        </div>
-                                        <div className="flex flex-col min-w-0 flex-1">
-                                          <span className="text-[13.5px] font-bold text-white truncate group-hover:text-white/90 transition-colors">{latestWatch.anime_title || latestWatch.content.split(' of ')[1]}</span>
-                                          <span className="text-[12px] text-zinc-400 truncate mt-0.5">
-                                            <span className="font-bold text-[var(--app-accent)]">Episode {epNum}</span>
-                                            {latestWatch.episode_title && latestWatch.episode_title !== `Episode ${epNum}` && <span className="text-zinc-500"> — {latestWatch.episode_title}</span>}
-                                          </span>
-                                          <span className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1.5">
-                                            <div className={`w-1.5 h-1.5 rounded-full ${isCurrentlyWatching ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
-                                            {timeAgo(latestWatch.created_at)}
-                                          </span>
-                                        </div>
+                              return (
+                                <div className="mb-2">
+                                  <SectionLabel>{isCurrentlyWatching ? 'Currently Watching' : 'Last Watched'}</SectionLabel>
+                                  <SectionCard
+                                    className={`overflow-hidden cursor-pointer group ${!isCurrentlyWatching ? 'opacity-50 grayscale-[30%]' : ''}`}
+                                    onClick={() => latestWatch.href && navigate(latestWatch.href)}
+                                  >
+                                    <div className="flex items-center gap-4 p-3.5 transition-colors duration-300 group-hover:bg-white/[0.04]">
+                                      <div className="relative w-[80px] h-[46px] rounded-lg overflow-hidden flex-shrink-0 border border-white/10 shadow-lg">
+                                        <img src={thumbSrc} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                       </div>
-                                    </SectionCard>
-                                  </div>
-                                );
-                              }
-                              return null;
+                                      <div className="flex flex-col min-w-0 flex-1">
+                                        <span className="text-[13.5px] font-bold text-white truncate group-hover:text-white/90 transition-colors">{latestWatch.anime_title || latestWatch.content.split(' of ')[1]}</span>
+                                        <span className="text-[12px] text-zinc-400 truncate mt-0.5">
+                                          <span className="font-bold text-[var(--app-accent)]">Episode {epNum}</span>
+                                          {latestWatch.episode_title && latestWatch.episode_title !== `Episode ${epNum}` && <span className="text-zinc-500"> — {latestWatch.episode_title}</span>}
+                                        </span>
+                                        <span className="text-[11px] text-zinc-500 mt-1 flex items-center gap-1.5">
+                                          <div className={`w-1.5 h-1.5 rounded-full ${isCurrentlyWatching ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`} />
+                                          {timeAgo(latestWatch.created_at)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </SectionCard>
+                                </div>
+                              );
                             })()}
+
 
                             <div>
                               <SectionLabel>Stats</SectionLabel>
+                              <SectionCard className="overflow-hidden">
+                                <div className="grid gap-0 sm:grid-cols-[1.05fr_1.35fr]">
+                                  {/* Stats Card: Left Column (This Month) */}
+                                  <div className="relative flex min-h-[142px] flex-col justify-between overflow-hidden p-5 border-b border-white/[0.04] sm:border-b-0 sm:border-r">
+
+                                    {/* Content Layer */}
+                                    <div className="relative z-10 flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.16em] text-[var(--app-accent)]">
+                                      <BarChart3 size={14} />
+                                      This Month
+                                    </div>
+                                    <div className="relative z-10 mt-5 flex items-end gap-4">
+                                      <div>
+                                        <div className="text-[34px] font-bold leading-none text-white" style={{ fontFamily: DISPLAY_FONT }}>
+                                          {monthlyRecap.episodesWatched}
+                                        </div>
+                                        <div className="mt-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-zinc-500">Episodes</div>
+                                      </div>
+                                      <div className="mb-1 h-8 w-px bg-white/[0.08]" />
+                                      <div>
+                                        <div className="text-[24px] font-bold leading-none text-white" style={{ fontFamily: DISPLAY_FONT }}>
+                                          {monthlyRecap.hoursWatched}
+                                        </div>
+                                        <div className="mt-1 text-[10.5px] font-bold uppercase tracking-[0.14em] text-zinc-500">Hours</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 divide-y divide-white/[0.04] bg-white/[0.01]">
+                                    {[
+                                      ['Favorite Show', monthlyRecap.favoriteShow],
+                                      ['Top Genres', monthlyRecap.topGenres],
+                                      ['Most Watched', monthlyRecap.mostWatchedDay],
+                                    ].map(([label, value]) => (
+                                      <div key={label} className="min-h-[47px] px-4 py-3 transition-colors duration-200 hover:bg-white/[0.03]">
+                                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">{label}</div>
+                                        <div className="mt-1 line-clamp-1 text-[13px] font-semibold text-zinc-100">{value}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </SectionCard>
+                            </div>
+
+                            <div>
+                              <SectionLabel>Details</SectionLabel>
                               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 {[
                                   { icon: Calendar, label: "Joined", val: stats.joined },
@@ -678,18 +861,13 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                                   <motion.div key={i} variants={fadeUpItem} className="h-full">
                                     <SectionCard className="overflow-hidden group cursor-default h-full">
                                       <div className="flex flex-col items-center justify-center text-center p-4 transition-colors duration-300 group-hover:bg-white/[0.04] aspect-square w-full relative h-full">
-
-                                        {/* Soft radial glow on hover */}
                                         <div
                                           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                                           style={{ background: 'radial-gradient(circle at center, color-mix(in srgb, var(--app-accent) 8%, transparent) 0%, transparent 70%)' }}
                                         />
-
                                         <div className="w-[34px] h-[34px] rounded-full mb-3 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:-translate-y-0.5 shadow-sm relative z-10">
                                           <stat.icon size={16} className="text-zinc-400 group-hover:text-[var(--app-accent)] transition-colors duration-300 flex-shrink-0" strokeWidth={2} />
                                         </div>
-
-                                        {/* Ensuring joined date perfectly matches dimensions of regular stats */}
                                         {stat.label === 'Joined' ? (
                                           <div className="flex flex-col flex-1 items-center justify-center min-h-[40px] w-full gap-0.5 relative z-10">
                                             <span className="text-[13px] font-bold text-zinc-300 group-hover:text-white transition-colors leading-tight">{stat.val.split(' ')[0]}</span>
@@ -700,7 +878,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                                             <span className="text-[24px] font-bold text-white group-hover:text-white/90 transition-colors leading-none" style={{ fontFamily: DISPLAY_FONT }}>{stat.val}</span>
                                           </div>
                                         )}
-
                                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1 flex-shrink-0 relative z-10">{stat.label}</span>
                                       </div>
                                     </SectionCard>
@@ -759,7 +936,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                           </>
                         )}
 
-                        {/* ── ACTIVITY ── */}
                         {activeTab === 'activity' && (
                           <div className="flex flex-col gap-4">
                             <div className="relative flex items-center gap-0 bg-black/30 p-1 rounded-xl w-fit border border-white/[0.06]">
@@ -835,47 +1011,129 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                           </div>
                         )}
 
-                        {/* ── BOOKMARKS ── */}
                         {activeTab === 'bookmarks' && (
-                          <>
-                            {bookmarks.length === 0 ? (
-                              <SectionCard className="p-8 text-center flex flex-col items-center gap-2">
-                                <Bookmark size={24} className="text-zinc-600" />
-                                <span className="text-[13px] text-zinc-500">Nothing bookmarked yet.</span>
+                          <div className="flex flex-col gap-4">
+
+                            {(bookmarks.length > 0 || bookmarkSearch !== '') && (
+                              <div className="flex items-center gap-3 w-full mb-3">
+
+                                <div className="relative flex-1 group/search">
+                                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors" />
+                                  <input
+                                    type="text"
+                                    placeholder="Search bookmarks..."
+                                    value={bookmarkSearch}
+                                    onChange={(e) => setBookmarkSearch(e.target.value)}
+                                    className="w-full bg-[#141415] hover:bg-[#18181b] focus:bg-[#18181b] border border-white/[0.05] focus:border-white/[0.1] rounded-full py-2.5 pl-11 pr-4 text-[13.5px] text-white placeholder-zinc-500 outline-none transition-all duration-300 shadow-inner"
+                                  />
+                                </div>
+
+                                <div className="relative" ref={filterDropdownRef}>
+                                  <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.96 }}
+                                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                                    className={`flex items-center gap-2.5 px-4 py-2.5 rounded-full text-[13.5px] font-semibold transition-colors border ${isFilterDropdownOpen
+                                      ? 'bg-[#18181b] border-white/[0.1] text-white'
+                                      : 'bg-[#141415] border-white/[0.05] text-zinc-200 hover:bg-[#18181b]'
+                                      }`}
+                                  >
+                                    <Filter size={15} className="text-zinc-400" />
+                                    <span className="capitalize hidden sm:inline-block">
+                                      {filterOptions.find(o => o.id === bookmarkFilter)?.label || 'All'}
+                                    </span>
+                                    <span className="px-2 py-[2px] rounded-[6px] text-[11px] font-bold bg-white/[0.08] text-zinc-400">
+                                      {filterOptions.find(o => o.id === bookmarkFilter)?.count || 0}
+                                    </span>
+                                    <ChevronDown size={14} className={`text-zinc-500 transition-transform duration-300 ${isFilterDropdownOpen ? 'rotate-180 text-zinc-300' : ''}`} />
+                                  </motion.button>
+
+                                  <AnimatePresence>
+                                    {isFilterDropdownOpen && (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.96 }}
+                                        transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+                                        className="absolute right-0 top-[calc(100%+8px)] w-[240px] z-[100] rounded-[16px] overflow-hidden shadow-2xl bg-[#0f0f11] border border-white/[0.08] py-1.5 flex flex-col"
+                                      >
+                                        <div className="px-5 py-3 mb-1.5 border-b border-white/[0.04]">
+                                          <p className="text-[10.5px] font-bold tracking-[0.1em] uppercase text-zinc-500">Filter By Status</p>
+                                        </div>
+                                        <div className="flex flex-col px-1.5 gap-0.5 pb-1 max-h-[320px] overflow-y-auto">
+                                          {filterOptions.map((option) => {
+                                            const isActive = bookmarkFilter === option.id;
+                                            return (
+                                              <button
+                                                key={option.id}
+                                                onClick={() => { setBookmarkFilter(option.id); setIsFilterDropdownOpen(false); }}
+                                                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-[13.5px] rounded-[10px] transition-colors hover:bg-white/[0.06]`}
+                                              >
+                                                <span className={`font-semibold transition-colors ${isActive ? 'text-[var(--app-accent)]' : 'text-zinc-200'}`}>
+                                                  {option.label}
+                                                </span>
+                                                <span className={`text-[11.5px] font-bold px-2 py-[2px] rounded-[6px] transition-colors ${isActive ? 'text-[var(--app-accent)] bg-transparent' : 'bg-white/[0.08] text-zinc-400'}`}>
+                                                  {option.count}
+                                                </span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              </div>
+                            )}
+
+                            {filteredBookmarks.length === 0 ? (
+                              <SectionCard className="p-10 text-center flex flex-col items-center gap-3">
+                                <Bookmark size={28} strokeWidth={1.5} className="text-zinc-600" />
+                                {bookmarkSearch ? (
+                                  <span className="text-[13px] text-zinc-400">
+                                    No bookmarks found matching "<span className="text-white font-medium">{bookmarkSearch}</span>"
+                                    {bookmarkFilter !== 'all' && ` in ${filterOptions.find(o => o.id === bookmarkFilter)?.label}`}.
+                                  </span>
+                                ) : (
+                                  <span className="text-[13px] text-zinc-400">
+                                    {bookmarkFilter !== 'all' ? `No bookmarks in ${filterOptions.find(o => o.id === bookmarkFilter)?.label}.` : 'Nothing bookmarked yet.'}
+                                  </span>
+                                )}
                               </SectionCard>
                             ) : (
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                                {bookmarks.map((b) => (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                {filteredBookmarks.map((b) => (
                                   <motion.div
-                                    key={b.mal_id}
+                                    key={b.id}
                                     variants={fadeUpItem}
-                                    onClick={() => { handleClose(); navigate(`/watch/${b.mal_id}`); }}
-                                    className="group cursor-pointer flex flex-col gap-2"
+                                    onClick={() => { handleClose(); navigate(`/watch/${b.id}`); }}
+                                    className="group relative flex flex-col cursor-pointer select-none rounded-[16px] p-2 bg-transparent border border-transparent transition-all duration-[350ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] hover:-translate-y-1 hover:border-white/[0.06] hover:bg-white/[0.02] active:scale-[0.97]"
                                   >
-                                    <div className="aspect-[2/3] w-full rounded-[12px] overflow-hidden relative border border-white/10 bg-[#1a1a1c]">
+                                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[12px] bg-white/[0.02] border border-white/[0.06] shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
                                       {b.cover ? (
-                                        <img src={b.cover} alt={b.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 group-hover:brightness-50" />
+                                        <img src={b.cover} alt={b.title} className="h-full w-full object-cover transition-all duration-500 group-hover:scale-[1.05] pointer-events-none" />
                                       ) : (
                                         <div className="w-full h-full flex items-center justify-center"><Bookmark className="text-zinc-600" /></div>
                                       )}
-                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'var(--app-accent)' }}>
-                                          <ExternalLink size={16} className="text-black" strokeWidth={2.5} />
-                                        </div>
-                                      </div>
+                                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                                      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--app-accent)] opacity-0 group-hover:opacity-100 transition-opacity duration-300 shadow-[0_0_8px_var(--app-accent)]" />
                                     </div>
-                                    <div>
-                                      <p className="text-[12px] font-bold text-white/90 truncate group-hover:text-white transition-colors">{b.title}</p>
-                                      <p className="text-[10px] text-zinc-500 uppercase tracking-wide mt-0.5">{b.type} • {b.status}</p>
+
+                                    <div className="pt-2.5 px-0.5 h-[48px] flex flex-col justify-start gap-0.5">
+                                      <h3 className="line-clamp-1 text-[13px] font-semibold leading-snug text-white/85 group-hover:text-white transition-colors" style={{ fontFamily: APP_FONT }}>
+                                        {b.title}
+                                      </h3>
+                                      <p className="text-[10.5px] font-medium text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors tracking-wide" style={{ fontFamily: APP_FONT }}>
+                                        {b.type || 'TV'}{b.episodes ? ` • ${b.episodes} EPS` : ''}
+                                      </p>
                                     </div>
                                   </motion.div>
                                 ))}
                               </div>
                             )}
-                          </>
+                          </div>
                         )}
 
-                        {/* ── FRIENDS ── */}
                         {activeTab === 'friends' && (
                           <>
                             {pendingRequests.length > 0 && (
@@ -916,12 +1174,12 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                             )}
 
                             <div>
-                              <SectionLabel>Network</SectionLabel>
+                              <SectionLabel>Friends</SectionLabel>
                               <SectionCard>
                                 {friends.length === 0 ? (
                                   <div className="p-8 text-center flex flex-col items-center gap-2">
                                     <Users size={24} className="text-zinc-600" />
-                                    <span className="text-[13px] text-zinc-500">No friends in network.</span>
+                                    <span className="text-[13px] text-zinc-500">No friends yet.</span>
                                   </div>
                                 ) : (
                                   friends.map((f, i) => (
@@ -954,7 +1212,6 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
                           </>
                         )}
 
-                        {/* ── BADGES ── */}
                         {activeTab === 'badges' && (
                           <SectionCard>
                             {activeUserBadges.map((b, i) => (
@@ -991,4 +1248,3 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ open, onClose, userId }) =>
 };
 
 export default ProfileModal;
-/* --- END OF FILE ProfileModal.tsx --- */

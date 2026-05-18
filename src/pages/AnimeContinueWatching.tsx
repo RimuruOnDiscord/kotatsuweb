@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, X, Trash2, MonitorPlay, ChevronLeft, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Trash2, MonitorPlay, ChevronLeft, Star, ArrowDownUp } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { supabase } from '../lib/supabase';
+import { fetchAnimeInfo } from '../utils/animeApi';
 
 // Define types
 interface WatchHistoryData {
@@ -134,14 +136,30 @@ export interface ContinueWatchingEntry {
     updatedAt: number;
 }
 
+type ContinueSort = 'lastWatched' | 'progress' | 'title' | 'recentlyUpdated' | 'nextAiring';
+
+interface ContinueWatchingMeta {
+    nextAiringAt?: number;
+    nextEpisode?: number;
+    latestEpisode?: number;
+}
+
+const SORT_OPTIONS: Array<{ value: ContinueSort; label: string }> = [
+    { value: 'lastWatched', label: 'Last watched' },
+    { value: 'progress', label: 'Progress' },
+    { value: 'title', label: 'Title' },
+    { value: 'recentlyUpdated', label: 'Recently updated' },
+    { value: 'nextAiring', label: 'Next airing' },
+];
+
 // ─────────────────────────────────────────
 // PREMIUM HORIZONTAL MEDIA CARD
 // ─────────────────────────────────────────
 interface MediaCardProps {
     title: string;
     image: string;
-    subtitle?: string;
-    badge?: string;
+    episodeTitle?: string | null;
+    badge?: string | null;
     score?: number | null;
     progress?: number;
     timestamp?: string;
@@ -152,7 +170,7 @@ interface MediaCardProps {
 const MediaCard: React.FC<MediaCardProps> = ({
     title,
     image,
-    subtitle,
+    episodeTitle,
     badge,
     score,
     progress,
@@ -163,68 +181,67 @@ const MediaCard: React.FC<MediaCardProps> = ({
     const clampedProgress = progress !== undefined ? Math.max(2, Math.min(100, progress)) : undefined;
 
     return (
-        <div
-            className="aw-media-card group relative flex h-[135px] w-full cursor-pointer gap-4 overflow-hidden rounded-[20px] border border-white/5 bg-[color-mix(in_srgb,var(--aw-accent),transparent_97%)] p-3 select-none"
+        <motion.div
+            whileHover={{ y: -4, scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             onClick={onClick}
+            className="aw-media-card group relative flex h-[140px] w-full cursor-pointer gap-3 rounded-[12px] border border-[var(--aw-border)] bg-[color-mix(in_srgb,var(--aw-s1),transparent_30%)] p-2.5 select-none hover:bg-[color-mix(in_srgb,var(--aw-accent),transparent_94%)] hover:border-[color-mix(in_srgb,var(--aw-accent),transparent_40%)] hover:shadow-[0_12px_30px_-8px_rgba(0,0,0,0.3)]"
         >
             {/* Image Container (Left) */}
-            <div className="relative aspect-[3/4] w-[80px] sm:w-[90px] flex-shrink-0 overflow-hidden rounded-xl bg-white/[0.02]">
+            <div className="relative aspect-[3/4] w-[85px] flex-shrink-0 overflow-hidden rounded-lg bg-white/[0.02]">
                 <img
                     src={image}
                     alt={title}
-                    className="h-full w-full object-cover transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] opacity-95 group-hover:opacity-100 group-hover:scale-110 pointer-events-none"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
                 />
 
-                {/* Play Button Overlay */}
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-all duration-300 pointer-events-none group-hover:opacity-100">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--aw-accent)] text-[#04110d] shadow-[0_0_20px_rgba(var(--aw-accent-glow),0.5)] transform scale-75 group-hover:scale-100 transition-transform duration-500 ease-out">
-                        <Play size={20} className="ml-1" fill="currentColor" />
-                    </div>
-                </div>
             </div>
 
             {/* Content Container (Right) */}
-            <div className="relative flex min-w-0 flex-1 flex-col justify-center py-1.5 pr-5">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
+            <div className="relative flex min-w-0 flex-1 flex-col justify-center py-0.5 pr-2">
+                <div className="mb-1 flex flex-wrap items-center gap-1.5">
                     {badge && (
-                        <span className="rounded-md bg-white/[0.06] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-widest text-[var(--aw-accent)] border border-white/5 shadow-sm" style={{ fontFamily: 'var(--aw-font-display)' }}>
+                        <span className="flex items-center gap-1.5 rounded-[6px] bg-[var(--aw-s2)] border border-[var(--aw-border)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-[var(--aw-accent)] shadow-sm transition-colors duration-300 group-hover:bg-[var(--aw-accent)] group-hover:text-[#04110d] group-hover:border-[var(--aw-accent)]" style={{ fontFamily: 'var(--aw-font-display)' }}>
                             {badge}
                         </span>
                     )}
                     {score ? (
-                        <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400" style={{ fontFamily: 'var(--aw-font-display)' }}>
-                            <Star size={11} className="fill-amber-400" />
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400" style={{ fontFamily: 'var(--aw-font-display)' }}>
+                            <Star size={10} className="fill-amber-400" />
                             {score.toFixed(1)}
                         </span>
                     ) : null}
                 </div>
 
-                <h3 className="line-clamp-2 text-[14px] sm:text-[15px] font-bold leading-tight text-white/95 group-hover:text-white transition-colors" style={{ fontFamily: 'var(--aw-font-display)' }}>
+                <h3 className="line-clamp-2 text-[13px] sm:text-[14px] font-bold leading-tight text-white/95 group-hover:text-white" style={{ fontFamily: 'var(--aw-font-display)' }}>
                     {title}
                 </h3>
 
-                {(subtitle || timestamp) && (
-                    <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                        {subtitle && (
-                            <p className="flex items-center gap-2 text-[12px] font-medium text-zinc-400 line-clamp-1" style={{ fontFamily: 'var(--aw-font-body)' }}>
-                                {subtitle}
+                {(episodeTitle || timestamp) && (
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2">
+                        {episodeTitle && (
+                            <p className="text-[11px] font-medium text-zinc-400 line-clamp-1" style={{ fontFamily: 'var(--aw-font-body)' }}>
+                                {episodeTitle}
                             </p>
                         )}
                         {timestamp && (
-                            <span className="text-[10px] font-bold text-zinc-500 whitespace-nowrap ml-auto" style={{ fontFamily: 'var(--aw-font-body)' }}>
+                            <span className="text-[10px] font-bold text-zinc-500" style={{ fontFamily: 'var(--aw-font-body)' }}>
                                 {timestamp}
                             </span>
                         )}
                     </div>
                 )}
 
-                {/* Progress Rail tightly packed below */}
+                {/* Progress Rail */}
                 {clampedProgress !== undefined && (
                     <div className="mt-2 w-full">
-                        <div className="h-1.5 w-full rounded-full bg-black/50 overflow-hidden border border-white/5">
-                            <div
-                                className="h-full rounded-full bg-[var(--aw-accent)] shadow-[0_0_10px_var(--aw-accent-glow)] transition-all duration-500"
-                                style={{ width: `${clampedProgress}%` }}
+                        <div className="h-1 w-full rounded-full bg-black/50 overflow-hidden border border-white/5">
+                            <motion.div
+                                className="h-full rounded-full bg-[var(--aw-accent)]"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${clampedProgress}%` }}
+                                transition={{ type: 'spring', damping: 20, stiffness: 300, delay: 0.1 }}
                             />
                         </div>
                     </div>
@@ -235,12 +252,12 @@ const MediaCard: React.FC<MediaCardProps> = ({
             {onClear && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onClear(); }}
-                    className="absolute top-3 right-3 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white/50 opacity-0 transition-all duration-300 hover:bg-red-500 hover:text-white group-hover:opacity-100 border border-white/10 backdrop-blur-sm pointer-events-auto"
+                    className="absolute top-2 right-2 z-50 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white/50 opacity-0 transition-all duration-300 hover:bg-red-500 hover:text-white group-hover:opacity-100"
                 >
-                    <X size={14} strokeWidth={2.5} />
+                    <X size={12} strokeWidth={2.5} />
                 </button>
             )}
-        </div>
+        </motion.div>
     );
 };
 
@@ -252,6 +269,8 @@ const AnimeContinueWatching: React.FC = () => {
     const { user } = useAuth();
     const [continueWatching, setContinueWatching] = useState<ContinueWatchingEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [sortBy, setSortBy] = useState<ContinueSort>('lastWatched');
+    const [seriesMeta, setSeriesMeta] = useState<Record<string, ContinueWatchingMeta>>({});
 
     // Inject Design Styles
     useEffect(() => {
@@ -331,12 +350,61 @@ if (!error && data) {
     useEffect(() => {
         syncContinue();
         window.addEventListener('storage', syncContinue);
-        window.addEventListener('focus', syncContinue);
         return () => {
             window.removeEventListener('storage', syncContinue);
-            window.removeEventListener('focus', syncContinue);
         };
     }, [syncContinue]);
+
+    useEffect(() => {
+        if (continueWatching.length === 0) {
+            setSeriesMeta({});
+            return;
+        }
+
+        let cancelled = false;
+        const loadMeta = async () => {
+            const entries = await Promise.all(
+                continueWatching.slice(0, 40).map(async (entry) => {
+                    try {
+                        const info = await fetchAnimeInfo(entry.animeId);
+                        return [entry.animeId, {
+                            nextAiringAt: info.nextAiringEpisode?.airingAt || undefined,
+                            nextEpisode: info.nextAiringEpisode?.episode || undefined,
+                            latestEpisode: info.episodes || undefined,
+                        }] as const;
+                    } catch {
+                        return [entry.animeId, {}] as const;
+                    }
+                })
+            );
+            if (!cancelled) setSeriesMeta(Object.fromEntries(entries));
+        };
+
+        loadMeta();
+        return () => { cancelled = true; };
+    }, [continueWatching]);
+
+    const sortedContinueWatching = React.useMemo(() => {
+        const progressOf = (entry: ContinueWatchingEntry) =>
+            entry.currentTime && entry.duration ? entry.currentTime / entry.duration : 0;
+        const metaOf = (entry: ContinueWatchingEntry) => seriesMeta[String(entry.animeId)] || {};
+
+        return [...continueWatching].sort((a, b) => {
+            if (sortBy === 'progress') return progressOf(b) - progressOf(a);
+            if (sortBy === 'title') return a.animeTitle.localeCompare(b.animeTitle);
+            if (sortBy === 'recentlyUpdated') {
+                const aMeta = metaOf(a);
+                const bMeta = metaOf(b);
+                return (bMeta.latestEpisode || b.episodeNumber || 0) - (aMeta.latestEpisode || a.episodeNumber || 0);
+            }
+            if (sortBy === 'nextAiring') {
+                const aTime = metaOf(a).nextAiringAt || Number.MAX_SAFE_INTEGER;
+                const bTime = metaOf(b).nextAiringAt || Number.MAX_SAFE_INTEGER;
+                return aTime - bTime;
+            }
+            return b.updatedAt - a.updatedAt;
+        });
+    }, [continueWatching, seriesMeta, sortBy]);
 
     // Clear Single Item
     const clearContinueWatching = useCallback(async (animeId: string) => {
@@ -430,14 +498,32 @@ if (!error && data) {
                     </div>
 
                     {continueWatching.length > 0 && (
-                        <button
-                            onClick={clearAllHistory}
-                            className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                            style={{ fontFamily: 'var(--aw-font-display)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                        >
-                            <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
-                            Clear History
-                        </button>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-white/70">
+                                <ArrowDownUp size={15} className="text-[var(--aw-accent)]" />
+                                <select
+                                    value={sortBy}
+                                    onChange={(event) => setSortBy(event.target.value as ContinueSort)}
+                                    className="bg-transparent text-[12px] font-bold uppercase tracking-[0.08em] text-white outline-none"
+                                    style={{ fontFamily: 'var(--aw-font-display)' }}
+                                    aria-label="Sort continue watching"
+                                >
+                                    {SORT_OPTIONS.map(option => (
+                                        <option key={option.value} value={option.value} className="bg-zinc-950 text-white">
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <button
+                                onClick={clearAllHistory}
+                                className="group flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                                style={{ fontFamily: 'var(--aw-font-display)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                            >
+                                <Trash2 size={16} className="group-hover:scale-110 transition-transform" />
+                                Clear History
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -450,20 +536,24 @@ if (!error && data) {
                     </div>
                 ) : continueWatching.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {continueWatching.map((entry) => {
+                        {sortedContinueWatching.map((entry) => {
                             const progressNum = entry.currentTime && entry.duration ? (entry.currentTime / entry.duration) * 100 : Math.floor(Math.random() * 60) + 20;
                             let timestampStr;
                             if (entry.currentTime && entry.duration) {
                                 timestampStr = `${formatTime(entry.currentTime)} / ${formatTime(entry.duration)}`;
                             }
+                            const meta = seriesMeta[String(entry.animeId)];
+                            const badge = meta?.nextAiringAt
+                                ? `Ep ${meta.nextEpisode || '?'} airing`
+                                : 'Watching';
 
                             return (
                                 <MediaCard
                                     key={`${entry.animeId}-${entry.episodeId}`}
                                     title={entry.animeTitle}
                                     image={entry.animeCover || '/placeholder-anime-cover.png'}
-                                    subtitle={`Episode ${entry.episodeNumber || '?'}`}
-                                    badge="Watching"
+                                    episodeTitle={`Episode ${entry.episodeNumber || '?'}`}
+                                    badge={badge}
                                     progress={progressNum}
                                     timestamp={timestampStr}
                                     onClick={() => {

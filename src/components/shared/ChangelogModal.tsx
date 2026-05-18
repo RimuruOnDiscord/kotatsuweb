@@ -229,7 +229,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative flex w-full max-w-[750px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
+              className="aw-material-modal relative flex w-full max-w-[750px] h-[80vh] max-h-[720px] overflow-hidden rounded-[20px] pointer-events-auto"
               style={modalStyles}
               onClick={e => e.stopPropagation()}
             >
@@ -318,7 +318,7 @@ const ChangelogModal: React.FC<ChangelogModalProps> = ({
               {/* ── Content ── */}
               <div className="flex flex-col flex-1 min-w-0 bg-white/[0.01]">
                 <div
-                  className="flex items-center justify-between px-8 py-6 flex-shrink-0"
+                  className="aw-material-modal-header flex items-center justify-between px-8 py-6 flex-shrink-0"
                   style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
                 >
                   <AnimatePresence mode="wait">

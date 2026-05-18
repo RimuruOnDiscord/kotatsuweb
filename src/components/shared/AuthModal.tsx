@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Mail, Lock, User, Loader2, Eye, EyeOff,
-  Check, X as XIcon, ArrowRight
+  Check, X as XIcon, ArrowRight, KeyRound
 } from 'lucide-react';
 import { useAuth } from '../../lib/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +30,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -83,7 +84,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
   };
 
   const reset = () => {
-    setEmail(''); setPassword(''); setConfirmPassword(''); setDisplayName('');
+    setEmail(''); setPassword(''); setConfirmPassword(''); setDisplayName(''); setInviteCode('');
     setShowPassword(false); setError(null); setSuccess(null);
   };
 
@@ -101,11 +102,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     setError(null);
 
     if (!displayName.trim()) { setError('Display name is required'); return; }
+    if (!inviteCode.trim()) { setError('Invite code is required'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match'); return; }
 
     setLoading(true);
-    const result = await signUp(email, password, displayName.trim());
+    const result = await signUp(email, password, displayName.trim(), inviteCode.trim());
 
     if (result.error) {
       setError(result.error);
@@ -125,6 +127,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
     setSuccess(null);
     setPassword(''); 
     setConfirmPassword('');
+    setInviteCode('');
   };
 
   // ADDED HOVER EFFECTS HERE
@@ -150,8 +153,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
               transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="relative w-full max-w-[420px] overflow-hidden rounded-[24px] pointer-events-auto shadow-2xl flex flex-col"
+              className="aw-material-modal relative w-full max-w-[420px] overflow-hidden rounded-[24px] pointer-events-auto shadow-2xl flex flex-col"
               style={{
+                position: 'relative',
                 fontFamily: APP_FONT,
                 background: 'var(--app-bg)',
                 border: '1px solid rgba(255,255,255,0.07)',
@@ -164,12 +168,20 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
               {/* Close Button */}
               <motion.button
                 onClick={handleClose}
-                whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                whileHover={{ scale: 1.1, rotate: 90, backgroundColor: 'rgba(255,255,255,0.1)' }}
                 whileTap={{ scale: 0.9 }}
-                className="absolute top-4 right-4 z-50 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white backdrop-blur-md cursor-pointer transition-colors"
-                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 outline-none transition-colors hover:text-white"
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  zIndex: 50,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)'
+                }}
               >
-                <XIcon size={15} strokeWidth={2} />
+                <XIcon size={16} strokeWidth={2.5} />
               </motion.button>
 
               <div className="px-8 pt-10 pb-8 relative z-10">
@@ -184,7 +196,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
                     {mode === 'login' ? 'Welcome back' : 'Create an account'}
                   </h2>
                   <p className="text-[14px] text-zinc-400">
-                    {mode === 'login' ? 'Enter your details to sign in.' : 'Join the community today.'}
+                    {mode === 'login' ? 'Enter your details to sign in.' : 'Create your account with an invite code.'}
                   </p>
                 </motion.div>
 
@@ -214,19 +226,44 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
                   {/* Dynamic Fields (Signup Only) */}
                   <AnimatePresence initial={false}>
                     {mode === 'signup' && (
-                      <motion.div
-                        key="displayNameField"
-                        initial={{ opacity: 0, height: 0, y: -10 }}
-                        animate={{ opacity: 1, height: 'auto', y: 0 }}
-                        exit={{ opacity: 0, height: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="relative group">
-                          <input type="text" placeholder="Display name" value={displayName} onChange={e => setDisplayName(e.target.value)} required={mode === 'signup'} className={`peer ${inputClasses}`} />
-                          <User size={18} className={iconClasses} />
-                        </div>
-                      </motion.div>
+                      <>
+                        <motion.div
+                          key="displayNameField"
+                          initial={{ opacity: 0, height: 0, y: -10 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="relative group">
+                            <input type="text" placeholder="Display name" value={displayName} onChange={e => setDisplayName(e.target.value)} required={mode === 'signup'} className={`peer ${inputClasses}`} />
+                            <User size={18} className={iconClasses} />
+                          </div>
+                        </motion.div>
+
+                        <motion.div
+                          key="inviteCodeField"
+                          initial={{ opacity: 0, height: 0, y: -10 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="relative group">
+                            <input
+                              type="text"
+                              placeholder="Invite code"
+                              value={inviteCode}
+                              onChange={e => setInviteCode(e.target.value)}
+                              required={mode === 'signup'}
+                              spellCheck={false}
+                              autoCapitalize="none"
+                              className={`peer font-mono ${inputClasses}`}
+                            />
+                            <KeyRound size={18} className={iconClasses} />
+                          </div>
+                        </motion.div>
+                      </>
                     )}
                   </AnimatePresence>
 

@@ -15,7 +15,7 @@ export interface SearchResult {
 }
 
 export const topbarNavItems = [
-  { icon: Home, label: 'Home', to: '/' },
+  { icon: Home, label: 'Home', to: '/home' },
   { icon: Globe, label: 'Discover', to: '/browse' },
   { icon: Bookmark, label: 'My List', to: '/bookmarks' },
   { icon: Clock, label: 'Updated', to: '/updated' },

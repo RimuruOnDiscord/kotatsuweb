@@ -3,206 +3,179 @@
 import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search,
-  Tags,
-  Activity,
-  Globe,
-  Calendar,
-  BookOpen,
-  Clock,
-  ChevronDown,
-  Check,
-  X,
-  Film
+  Search, Tags, Activity, Calendar,
+  BookOpen, ChevronDown, X, Film,
+  Check, Tv,
 } from 'lucide-react';
 
-type FilterOption = {
-  value: string;
-  label: string;
-  disabled?: boolean;
-};
-
-type GenreFilterOption = FilterOption & {
-  mode?: 'genre' | 'tag';
-  queryValue?: string;
-};
+type FilterOption = { value: string; label: string; disabled?: boolean };
+type GenreFilterOption = FilterOption & { mode?: 'genre' | 'tag'; queryValue?: string };
 
 interface DesktopBrowseFiltersProps {
   searchQuery: string;
   setSearchQuery: (val: string) => void;
   submitSearch: () => void;
   searchPlaceholder?: string;
-  fieldLabels?: Partial<Record<'type' | 'genre' | 'status' | 'language' | 'year' | 'length' | 'release' | 'studio', string>>;
+  fieldLabels?: Partial<Record<'format' | 'genre' | 'status' | 'year' | 'length' | 'studio', string>>;
   activeDropdown: string | null;
   setActiveDropdown: (val: string | null) => void;
-  typeFilter: string;
+
+  formatFilter: string[];
   genreFilter: string[];
-  statusFilter: string;
-  languageFilter: string;
-  yearFilter: string;
-  lengthFilter: string;
-  releaseFilter: string;
-  studioFilter: string;
-  typeOptions: FilterOption[];
-  genreOptions: GenreFilterOption[];
+  statusFilter: string[];
+  yearFilter: string[];
+  lengthFilter: string[];
+  studioFilter: string[];
+
+  formatOptions: FilterOption[]; genreOptions: GenreFilterOption[];
   statusOptions: FilterOption[];
-  languageOptions: FilterOption[];
-  yearOptions: FilterOption[];
-  lengthOptions: FilterOption[];
-  releaseOptions: FilterOption[];
+  yearOptions: FilterOption[]; lengthOptions: FilterOption[];
   studioOptions: FilterOption[];
-  updateTypeFilter: (val: string) => void;
-  updateGenreFilter: (val: string) => void;
+
+  updateFormatFilter: (val: string) => void; updateGenreFilter: (val: string) => void;
   updateStatusFilter: (val: string) => void;
-  updateLanguageFilter: (val: string) => void;
-  updateYearFilter: (val: string) => void;
-  updateLengthFilter: (val: string) => void;
-  updateReleaseFilter: (val: string) => void;
+  updateYearFilter: (val: string) => void; updateLengthFilter: (val: string) => void;
   updateStudioFilter: (val: string) => void;
+
   hasActiveFilters: boolean;
   clearFilters: () => void;
 }
 
-// ─────────────────────────────────────────
-// FRAMER MOTION VARIANTS
-// ─────────────────────────────────────────
-const dropdownVariants = {
-  hidden: { opacity: 0, y: -8, scale: 0.96, filter: 'blur(4px)' },
+// ─────────────────────────────────────────────────────────────
+// FILTER DROPDOWN
+// ─────────────────────────────────────────────────────────────
+const dropdownVariants: any = {
+  hidden: { opacity: 0, y: -6, scale: 0.96, filter: 'blur(3px)' },
   visible: {
     opacity: 1, y: 0, scale: 1, filter: 'blur(0px)',
-    transition: { type: 'spring', damping: 25, stiffness: 300, staggerChildren: 0.03 }
+    transition: { type: 'spring', damping: 24, stiffness: 320, mass: 0.8 },
   },
   exit: {
-    opacity: 0, y: -4, scale: 0.98, filter: 'blur(4px)',
-    transition: { duration: 0.15, ease: 'easeIn' }
-  }
+    opacity: 0, y: -4, scale: 0.98, filter: 'blur(2px)',
+    transition: { duration: 0.1, ease: 'easeOut' },
+  },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, x: -8 },
-  visible: { opacity: 1, x: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } }
+const checkVariants: any = {
+  initial: { scale: 0, opacity: 0, rotate: -20 },
+  animate: {
+    scale: 1, opacity: 1, rotate: 0,
+    transition: { type: 'spring', stiffness: 500, damping: 18 },
+  },
+  exit: {
+    scale: 0, opacity: 0, rotate: 20,
+    transition: { duration: 0.1 },
+  },
 };
 
 const FilterDropdown = ({
-  id,
-  icon: Icon,
-  label,
-  options,
-  value,
-  onChange,
-  activeDropdown,
-  setActiveDropdown,
+  id, icon: Icon, label, options, value, onChange,
+  activeDropdown, setActiveDropdown,
   isMultiple = false,
+  isSingleSelect = false,
 }: {
-  id: string;
-  icon: React.ElementType;
-  label: string;
-  options: FilterOption[];
-  value: string | string[];
+  id: string; icon: React.ElementType; label: string;
+  options: FilterOption[]; value: string | string[];
   onChange: (val: string) => void;
-  activeDropdown: string | null;
-  setActiveDropdown: (val: string | null) => void;
+  activeDropdown: string | null; setActiveDropdown: (val: string | null) => void;
   isMultiple?: boolean;
+  /** When true, clicking a selected item calls onChange('') to deselect (used for single-value filters wrapped as arrays) */
+  isSingleSelect?: boolean;
 }) => {
   const isOpen = activeDropdown === id;
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        if (isOpen) setActiveDropdown(null);
-      }
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) && isOpen)
+        setActiveDropdown(null);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [isOpen, setActiveDropdown]);
 
-  const toggleDropdown = () => setActiveDropdown(isOpen ? null : id);
+  const selectedCount = isMultiple
+    ? (Array.isArray(value) ? value.length : 0)
+    : (value ? 1 : 0);
 
-  let displayLabel = label;
-  if (isMultiple && Array.isArray(value)) {
-    if (value.length === 1) {
-      const opt = options.find((o) => o.value === value[0]);
-      displayLabel = opt ? opt.label : label;
-    } else if (value.length > 1) {
-      displayLabel = `${label} (${value.length})`;
-    }
-  } else if (!isMultiple && typeof value === 'string' && value) {
-    const opt = options.find((o) => o.value === value);
-    if (opt && opt.value !== '') displayLabel = opt.label;
-  }
-
-  const hasSelection = isMultiple ? value.length > 0 : !!value;
+  const displayLabel = selectedCount > 0 ? `${label} (${selectedCount})` : label;
+  const hasSelection = selectedCount > 0;
+  const validOptions = (options || []).filter(o => o.value !== '');
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className={`relative ${isOpen ? 'z-[100]' : 'z-10'}`} ref={ref}>
       <motion.button
+        whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
+        transition={{ duration: 0.1 }}
         type="button"
-        onClick={toggleDropdown}
-        className={`flex h-11 select-none items-center gap-2.5 rounded-[16px] border px-4 text-[13px] font-bold transition-all duration-300 outline-none backdrop-blur-md
-          ${isOpen
-            ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_90%)] text-[var(--app-accent)] shadow-[0_8px_20px_-8px_rgba(var(--app-accent-rgb),0.3)]'
-            : hasSelection
-              ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] text-[var(--app-accent)] hover:border-[var(--app-accent)] hover:bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)]'
-              : 'border-white/5 bg-[color-mix(in_srgb,var(--app-accent),transparent_98%)] text-zinc-400 hover:border-white/20 hover:bg-[color-mix(in_srgb,var(--app-accent),transparent_94%)] hover:text-white'
-          }
-        `}
+        onClick={() => setActiveDropdown(isOpen ? null : id)}
+        className={`aw-material-control group relative flex h-[45px] select-none items-center gap-2.5 rounded-[14px] px-4 text-[13.5px] font-bold outline-none overflow-hidden transition-all duration-150
+          ${isOpen || hasSelection
+            ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)] text-[var(--app-accent)]'
+            : 'text-zinc-400 hover:text-white'
+          }`}
       >
-        <Icon size={16} className={`transition-colors duration-500 ${hasSelection || isOpen ? 'text-[var(--app-accent)]' : 'text-zinc-500'}`} />
-        <span className="max-w-[110px] truncate whitespace-nowrap" style={{ fontFamily: 'var(--aw-font-display)' }}>{displayLabel}</span>
-        <ChevronDown size={14} className={`ml-0.5 transition-transform duration-500 ${isOpen ? 'rotate-180 text-[var(--app-accent)]' : 'text-zinc-500'}`} />
+        <Icon size={14} className={`relative z-10 flex-shrink-0 transition-colors duration-150 ${hasSelection || isOpen ? 'text-[var(--app-accent)]' : 'text-zinc-500 group-hover:text-[var(--app-accent)]'}`} />
+        <span className="relative z-10 truncate whitespace-nowrap tracking-wide" style={{ fontFamily: 'var(--aw-font-display)' }}>
+          {displayLabel}
+        </span>
+        <ChevronDown size={13} strokeWidth={2.5} className={`relative z-10 ml-0.5 flex-shrink-0 transition-all duration-150 ${isOpen ? 'rotate-180 text-[var(--app-accent)]' : 'text-zinc-500 group-hover:text-[var(--app-accent)]'}`} />
       </motion.button>
 
       <AnimatePresence>
         {isOpen && (
-          <div className="absolute top-[calc(100%+10px)] left-1/2 -translate-x-1/2 z-50">
+          <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[100] min-w-[200px]" style={{ transformOrigin: 'top center' }}>
             <motion.div
-              variants={dropdownVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className={`max-h-[380px] overflow-y-auto rounded-[20px] border border-white/10 bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] p-2 backdrop-blur-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] origin-top
-                ${options.length > 25 ? 'grid grid-cols-4 min-w-[580px] gap-1' : options.length > 15 ? 'grid grid-cols-3 min-w-[440px] gap-1' : options.length > 8 ? 'grid grid-cols-2 min-w-[320px] gap-1' : 'flex flex-col min-w-[220px] gap-1'}
-              `}
+              variants={dropdownVariants} initial="hidden" animate="visible" exit="exit"
+              className="aw-material-menu overflow-hidden rounded-[16px] p-1.5"
             >
-              {options.map((opt) => {
-                if (opt.value === '') return null;
-
-                const isSelected = isMultiple ? value.includes(opt.value) : value === opt.value;
-
-                return (
-                  <motion.button
-                    variants={itemVariants}
-                    key={opt.value}
-                    type="button"
-                    disabled={opt.disabled}
-                    onClick={() => {
-                      if (isSelected && !isMultiple) {
-                        onChange('');
-                      } else {
-                        onChange(opt.value);
-                      }
-                      if (!isMultiple) setActiveDropdown(null);
-                    }}
-                    className={`group flex w-full items-center justify-between rounded-[0.8rem] px-3.5 py-2.5 text-left text-[13px] font-medium transition-colors duration-200
-                    ${opt.disabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-white/[0.05]'}
-                    ${isSelected ? 'bg-white/[0.08] text-[var(--app-accent)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]' : 'text-zinc-400 hover:text-white'}
-                  `}
-                  >
-                    <span className="truncate pr-4">{opt.label}</span>
-                    {isSelected && (
-                      <motion.div
-                        initial={{ scale: 0, rotate: -45 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ type: "spring", damping: 15, stiffness: 300 }}
-                      >
-                        <Check size={16} strokeWidth={2.5} className="flex-shrink-0 text-[var(--app-accent)]" />
-                      </motion.div>
-                    )}
-                  </motion.button>
-                );
-              })}
+              <div className="flex flex-col gap-0.5 max-h-[320px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+                {validOptions.map(opt => {
+                  const isSel = isMultiple
+                    ? (value as string[]).includes(opt.value)
+                    : value === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={opt.disabled}
+                      onClick={() => {
+                        if (isSel) {
+                          // isSingleSelect: parent expects '' to clear; otherwise parent handles toggle via value
+                          onChange(isSingleSelect ? '' : opt.value);
+                        } else {
+                          onChange(opt.value);
+                        }
+                        if (!isMultiple) setActiveDropdown(null);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-[8px] px-3 py-2.5 text-[13.5px] transition-all duration-150
+                        ${opt.disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer active:scale-[0.98]'}
+                        ${isSel
+                          ? 'bg-[color-mix(in_srgb,var(--app-accent),transparent_82%)] text-[var(--app-accent)] font-semibold border border-[color-mix(in_srgb,var(--app-accent),transparent_65%)]'
+                          : 'bg-transparent text-zinc-300 hover:bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)] hover:text-white hover:border-[color-mix(in_srgb,var(--app-accent),transparent_80%)] border border-transparent font-medium'
+                        }`}
+                      style={{ fontFamily: 'var(--aw-font-body, sans-serif)' }}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      <AnimatePresence mode="wait">
+                        {isSel && (
+                          <motion.span
+                            key="check"
+                            variants={checkVariants}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            className="flex-shrink-0 ml-2"
+                          >
+                            <Check size={14} className="text-[var(--app-accent)]" strokeWidth={3} />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
           </div>
         )}
@@ -211,101 +184,89 @@ const FilterDropdown = ({
   );
 };
 
+// ─────────────────────────────────────────────────────────────
+// MAIN EXPORT
+// ─────────────────────────────────────────────────────────────
 export default function DesktopBrowseFilters(props: DesktopBrowseFiltersProps) {
-  const labels = {
-    type: props.fieldLabels?.type || 'Type',
+  const L = {
+    format: props.fieldLabels?.format || 'Format',
     genre: props.fieldLabels?.genre || 'Genre',
     status: props.fieldLabels?.status || 'Status',
-    language: props.fieldLabels?.language || 'Language',
     year: props.fieldLabels?.year || 'Year',
     length: props.fieldLabels?.length || 'Length',
-    release: props.fieldLabels?.release || 'Release',
+    studio: props.fieldLabels?.studio || 'Studio',
   };
 
   return (
-    <motion.div layout className="hidden xl:flex flex-wrap items-center gap-2.5">
+    <motion.div layout className="hidden xl:flex flex-wrap items-center gap-2.5 w-full">
+      <FilterDropdown id="genre" icon={Tags} label={L.genre} options={props.genreOptions} value={props.genreFilter} onChange={props.updateGenreFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple />
 
-      {/* Search Input - Polished Version */}
-      <motion.div layout className="group relative flex min-w-[240px] max-w-[300px] flex-1 items-center">
-        {/* Animated Background Glow */}
-        <div className="absolute -inset-[1px] rounded-[1.25rem] opacity-0 blur-[2px] transition-opacity duration-500 group-focus-within:opacity-20" />
+      {/* Single-value filters wrapped as arrays — isSingleSelect so deselect sends '' */}
+      <FilterDropdown id="format" icon={Tv} label={L.format} options={props.formatOptions} value={props.formatFilter} onChange={props.updateFormatFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple isSingleSelect />
+      <FilterDropdown id="status" icon={Activity} label={L.status} options={props.statusOptions} value={props.statusFilter} onChange={props.updateStatusFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple isSingleSelect />
+      <FilterDropdown id="year" icon={Calendar} label={L.year} options={props.yearOptions} value={props.yearFilter} onChange={props.updateYearFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple isSingleSelect />
+      <FilterDropdown id="length" icon={BookOpen} label={L.length} options={props.lengthOptions} value={props.lengthFilter} onChange={props.updateLengthFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple isSingleSelect />
+      <FilterDropdown id="studio" icon={Film} label={L.studio} options={props.studioOptions} value={props.studioFilter} onChange={props.updateStudioFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple isSingleSelect />
 
-        <Search
-          size={16}
-          className="absolute left-4 z-10 text-zinc-500 transition-all duration-300 group-focus-within:scale-110 group-focus-within:text-[var(--app-accent)]"
-        />
+      {/* Always rendered to reserve width and entirely prevent layout shifting */}
+      <motion.button
+        animate={{
+          opacity: props.hasActiveFilters ? 1 : 0,
+          scale: props.hasActiveFilters ? 1 : 0.8,
+          filter: props.hasActiveFilters ? 'blur(0px)' : 'blur(4px)',
+        }}
+        initial={false}
+        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+        onClick={props.clearFilters}
+        disabled={!props.hasActiveFilters}
+        className={`aw-material-control ml-1 flex h-[45px] shrink-0 items-center gap-2 rounded-[14px] px-4 text-[11.5px] font-bold tracking-widest text-red-400 bg-red-500/[0.08] border-red-500/20 hover:bg-red-500/[0.12] hover:border-red-500/30 hover:text-red-300 overflow-hidden whitespace-nowrap transition-all duration-150 ${props.hasActiveFilters ? 'pointer-events-auto' : 'pointer-events-none'
+          }`}
+        style={{ fontFamily: 'var(--aw-font-display)' }}
+      >
+        <X size={13} strokeWidth={2.5} />
+        <span>Clear</span>
+      </motion.button>
 
+      {/* Unified Search Input on the right */}
+      <motion.div
+        layout
+        whileHover={{ scale: 1.01 }}
+        className={`aw-browse-search group relative ml-auto flex min-w-[260px] max-w-[320px] items-center h-[45px] rounded-[14px] transition-all duration-200 overflow-hidden
+          ${props.searchQuery
+            ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)]'
+            : ''
+          }
+          focus-within:border-[var(--app-accent)]
+        `}
+      >
+        <div className={`flex shrink-0 items-center justify-center h-full w-[44px] transition-colors duration-200 ${props.searchQuery ? 'text-[var(--app-accent)]' : 'text-zinc-500 group-hover:text-[var(--app-accent)]'}`}>
+          <Search size={15} />
+        </div>
         <input
-          type="text"
-          value={props.searchQuery}
-          onChange={(e) => props.setSearchQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && props.submitSearch()}
-          placeholder={props.searchPlaceholder || 'Search Manga...'}
-          className={`peer relative h-11 w-full rounded-[16px] border pl-11 pr-10 text-[13px] font-medium text-white shadow-inner outline-none backdrop-blur-md transition-all duration-300 placeholder:text-zinc-500
-            ${props.searchQuery
-              ? 'border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)]'
-              : 'border-white/5 bg-[color-mix(in_srgb,var(--app-accent),transparent_98%)]'
-            }
-            hover:bg-[color-mix(in_srgb,var(--app-accent),transparent_95%)] hover:border-white/20 
-            focus:bg-[color-mix(in_srgb,var(--app-accent),transparent_92%)] focus:border-[var(--app-accent)] focus:placeholder-[var(--app-accent)]
-          `}
+          type="text" value={props.searchQuery}
+          onChange={e => props.setSearchQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && props.submitSearch()}
+          placeholder={props.searchPlaceholder || "Search..."}
+          className="flex-1 bg-transparent text-[13.5px] font-bold text-white placeholder:text-zinc-500 group-hover:placeholder:text-white border-none outline-none ring-0 h-full pr-10 transition-colors duration-200"
+          style={{ fontFamily: 'var(--aw-font-display)' }}
         />
-
-        {/* Clear Search Button - Only shows when typing */}
-        <AnimatePresence>
-          {props.searchQuery && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              exit={{ opacity: 0, scale: 0.5, rotate: 45 }}
-              transition={{ type: "spring", damping: 20, stiffness: 300 }}
-              onClick={() => props.setSearchQuery('')}
-              className="absolute right-3 z-10 flex h-6 w-6 items-center justify-center rounded-lg text-zinc-500 transition-all"
-            >
-              <X size={14} className="transition-colors duration-300 hover:text-[var(--app-accent)]" />
-            </motion.button>
-          )}
-        </AnimatePresence>
-
-        {/* Keyboard Hint - Subtle "Enter" badge */}
-        <AnimatePresence>
-          {!props.searchQuery && (
-            <motion.div
-              initial={{ opacity: 0, x: 5 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 5 }}
-              className="pointer-events-none absolute right-4 flex items-center gap-1 rounded border border-[var(--app-accent)] bg-white/[0.02] px-1.5 py-0.5 text-[10px] font-bold text-[var(--app-accent)] opacity-0 transition-opacity duration-300 group-focus-within:opacity-100"
-            >
-              <span>ENTER</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="absolute right-2 top-0 bottom-0 flex items-center justify-center z-20 gap-1.5">
+          <AnimatePresence>
+            {props.searchQuery && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.5, rotate: -45 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.5, rotate: 45 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                onClick={() => { props.setSearchQuery(''); props.submitSearch(); }}
+                className="flex h-[26px] w-[26px] items-center justify-center rounded-[8px] text-zinc-400 hover:bg-white/10 hover:text-white outline-none"
+              >
+                <X size={13} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
-
-      {/* Dropdowns */}
-      <FilterDropdown id="genre" icon={Tags} label={labels.genre} options={props.genreOptions} value={props.genreFilter} onChange={props.updateGenreFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} isMultiple />
-      <FilterDropdown id="status" icon={Activity} label={labels.status} options={props.statusOptions} value={props.statusFilter} onChange={props.updateStatusFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-      <FilterDropdown id="language" icon={Globe} label={labels.language} options={props.languageOptions} value={props.languageFilter} onChange={props.updateLanguageFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-      <FilterDropdown id="year" icon={Calendar} label={labels.year} options={props.yearOptions} value={props.yearFilter} onChange={props.updateYearFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-      <FilterDropdown id="length" icon={BookOpen} label={labels.length} options={props.lengthOptions} value={props.lengthFilter} onChange={props.updateLengthFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-      <FilterDropdown id="studio" icon={Film} label={labels.studio || 'Studio'} options={props.studioOptions} value={props.studioFilter} onChange={props.updateStudioFilter} activeDropdown={props.activeDropdown} setActiveDropdown={props.setActiveDropdown} />
-
-      {/* Clear All Filters Button */}
-      <AnimatePresence>
-        {props.hasActiveFilters && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8, filter: 'blur(4px)', width: 0, marginLeft: 0 }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)', width: 'auto', marginLeft: 4 }}
-            exit={{ opacity: 0, scale: 0.8, filter: 'blur(4px)', width: 0, marginLeft: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 350 }}
-            onClick={props.clearFilters}
-            className="flex h-11 items-center gap-2 rounded-[1.2rem] px-3.5 text-[13px] font-medium text-zinc-400 transition-colors duration-300 hover:bg-red-500/10 hover:text-red-400 overflow-hidden whitespace-nowrap"
-          >
-            <X size={16} />
-            <span>Clear All</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
