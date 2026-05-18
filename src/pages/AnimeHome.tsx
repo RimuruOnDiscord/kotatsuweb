@@ -1712,13 +1712,13 @@ const AnimeHome: React.FC = () => {
   return (
     <div className="aw-root relative min-h-screen overflow-x-hidden text-white selection:bg-[var(--app-accent-muted)]">
 
-      {/* ══ AMBIENT BACKGROUND GLOWS (InviteRequiredPage style) ══ */}
-      <div className="fixed inset-0 pointer-events-none opacity-40 mix-blend-screen z-0">
-        <div className="absolute top-[15%] left-[20%] w-[500px] h-[500px] rounded-full bg-[var(--app-accent)] blur-[130px] opacity-[0.12]" />
-        <div className="absolute bottom-[20%] right-[20%] w-[450px] h-[450px] rounded-full bg-[var(--app-accent)] blur-[120px] opacity-[0.08]" />
+      {/* ══ AMBIENT BACKGROUND GLOWS ══ */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-[15%] left-[20%] w-[500px] h-[500px] rounded-full blur-[130px] opacity-[0.06]" style={{ background: 'var(--app-accent)' }} />
+        <div className="absolute bottom-[20%] right-[20%] w-[450px] h-[450px] rounded-full blur-[120px] opacity-[0.04]" style={{ background: 'var(--app-accent)' }} />
       </div>
 
-      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'transparent', backdropFilter: 'blur(20px)' }}></div>
+      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'transparent', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}></div>
 
       <motion.main variants={containerVariants} initial="hidden" animate="visible" className="relative z-10 mx-auto w-full max-w-[1540px] space-y-10 px-4 md:px-6 lg:px-8">
 

@@ -141,7 +141,7 @@ const UsersPage: React.FC = () => {
 
   return (
     <div className="aw-root aw-noise relative min-h-screen pb-24 selection:bg-[var(--aw-accent)]/20">
-      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)' }} />
+      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }} />
 
       <main className="relative z-10 mx-auto w-full max-w-[1460px] px-4 pt-10 md:px-8">
 

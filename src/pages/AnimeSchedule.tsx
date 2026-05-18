@@ -568,7 +568,7 @@ const AnimeSchedule: React.FC = () => {
 
   return (
     <div className="aw-root aw-noise relative min-h-screen overflow-x-hidden text-white selection:bg-[var(--aw-accent)]/20">
-      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)' }}></div>
+      <div style={{ position: 'sticky', top: 0, zIndex: 60, background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}></div>
 
       <main className="mx-auto w-full max-w-[1460px] space-y-10 px-4 py-12 md:px-8 relative z-10">
 

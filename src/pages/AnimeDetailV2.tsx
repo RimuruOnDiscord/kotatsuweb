@@ -1603,7 +1603,7 @@ const AnimeDetailV2: React.FC = () => {
   if (loading) {
     return (
       <div className="aw-root aw-noise relative min-h-screen pb-20">
-        <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: 'none', background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)' }} />
+        <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: 'none', background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }} />
         <motion.div initial="hidden" animate="visible" exit="exit" variants={containerVariants} className="relative z-10 mx-auto w-full max-w-[1460px] px-4 pt-8">
           <div className="flex flex-col md:flex-row gap-8 lg:gap-12 mb-12">
             <motion.div variants={itemVariants} className="w-full md:w-[17.5rem] lg:w-[20.125rem] flex-shrink-0 aw-skeleton-card aspect-[2/3] rounded-[16px]" />
@@ -1648,7 +1648,7 @@ const AnimeDetailV2: React.FC = () => {
 
   return (
     <div className="aw-root aw-noise relative min-h-screen text-white pb-20 md:pb-20 selection:bg-[var(--aw-accent)]/20">
-      <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: 'none', background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)' }} />
+      <div style={{ position: 'sticky', top: 0, zIndex: 60, borderBottom: 'none', background: 'color-mix(in srgb, var(--aw-bg), transparent 15%)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }} />
 
       {/* ── MOBILE HERO (Crunchyroll-style) ── */}
       <div className="md:hidden">
@@ -2874,7 +2874,7 @@ const AnimeDetailV2: React.FC = () => {
       <AnimatePresence>
         {isCoverOpen && (
           <motion.div
-            style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(16px)' }}
+            style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
